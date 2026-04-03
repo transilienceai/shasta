@@ -1,0 +1,38 @@
+[project]
+name = "shasta"
+version = "0.1.0"
+description = "AWS compliance automation platform — SOC 2 gap analysis, remediation, and continuous compliance"
+requires-python = ">=3.11"
+dependencies = [
+    "boto3>=1.35.0",
+    "rich>=13.9.0",
+    "jinja2>=3.1.0",
+    "xhtml2pdf>=0.2.17",
+    "pydantic>=2.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "moto[all]>=5.0",
+    "ruff>=0.8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/shasta"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
