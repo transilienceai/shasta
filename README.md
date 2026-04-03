@@ -448,7 +448,7 @@ In every case, the pattern was: error → diagnose → fix → continue. No erro
 | **Lines of code written** | 10,537 |
 | **Files created** | 67 |
 | **Python modules** | 22 |
-| **Claude Code skills** | 14 (11 user-facing + 3 planned) |
+| **Claude Code skills** | 11 user-facing (in `.claude/skills/`) |
 | **Terraform resources deployed** | ~55 (test env + monitoring) |
 | **AWS services integrated** | 15 (IAM, EC2, S3, RDS, Lambda, CloudTrail, GuardDuty, Config, Inspector, SecurityHub, EventBridge, SNS, KMS, ECS, CloudWatch) |
 | **SOC 2 controls covered** | 13 (8 automated + 5 policy-only) |
@@ -493,7 +493,7 @@ shasta/
 ├── README.md                              # This file
 ├── pyproject.toml                         # Python project configuration
 │
-├── skills/                                # Claude Code skills (user interface)
+├── .claude/skills/                        # Claude Code skills (auto-discovered)
 │   ├── connect-aws.md                     # AWS connection and validation
 │   ├── scan.md                            # Full compliance scan
 │   ├── gap-analysis.md                    # Interactive gap analysis

@@ -18,8 +18,11 @@ data/
 infra/test-env/lambda/*.zip
 infra/test-env/data/
 
-# Claude Code
-.claude/
+# Claude Code (user-local data, not skills)
+.claude/projects/
+.claude/plans/
+.claude/memory/
+.claude/settings.json
 
 # IDE
 .vscode/

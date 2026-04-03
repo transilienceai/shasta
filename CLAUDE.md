@@ -10,7 +10,7 @@ Shasta is a Claude Code-native SOC 2 compliance platform. It scans AWS environme
 
 ## Project layout
 - `src/shasta/` — core Python library
-- `skills/` — Claude Code skill definitions
+- `.claude/skills/` — Claude Code skill definitions
 - `tests/` — pytest test suite (uses moto for AWS mocking)
 - `data/` — runtime data (gitignored)
 
