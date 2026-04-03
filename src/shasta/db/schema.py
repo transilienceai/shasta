@@ -53,6 +53,31 @@ CREATE TABLE IF NOT EXISTS evidence (
     FOREIGN KEY (scan_id) REFERENCES scans(id)
 );
 
+CREATE TABLE IF NOT EXISTS risk_items (
+    risk_id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    category TEXT NOT NULL,
+    likelihood TEXT NOT NULL,
+    impact TEXT NOT NULL,
+    risk_score INTEGER NOT NULL,
+    risk_level TEXT NOT NULL,
+    owner TEXT,
+    treatment TEXT NOT NULL,
+    treatment_plan TEXT,
+    status TEXT NOT NULL,
+    soc2_controls TEXT,  -- JSON array
+    related_finding TEXT,
+    created_date TEXT NOT NULL,
+    last_reviewed TEXT NOT NULL,
+    review_notes TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_risk_items_account ON risk_items(account_id);
+CREATE INDEX IF NOT EXISTS idx_risk_items_status ON risk_items(status);
+CREATE INDEX IF NOT EXISTS idx_risk_items_level ON risk_items(risk_level);
+
 CREATE INDEX IF NOT EXISTS idx_findings_scan ON findings(scan_id);
 CREATE INDEX IF NOT EXISTS idx_findings_status ON findings(status);
 CREATE INDEX IF NOT EXISTS idx_findings_domain ON findings(domain);
@@ -206,6 +231,22 @@ class ShastaDB:
         params.append(limit)
 
         rows = self.conn.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def save_risk_items(self, items: list, account_id: str) -> None:
+        """Save risk register items to the database."""
+        for item in items:
+            self.conn.execute(
+                "INSERT OR REPLACE INTO risk_items (risk_id, account_id, title, description, category, likelihood, impact, risk_score, risk_level, owner, treatment, treatment_plan, status, soc2_controls, related_finding, created_date, last_reviewed, review_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (item.risk_id, account_id, item.title, item.description, item.category, item.likelihood, item.impact, item.risk_score, item.risk_level, item.owner, item.treatment, item.treatment_plan, item.status, json.dumps(item.soc2_controls), item.related_finding, item.created_date, item.last_reviewed, item.review_notes),
+            )
+        self.conn.commit()
+
+    def get_risk_items(self, account_id: str) -> list[dict]:
+        """Get all risk items for an account."""
+        rows = self.conn.execute(
+            "SELECT * FROM risk_items WHERE account_id = ? ORDER BY risk_score DESC", (account_id,)
+        ).fetchall()
         return [dict(row) for row in rows]
 
     def get_recent_scan(self, max_age_minutes: int = 60, account_id: str | None = None) -> ScanResult | None:

@@ -16,13 +16,18 @@ from shasta.evidence.models import CheckDomain, Finding, ScanResult
 def run_full_scan(
     client: AWSClient,
     domains: list[CheckDomain] | None = None,
+    framework: str = "soc2",  # "soc2", "iso27001", or "both"
     include_github: bool = False,
     github_token: str | None = None,
     github_repos: list[str] | None = None,
 ) -> ScanResult:
     """Run compliance checks across specified domains (or all if None).
 
-    Returns a ScanResult with all findings, enriched with SOC 2 control mappings.
+    Args:
+        framework: Which compliance framework to map findings to.
+            "soc2" — SOC 2 Trust Service Criteria (default)
+            "iso27001" — ISO 27001:2022 Annex A
+            "both" — map to both frameworks simultaneously
     """
     if domains is None:
         domains = [
@@ -65,8 +70,12 @@ def run_full_scan(
         from shasta.integrations.github import run_github_checks
         scan.findings.extend(run_github_checks(github_token, github_repos))
 
-    # Enrich any findings missing SOC 2 control mappings
-    enrich_findings_with_controls(scan.findings)
+    # Enrich findings with compliance framework mappings
+    if framework in ("soc2", "both"):
+        enrich_findings_with_controls(scan.findings)
+    if framework in ("iso27001", "both"):
+        from shasta.compliance.iso27001_mapper import enrich_findings_with_iso27001
+        enrich_findings_with_iso27001(scan.findings)
 
     scan.complete()
     return scan
