@@ -15,7 +15,7 @@ Deploy Shasta to scan your AWS environment for SOC 2 compliance. This guide walk
 ## Step 1: Clone and Install
 
 ```bash
-git clone https://guthub.com/kkmookhey/shasta
+git clone https://github.com/kkmookhey/shasta
 cd shasta
 pip install -e ".[dev]"
 ```
