@@ -1,0 +1,69 @@
+[project]
+name = "transilience-communitytools-compliance"
+version = "0.1.0"
+description = "AWS-first open-source compliance automation toolkit for SOC 2 and ISO 27001 workflows."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+  { name = "Transilience AI" },
+]
+maintainers = [
+  { name = "Transilience AI", email = "contact@transilience.ai" },
+]
+keywords = ["aws", "compliance", "soc2", "iso27001", "security", "governance"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Information Technology",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Security",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: System :: Systems Administration",
+]
+dependencies = [
+  "boto3>=1.35.0",
+  "jinja2>=3.1.0",
+  "pydantic>=2.9.0",
+  "rich>=13.9.0",
+  "xhtml2pdf>=0.2.17",
+]
+
+[project.optional-dependencies]
+dev = [
+  "moto[all]>=5.0",
+  "pytest>=8.0",
+  "pytest-asyncio>=0.24",
+  "ruff>=0.8.0",
+]
+
+[project.scripts]
+transilience-compliance = "transilience_compliance.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/transilienceai/transilience-communitytools-compliance"
+Repository = "https://github.com/transilienceai/transilience-communitytools-compliance"
+Issues = "https://github.com/transilienceai/transilience-communitytools-compliance/issues"
+Documentation = "https://github.com/transilienceai/transilience-communitytools-compliance/tree/main/docs"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/transilience_compliance"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E9", "F63", "F7", "F82"]

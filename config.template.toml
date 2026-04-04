@@ -1,0 +1,11 @@
+# Deprecated template path. Prefer examples/config.example.toml.
+aws_profile = "compliance"
+aws_region = "us-east-1"
+company_name = "Example Co"
+output_dir = "data"
+github_repos = ["example-org/example-repo"]
+slack_webhook_url = ""
+jira_base_url = ""
+jira_email = ""
+jira_project_key = ""
+python_cmd = "python3"

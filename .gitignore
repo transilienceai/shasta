@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Runtime data
+data/
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+infra/test-env/lambda/*.zip
+infra/test-env/data/
+
+# Claude Code (user-local data, not skills)
+.claude/projects/
+.claude/plans/
+.claude/memory/
+.claude/settings.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# User-specific config
+config.toml
+shasta.config.json
