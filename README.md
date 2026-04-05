@@ -1,8 +1,8 @@
-# Shasta — AWS Compliance Automation Platform for SOC 2
+# Shasta — Multi-Cloud Compliance Automation Platform for SOC 2 & ISO 27001
 
-**An AI-native compliance toolkit that enables startup founders to achieve and maintain SOC 2 compliance through their terminal.**
+**An AI-native compliance toolkit that enables startup founders to achieve and maintain SOC 2 and ISO 27001 compliance across AWS and Azure through their terminal.**
 
-Shasta is not a SaaS dashboard. It's a set of Claude Code skills, Python libraries, and AWS infrastructure that uses AI as the interface — explaining findings in plain English, generating tailored policies, producing Terraform remediation code, and delivering personalized threat intelligence. Built for founders running <50 employee companies who need SOC 2 without the $30K/year Vanta bill.
+Shasta is not a SaaS dashboard. It's a set of Claude Code skills, Python libraries, and cloud infrastructure that uses AI as the interface — explaining findings in plain English, generating tailored policies, producing Terraform remediation code, and delivering personalized threat intelligence. Built for founders running <50 employee companies who need SOC 2 without the $30K/year Vanta bill.
 
 ---
 
@@ -22,7 +22,9 @@ Shasta is not a SaaS dashboard. It's a set of Claude Code skills, Python librari
 
 ## Platform Capabilities
 
-### 1. Automated AWS Security Scanning (5 Domains, 40+ Checks)
+### 1. Multi-Cloud Security Scanning (5 Domains, 60+ Checks)
+
+#### AWS Checks (40+)
 
 | Domain | Checks | SOC 2 Controls |
 |--------|--------|----------------|
@@ -32,7 +34,17 @@ Shasta is not a SaaS dashboard. It's a set of Claude Code skills, Python librari
 | **Encryption** | EBS encryption by default, EBS volume encryption, RDS encryption at rest, RDS public access, RDS backups | CC6.6, CC6.7 |
 | **Monitoring** | CloudTrail configuration, GuardDuty status, AWS Config recording, Inspector vulnerability scanning | CC7.1, CC7.2, CC8.1 |
 
-Every check produces a `Finding` object with: severity, compliance status, resource ID, SOC 2 control mapping, plain-English description, and remediation guidance.
+#### Azure Checks (22)
+
+| Domain | Checks | SOC 2 Controls |
+|--------|--------|----------------|
+| **Identity & Access** | Conditional Access MFA, privileged directory roles, RBAC least privilege, inactive users, guest access, service principal hygiene | CC6.1, CC6.2, CC6.3 |
+| **Networking** | NSG unrestricted ingress, NSG default rules, VNet/NSG flow logs, public IP exposure | CC6.6 |
+| **Storage** | Storage account encryption (TLS), HTTPS enforcement, blob public access, soft delete & versioning | CC6.7 |
+| **Encryption** | Managed disk encryption, SQL TDE, Key Vault config (purge protection), SQL public access | CC6.6, CC6.7 |
+| **Monitoring** | Activity Log export, Microsoft Defender for Cloud, Azure Policy compliance, Monitor alerts | CC7.1, CC7.2, CC8.1 |
+
+Every check produces a `Finding` object with: severity, compliance status, resource ID, cloud provider, SOC 2 control mapping, plain-English description, and remediation guidance.
 
 ### 2. SOC 2 Compliance Framework
 
@@ -138,16 +150,16 @@ Attack surface analysis that produces auditor-grade pen test evidence:
 │                      Claude Code CLI                            │
 │                (Orchestrator / User Interface)                   │
 ├────────────────────────────────────────────────────────────────┤
-│  Skills (14 user-facing commands)                               │
-│  /connect-aws  /scan  /gap-analysis  /report  /remediate       │
-│  /policy-gen   /review-access  /evidence  /sbom                │
-│  /threat-advisory  /pentest                                     │
+│  Skills (15 user-facing commands)                               │
+│  /connect-aws  /connect-azure  /scan  /gap-analysis  /report  │
+│  /remediate  /policy-gen  /review-access  /evidence  /sbom     │
+│  /threat-advisory  /pentest  /risk-register  /iso27001         │
 ├────────────────────────────────────────────────────────────────┤
 │  Integrations          │  Threat Intelligence                   │
 │  GitHub, Slack, Jira   │  NVD, CISA KEV, OSV.dev, GitHub Adv. │
 ├────────────────────────────────────────────────────────────────┤
 │  Core Libraries (Python)                                        │
-│  aws/  compliance/  evidence/  remediation/  reports/           │
+│  aws/  azure/  compliance/  evidence/  remediation/  reports/  │
 │  policies/  sbom/  threat_intel/  workflows/  integrations/    │
 ├────────────────────────────────────────────────────────────────┤
 │  Continuous Monitoring (AWS-native)                              │
@@ -157,9 +169,11 @@ Attack surface analysis that produces auditor-grade pen test evidence:
 │  Data Layer                                                     │
 │  SQLite DB  │  JSON Evidence  │  CycloneDX SBOM  │  Reports   │
 └────────────────────────────────────────────────────────────────┘
-         │
-         ▼
-    AWS Account (42 read-only API permissions via boto3)
+         │                              │
+         ▼                              ▼
+    AWS Account                   Azure Subscription
+    (42 read-only permissions     (DefaultAzureCredential
+     via boto3)                    via azure-identity)
 ```
 
 ### Design Principles
@@ -178,19 +192,26 @@ Attack surface analysis that produces auditor-grade pen test evidence:
 # 1. Clone and install
 git clone https://github.com/kkmookhey/shasta.git
 cd shasta
-pip install -e ".[dev]"
+pip install -e ".[dev]"           # Core + dev tools
+pip install -e ".[azure]"         # Add Azure support (optional)
+pip install -e ".[dev,azure]"     # Everything
 
-# 2. Configure AWS (read-only access)
+# 2a. Configure AWS (read-only access)
 aws configure --profile shasta
 # Or use the scoped policy: infra/shasta-scanning-policy.json (42 permissions)
 
+# 2b. Configure Azure (read access via az login)
+az login
+az account show   # Note your subscription_id and tenant_id
+
 # 3. Open Claude Code and run
-/connect-aws    # Validate credentials, discover services
-/scan           # Full SOC 2 compliance scan
-/gap-analysis   # Interactive gap analysis with AI guidance
-/report         # Generate PDF/HTML/MD reports
-/remediate      # Get Terraform fixes for findings
-/policy-gen     # Generate 8 SOC 2 policy documents
+/connect-aws      # Validate AWS credentials, discover services
+/connect-azure    # Validate Azure credentials, discover services
+/scan             # Full SOC 2 compliance scan (AWS, Azure, or both)
+/gap-analysis     # Interactive gap analysis with AI guidance
+/report           # Generate PDF/HTML/MD reports
+/remediate        # Get Terraform fixes for findings
+/policy-gen       # Generate 8 SOC 2 policy documents
 ```
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for the complete setup guide including exact IAM permissions.
@@ -202,7 +223,8 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for the complete setup guide including exact 
 | Skill | Description | Output |
 |-------|-------------|--------|
 | `/connect-aws` | Validate AWS credentials, discover account topology and services | Account info, service list |
-| `/scan` | Run all compliance checks (IAM, network, storage, encryption, monitoring) | Findings with AI explanations |
+| `/connect-azure` | Validate Azure credentials, discover subscription and services | Subscription info, service list |
+| `/scan` | Run all compliance checks across AWS and/or Azure (IAM, network, storage, encryption, monitoring) | Findings with AI explanations |
 | `/gap-analysis` | Interactive SOC 2 gap analysis with control-by-control walkthrough | Gap analysis report |
 | `/report` | Generate compliance reports in all formats | MD, HTML, PDF files |
 | `/remediate` | Interactive remediation with Terraform code and step-by-step instructions | Terraform bundle + guidance |
@@ -448,11 +470,12 @@ In every case, the pattern was: error → diagnose → fix → continue. No erro
 | **Lines of code written** | 10,537 |
 | **Files created** | 67 |
 | **Python modules** | 22 |
-| **Claude Code skills** | 11 user-facing (in `.claude/skills/`) |
+| **Claude Code skills** | 15 user-facing (in `.claude/skills/`) |
 | **Terraform resources deployed** | ~55 (test env + monitoring) |
 | **AWS services integrated** | 15 (IAM, EC2, S3, RDS, Lambda, CloudTrail, GuardDuty, Config, Inspector, SecurityHub, EventBridge, SNS, KMS, ECS, CloudWatch) |
+| **Azure services integrated** | 10 (Entra ID, Network, Storage, Compute, SQL, Key Vault, Monitor, Defender, Policy, Authorization) |
 | **SOC 2 controls covered** | 13 (8 automated + 5 policy-only) |
-| **Automated checks** | 40+ |
+| **Automated checks** | 60+ (40+ AWS, 22 Azure) |
 | **Control tests** | 17 |
 | **Policy templates** | 8 |
 | **Terraform remediation templates** | 14 |
@@ -494,8 +517,9 @@ shasta/
 ├── pyproject.toml                         # Python project configuration
 │
 ├── .claude/skills/                        # Claude Code skills (auto-discovered)
-│   ├── connect-aws.md                     # AWS connection and validation
-│   ├── scan.md                            # Full compliance scan
+│   ├── connect-aws/SKILL.md               # AWS connection and validation
+│   ├── connect-azure/SKILL.md             # Azure connection and validation
+│   ├── scan/SKILL.md                      # Full compliance scan (AWS + Azure)
 │   ├── gap-analysis.md                    # Interactive gap analysis
 │   ├── report.md                          # Report generation (MD/HTML/PDF)
 │   ├── remediate.md                       # Terraform remediation guidance
@@ -507,7 +531,7 @@ shasta/
 │   └── pentest.md                         # Automated security assessment
 │
 ├── src/shasta/
-│   ├── scanner.py                         # Scan orchestrator
+│   ├── scanner.py                         # Multi-cloud scan orchestrator
 │   ├── aws/                               # AWS interaction layer
 │   │   ├── client.py                      # boto3 session management
 │   │   ├── iam.py                         # IAM security checks (7 functions)
@@ -517,7 +541,14 @@ shasta/
 │   │   ├── logging_checks.py             # CloudTrail/GuardDuty/Config checks
 │   │   ├── vulnerabilities.py            # AWS Inspector integration
 │   │   └── pentest.py                     # Attack surface analysis
-│   ├── compliance/                        # SOC 2 framework
+│   ├── azure/                             # Azure interaction layer
+│   │   ├── client.py                      # Azure SDK session management
+│   │   ├── iam.py                         # Entra ID + RBAC checks (6 functions)
+│   │   ├── networking.py                  # NSG + VNet checks (4 functions)
+│   │   ├── storage.py                     # Storage account checks (4 functions)
+│   │   ├── encryption.py                  # Disk/SQL/KeyVault checks (4 functions)
+│   │   └── monitoring.py                  # Activity Log/Defender/Policy checks (4 functions)
+│   ├── compliance/                        # SOC 2 + ISO 27001 framework
 │   │   ├── framework.py                   # Control definitions (13 controls)
 │   │   ├── mapper.py                      # Finding → control mapping
 │   │   ├── scorer.py                      # Compliance scoring engine
@@ -549,12 +580,14 @@ shasta/
 │       └── schema.py                      # SQLite schema + CRUD operations
 │
 ├── infra/
-│   ├── shasta-scanning-policy.json        # IAM policy (42 read-only permissions)
-│   └── test-env/
-│       ├── main.tf                        # Test resources (compliant + non-compliant)
-│       ├── monitoring.tf                  # Config Rules, EventBridge, SecurityHub, Inspector
-│       └── lambda/
-│           └── alert_forwarder.py         # SNS → Slack + Jira Lambda
+│   ├── shasta-scanning-policy.json        # AWS IAM policy (42 read-only permissions)
+│   ├── test-env/                          # AWS test environment
+│   │   ├── main.tf                        # Test resources (compliant + non-compliant)
+│   │   ├── monitoring.tf                  # Config Rules, EventBridge, SecurityHub, Inspector
+│   │   └── lambda/
+│   │       └── alert_forwarder.py         # SNS → Slack + Jira Lambda
+│   └── azure-test-env/                    # Azure test environment
+│       └── main.tf                        # Azure test resources (compliant + non-compliant)
 │
 ├── tests/                                 # pytest test suite
 │   ├── conftest.py
@@ -577,15 +610,16 @@ shasta/
 ## What's Next
 
 ### Immediate Improvements
-- [ ] Risk register workflow (CSV/JSON-based, with tracking)
+- [x] ~~Risk register workflow~~ (completed)
+- [x] ~~ISO 27001 framework mapping~~ (completed)
+- [x] ~~Azure scanning modules~~ (completed — 22 checks across 5 domains)
 - [ ] Vendor inventory management (active tracking, not just policy)
 - [ ] EBS snapshot encryption checks
 - [ ] RDS snapshot public access checks
 - [ ] Multi-region scanning support
 
 ### Medium Term
-- [ ] GCP and Azure scanning modules
-- [ ] ISO 27001 framework mapping
+- [ ] GCP scanning modules
 - [ ] HIPAA control framework
 - [ ] Security questionnaire auto-fill from evidence
 - [ ] Employee onboarding/offboarding tracking

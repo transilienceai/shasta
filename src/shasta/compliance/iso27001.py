@@ -1,6 +1,6 @@
 """ISO 27001:2022 Annex A control framework definitions.
 
-Maps existing Shasta AWS checks to ISO 27001:2022 Annex A controls.
+Maps Shasta cloud checks (AWS + Azure) to ISO 27001:2022 Annex A controls.
 Same scanner, same findings — different compliance framework view.
 
 ISO 27001:2022 has 93 controls organized into 4 themes:
@@ -97,8 +97,12 @@ ISO27001_CONTROLS: dict[str, ISO27001Control] = {
         title="Access control",
         description="Rules to control physical and logical access to information and other associated assets shall be established and implemented.",
         theme=ISO27001Theme.ORGANIZATIONAL,
-        check_ids=["iam-password-policy", "iam-user-mfa", "iam-root-mfa"],
-        guidance="Enforce strong authentication: MFA for all users, robust password policy, secured root account.",
+        check_ids=[
+            "iam-password-policy", "iam-user-mfa", "iam-root-mfa",
+            # Azure
+            "azure-conditional-access-mfa", "azure-privileged-roles",
+        ],
+        guidance="Enforce strong authentication: MFA for all users, robust password policy, secured root/admin accounts.",
         soc2_equivalent=["CC6.1"],
     ),
     "A.5.16": ISO27001Control(
@@ -106,8 +110,12 @@ ISO27001_CONTROLS: dict[str, ISO27001Control] = {
         title="Identity management",
         description="The full lifecycle of identities shall be managed.",
         theme=ISO27001Theme.ORGANIZATIONAL,
-        check_ids=["iam-no-direct-policies", "iam-overprivileged-user"],
-        guidance="Manage IAM identities through groups/roles with least privilege. No direct policy attachments.",
+        check_ids=[
+            "iam-no-direct-policies", "iam-overprivileged-user",
+            # Azure
+            "azure-rbac-least-privilege", "azure-service-principal-hygiene",
+        ],
+        guidance="Manage identities through groups/roles with least privilege. No direct policy attachments or overprivileged RBAC assignments.",
         soc2_equivalent=["CC6.2"],
     ),
     "A.5.17": ISO27001Control(
@@ -115,8 +123,12 @@ ISO27001_CONTROLS: dict[str, ISO27001Control] = {
         title="Authentication information",
         description="Allocation and management of authentication information shall be controlled.",
         theme=ISO27001Theme.ORGANIZATIONAL,
-        check_ids=["iam-password-policy", "iam-access-key-rotation"],
-        guidance="Password policy meets complexity standards, access keys are rotated within 90 days.",
+        check_ids=[
+            "iam-password-policy", "iam-access-key-rotation",
+            # Azure
+            "azure-service-principal-hygiene",
+        ],
+        guidance="Password policy meets complexity standards, access keys and service principal credentials are rotated regularly.",
         soc2_equivalent=["CC6.1", "CC6.3"],
     ),
     "A.5.18": ISO27001Control(
@@ -124,8 +136,12 @@ ISO27001_CONTROLS: dict[str, ISO27001Control] = {
         title="Access rights",
         description="Access rights to information and assets shall be provisioned, reviewed, modified, and removed in accordance with the organization's access control policy.",
         theme=ISO27001Theme.ORGANIZATIONAL,
-        check_ids=["iam-inactive-user", "iam-access-key-rotation"],
-        guidance="Review access quarterly, remove inactive users, rotate keys. Use /review-access for formal reviews.",
+        check_ids=[
+            "iam-inactive-user", "iam-access-key-rotation",
+            # Azure
+            "azure-inactive-users", "azure-guest-access",
+        ],
+        guidance="Review access quarterly, remove inactive users and stale guests, rotate keys. Use /review-access for formal reviews.",
         soc2_equivalent=["CC6.3"],
     ),
     "A.5.19": ISO27001Control(
@@ -146,8 +162,12 @@ ISO27001_CONTROLS: dict[str, ISO27001Control] = {
             "cloudtrail-enabled", "guardduty-enabled", "config-enabled",
             "iam-password-policy", "iam-user-mfa",
             "s3-encryption-at-rest", "sg-no-unrestricted-ingress",
+            # Azure
+            "azure-activity-log", "azure-defender-enabled", "azure-policy-compliance",
+            "azure-conditional-access-mfa",
+            "azure-storage-encryption", "azure-nsg-unrestricted-ingress",
         ],
-        guidance="This is the catch-all cloud security control. Your full Shasta scan covers this comprehensively.",
+        guidance="This is the catch-all cloud security control. Your full Shasta scan covers this comprehensively across AWS and Azure.",
         soc2_equivalent=["CC6.1", "CC6.6", "CC6.7", "CC7.1"],
     ),
     "A.5.24": ISO27001Control(
@@ -156,8 +176,8 @@ ISO27001_CONTROLS: dict[str, ISO27001Control] = {
         description="The organization shall plan and prepare for managing information security incidents.",
         theme=ISO27001Theme.ORGANIZATIONAL,
         requires_policy=True,
-        check_ids=["guardduty-enabled"],
-        guidance="Your Incident Response Plan + GuardDuty for automated detection. Test the plan annually.",
+        check_ids=["guardduty-enabled", "azure-defender-enabled"],
+        guidance="Your Incident Response Plan + GuardDuty/Defender for automated detection. Test the plan annually.",
         soc2_equivalent=["CC7.1", "CC7.2"],
     ),
     "A.5.29": ISO27001Control(
@@ -205,7 +225,7 @@ ISO27001_CONTROLS: dict[str, ISO27001Control] = {
         title="Responsibilities after termination or change of employment",
         description="Information security responsibilities that remain valid after termination or change shall be defined, enforced, and communicated.",
         theme=ISO27001Theme.PEOPLE,
-        check_ids=["iam-inactive-user"],
+        check_ids=["iam-inactive-user", "azure-inactive-users"],
         guidance="Revoke access within 24 hours of termination. Access review catches lingering accounts.",
         soc2_equivalent=["CC6.3"],
     ),
@@ -226,8 +246,12 @@ ISO27001_CONTROLS: dict[str, ISO27001Control] = {
         title="Information access restriction",
         description="Access to information and application functions shall be restricted in accordance with the access control policy.",
         theme=ISO27001Theme.TECHNOLOGICAL,
-        check_ids=["iam-overprivileged-user", "s3-public-access-block"],
-        guidance="Least privilege enforced through IAM. S3 public access blocked. No admin policies on regular users.",
+        check_ids=[
+            "iam-overprivileged-user", "s3-public-access-block",
+            # Azure
+            "azure-rbac-least-privilege", "azure-blob-public-access",
+        ],
+        guidance="Least privilege enforced through IAM/RBAC. Storage public access blocked. No admin policies on regular users.",
         soc2_equivalent=["CC6.2", "CC6.7"],
     ),
     "A.8.5": ISO27001Control(
@@ -235,7 +259,11 @@ ISO27001_CONTROLS: dict[str, ISO27001Control] = {
         title="Secure authentication",
         description="Secure authentication technologies and procedures shall be established and implemented.",
         theme=ISO27001Theme.TECHNOLOGICAL,
-        check_ids=["iam-root-mfa", "iam-user-mfa", "iam-password-policy"],
+        check_ids=[
+            "iam-root-mfa", "iam-user-mfa", "iam-password-policy",
+            # Azure
+            "azure-conditional-access-mfa",
+        ],
         guidance="MFA on all accounts, strong password policy, no shared credentials.",
         soc2_equivalent=["CC6.1"],
     ),
@@ -244,8 +272,12 @@ ISO27001_CONTROLS: dict[str, ISO27001Control] = {
         title="Configuration management",
         description="Configurations, including security configurations, of hardware, software, services, and networks shall be established, documented, maintained, and reviewed.",
         theme=ISO27001Theme.TECHNOLOGICAL,
-        check_ids=["config-enabled", "cloudtrail-enabled"],
-        guidance="AWS Config records all resource configurations. CloudTrail logs all changes.",
+        check_ids=[
+            "config-enabled", "cloudtrail-enabled",
+            # Azure
+            "azure-policy-compliance", "azure-activity-log",
+        ],
+        guidance="AWS Config / Azure Policy records resource configurations. CloudTrail / Activity Log logs all changes.",
         soc2_equivalent=["CC7.1", "CC8.1"],
     ),
     "A.8.12": ISO27001Control(
@@ -253,8 +285,12 @@ ISO27001_CONTROLS: dict[str, ISO27001Control] = {
         title="Data leakage prevention",
         description="Data leakage prevention measures shall be applied to systems, networks, and any other devices that process, store, or transmit sensitive information.",
         theme=ISO27001Theme.TECHNOLOGICAL,
-        check_ids=["s3-public-access-block", "s3-ssl-only", "rds-no-public-access"],
-        guidance="Block public S3 access, enforce SSL, keep databases private.",
+        check_ids=[
+            "s3-public-access-block", "s3-ssl-only", "rds-no-public-access",
+            # Azure
+            "azure-blob-public-access", "azure-storage-https-only", "azure-sql-public-access",
+        ],
+        guidance="Block public storage access, enforce SSL/TLS, keep databases private.",
         soc2_equivalent=["CC6.6", "CC6.7"],
     ),
     "A.8.15": ISO27001Control(
@@ -262,8 +298,12 @@ ISO27001_CONTROLS: dict[str, ISO27001Control] = {
         title="Logging",
         description="Logs that record activities, exceptions, faults, and other relevant events shall be produced, stored, protected, and analysed.",
         theme=ISO27001Theme.TECHNOLOGICAL,
-        check_ids=["cloudtrail-enabled", "vpc-flow-logs-enabled"],
-        guidance="CloudTrail for API activity, VPC flow logs for network traffic. Minimum 1 year retention.",
+        check_ids=[
+            "cloudtrail-enabled", "vpc-flow-logs-enabled",
+            # Azure
+            "azure-activity-log", "azure-vnet-flow-logs",
+        ],
+        guidance="CloudTrail / Activity Log for API activity, VPC / NSG flow logs for network traffic. Minimum 1 year retention.",
         soc2_equivalent=["CC7.1"],
     ),
     "A.8.16": ISO27001Control(
@@ -271,8 +311,12 @@ ISO27001_CONTROLS: dict[str, ISO27001Control] = {
         title="Monitoring activities",
         description="Networks, systems, and applications shall be monitored for anomalous behaviour and appropriate actions taken.",
         theme=ISO27001Theme.TECHNOLOGICAL,
-        check_ids=["guardduty-enabled", "guardduty-no-active-findings"],
-        guidance="GuardDuty for ML-based threat detection. Review and respond to all findings.",
+        check_ids=[
+            "guardduty-enabled", "guardduty-no-active-findings",
+            # Azure
+            "azure-defender-enabled", "azure-monitor-alerts",
+        ],
+        guidance="GuardDuty / Defender for ML-based threat detection. Review and respond to all findings.",
         soc2_equivalent=["CC7.2"],
     ),
     "A.8.20": ISO27001Control(
@@ -280,8 +324,12 @@ ISO27001_CONTROLS: dict[str, ISO27001Control] = {
         title="Networks security",
         description="Networks and network devices shall be secured, managed, and controlled to protect information in systems and applications.",
         theme=ISO27001Theme.TECHNOLOGICAL,
-        check_ids=["sg-no-unrestricted-ingress", "vpc-flow-logs-enabled", "sg-default-restricted"],
-        guidance="Restrict security groups, enable flow logs, lock down default SGs.",
+        check_ids=[
+            "sg-no-unrestricted-ingress", "vpc-flow-logs-enabled", "sg-default-restricted",
+            # Azure
+            "azure-nsg-unrestricted-ingress", "azure-vnet-flow-logs", "azure-nsg-default-restricted",
+        ],
+        guidance="Restrict security groups / NSGs, enable flow logs, lock down default rules.",
         soc2_equivalent=["CC6.6"],
     ),
     "A.8.21": ISO27001Control(
@@ -289,7 +337,11 @@ ISO27001_CONTROLS: dict[str, ISO27001Control] = {
         title="Security of network services",
         description="Security mechanisms, service levels, and service requirements of network services shall be identified, implemented, and monitored.",
         theme=ISO27001Theme.TECHNOLOGICAL,
-        check_ids=["s3-ssl-only", "sg-no-unrestricted-ingress"],
+        check_ids=[
+            "s3-ssl-only", "sg-no-unrestricted-ingress",
+            # Azure
+            "azure-storage-https-only", "azure-nsg-unrestricted-ingress",
+        ],
         guidance="Enforce TLS everywhere. Restrict network service access to known sources.",
         soc2_equivalent=["CC6.6", "CC6.7"],
     ),
@@ -301,8 +353,11 @@ ISO27001_CONTROLS: dict[str, ISO27001Control] = {
         check_ids=[
             "s3-encryption-at-rest", "ebs-encryption-by-default",
             "ebs-volume-encrypted", "rds-encryption-at-rest",
+            # Azure
+            "azure-storage-encryption", "azure-disk-encryption",
+            "azure-sql-tde", "azure-keyvault-config",
         ],
-        guidance="Encrypt everything at rest (S3, EBS, RDS) using KMS. Encrypt in transit with TLS.",
+        guidance="Encrypt everything at rest (S3/Storage, EBS/Disks, RDS/SQL) using KMS/Key Vault. Encrypt in transit with TLS.",
         soc2_equivalent=["CC6.7"],
     ),
     "A.8.25": ISO27001Control(
@@ -337,8 +392,12 @@ ISO27001_CONTROLS: dict[str, ISO27001Control] = {
         title="Change management",
         description="Changes to information processing facilities and information systems shall be subject to change management procedures.",
         theme=ISO27001Theme.TECHNOLOGICAL,
-        check_ids=["cloudtrail-enabled", "config-enabled"],
-        guidance="CloudTrail logs all API changes. AWS Config tracks configuration drift. Your Change Management Policy documents the process.",
+        check_ids=[
+            "cloudtrail-enabled", "config-enabled",
+            # Azure
+            "azure-activity-log", "azure-policy-compliance",
+        ],
+        guidance="CloudTrail / Activity Log logs all API changes. Config / Policy tracks configuration drift. Your Change Management Policy documents the process.",
         soc2_equivalent=["CC8.1"],
     ),
 }

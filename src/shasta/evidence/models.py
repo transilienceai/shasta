@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 from uuid import uuid4
@@ -30,8 +30,15 @@ class ComplianceStatus(str, Enum):
     NOT_APPLICABLE = "not_applicable"
 
 
+class CloudProvider(str, Enum):
+    """Cloud provider for a finding or scan."""
+
+    AWS = "aws"
+    AZURE = "azure"
+
+
 class CheckDomain(str, Enum):
-    """AWS check domains."""
+    """Compliance check domains (cloud-agnostic)."""
 
     IAM = "iam"
     NETWORKING = "networking"
@@ -43,44 +50,46 @@ class CheckDomain(str, Enum):
 
 
 class Finding(BaseModel):
-    """A single compliance finding from an AWS check.
+    """A single compliance finding from a cloud check.
 
     Each check function produces one or more Findings. A Finding represents
     a specific resource or configuration that was evaluated.
     """
 
     id: str = Field(default_factory=lambda: uuid4().hex[:12])
-    check_id: str  # e.g., "iam-mfa-enabled", "s3-encryption-at-rest"
+    check_id: str  # e.g., "iam-mfa-enabled", "azure-nsg-unrestricted-ingress"
     title: str  # Human-readable title
     description: str  # What was found
     severity: Severity
     status: ComplianceStatus
     domain: CheckDomain
-    resource_type: str  # e.g., "AWS::IAM::User", "AWS::S3::Bucket"
-    resource_id: str  # ARN or identifier of the specific resource
+    resource_type: str  # e.g., "AWS::IAM::User", "Azure::Network::NSG"
+    resource_id: str  # ARN or Azure resource ID
     region: str
-    account_id: str
+    account_id: str  # AWS account ID or Azure subscription ID
+    cloud_provider: CloudProvider = CloudProvider.AWS
     remediation: str = ""  # Brief remediation guidance
     details: dict[str, Any] = Field(default_factory=dict)  # Raw evidence data
     soc2_controls: list[str] = Field(default_factory=list)  # e.g., ["CC6.1", "CC6.2"]
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class ScanResult(BaseModel):
     """Result of a compliance scan across one or more domains."""
 
     id: str = Field(default_factory=lambda: uuid4().hex[:12])
-    account_id: str
+    account_id: str  # AWS account ID or Azure subscription ID
     region: str
+    cloud_provider: CloudProvider = CloudProvider.AWS
     domains_scanned: list[CheckDomain]
     findings: list[Finding] = Field(default_factory=list)
-    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
     summary: ScanSummary | None = None
 
     def complete(self) -> None:
         """Mark the scan as completed and generate summary."""
-        self.completed_at = datetime.now(timezone.utc)
+        self.completed_at = datetime.now(UTC)
         self.summary = ScanSummary.from_findings(self.findings)
 
 
@@ -160,4 +169,4 @@ class Evidence(BaseModel):
     evidence_type: str  # "api_response", "config_snapshot", "policy_document"
     description: str
     data: dict[str, Any] = Field(default_factory=dict)
-    collected_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    collected_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

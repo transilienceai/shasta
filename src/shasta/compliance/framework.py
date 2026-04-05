@@ -49,8 +49,11 @@ SOC2_CONTROLS: dict[str, SOC2Control] = {
             "iam-root-mfa",
             "iam-root-access-keys",
             "iam-user-mfa",
+            # Azure
+            "azure-conditional-access-mfa",
+            "azure-privileged-roles",
         ],
-        guidance="This control requires strong authentication: MFA for all users, a robust password policy, and protected root account credentials.",
+        guidance="This control requires strong authentication: MFA for all users, a robust password policy, and protected root/admin account credentials.",
     ),
     "CC6.2": SOC2Control(
         id="CC6.2",
@@ -60,6 +63,9 @@ SOC2_CONTROLS: dict[str, SOC2Control] = {
         check_ids=[
             "iam-no-direct-policies",
             "iam-overprivileged-user",
+            # Azure
+            "azure-rbac-least-privilege",
+            "azure-service-principal-hygiene",
         ],
         guidance="This control requires least-privilege access: users get only the permissions they need, managed through groups/roles, not direct policy attachments.",
     ),
@@ -71,6 +77,9 @@ SOC2_CONTROLS: dict[str, SOC2Control] = {
         check_ids=[
             "iam-access-key-rotation",
             "iam-inactive-user",
+            # Azure
+            "azure-inactive-users",
+            "azure-guest-access",
         ],
         guidance="This control requires timely removal of access: rotate credentials regularly, disable inactive accounts, and have a process for offboarding.",
     ),
@@ -82,8 +91,14 @@ SOC2_CONTROLS: dict[str, SOC2Control] = {
         check_ids=[
             "sg-no-unrestricted-ingress",
             "vpc-flow-logs-enabled",
+            # Azure
+            "azure-nsg-unrestricted-ingress",
+            "azure-nsg-default-restricted",
+            "azure-vnet-flow-logs",
+            "azure-public-ip-exposure",
+            "azure-sql-public-access",
         ],
-        guidance="This control requires network segmentation: restrict inbound traffic, use private subnets, and enable VPC flow logs for monitoring.",
+        guidance="This control requires network segmentation: restrict inbound traffic, use private subnets/VNets, and enable flow logs for monitoring.",
     ),
     "CC6.7": SOC2Control(
         id="CC6.7",
@@ -95,8 +110,16 @@ SOC2_CONTROLS: dict[str, SOC2Control] = {
             "s3-ssl-only",
             "s3-versioning",
             "s3-public-access-block",
+            # Azure
+            "azure-storage-encryption",
+            "azure-storage-https-only",
+            "azure-blob-public-access",
+            "azure-storage-soft-delete",
+            "azure-disk-encryption",
+            "azure-sql-tde",
+            "azure-keyvault-config",
         ],
-        guidance="This control requires encryption everywhere: data at rest (S3, EBS, RDS), data in transit (TLS/SSL), and access controls on storage.",
+        guidance="This control requires encryption everywhere: data at rest (S3/Storage/Disks), data in transit (TLS/SSL), and access controls on storage.",
     ),
 
     # CC7 — System Operations / Monitoring
@@ -109,8 +132,12 @@ SOC2_CONTROLS: dict[str, SOC2Control] = {
             "cloudtrail-enabled",
             "guardduty-enabled",
             "config-enabled",
+            # Azure
+            "azure-activity-log",
+            "azure-defender-enabled",
+            "azure-policy-compliance",
         ],
-        guidance="This control requires comprehensive logging: CloudTrail for API activity, GuardDuty for threat detection, and AWS Config for configuration tracking.",
+        guidance="This control requires comprehensive logging: CloudTrail/Activity Log for API activity, GuardDuty/Defender for threat detection, and Config/Policy for configuration tracking.",
     ),
     "CC7.2": SOC2Control(
         id="CC7.2",
@@ -120,8 +147,11 @@ SOC2_CONTROLS: dict[str, SOC2Control] = {
         check_ids=[
             "guardduty-enabled",
             "guardduty-no-active-findings",
+            # Azure
+            "azure-defender-enabled",
+            "azure-monitor-alerts",
         ],
-        guidance="This control requires active threat monitoring: GuardDuty for anomaly detection, and a process to review and respond to findings.",
+        guidance="This control requires active threat monitoring: GuardDuty/Defender for anomaly detection, and a process to review and respond to findings.",
     ),
 
     # CC8 — Change Management
@@ -133,9 +163,12 @@ SOC2_CONTROLS: dict[str, SOC2Control] = {
         check_ids=[
             "cloudtrail-enabled",
             "config-enabled",
+            # Azure
+            "azure-activity-log",
+            "azure-policy-compliance",
         ],
         requires_policy=True,
-        guidance="This control requires change tracking: CloudTrail logs all API changes, AWS Config records configuration history, and you need a documented change management policy.",
+        guidance="This control requires change tracking: CloudTrail/Activity Log logs all API changes, Config/Policy records configuration history, and you need a documented change management policy.",
     ),
 
     # Non-automated controls (require policies/processes)

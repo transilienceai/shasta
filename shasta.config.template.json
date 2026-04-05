@@ -1,6 +1,9 @@
 {
   "aws_profile": "",
   "aws_region": "us-east-1",
+  "azure_subscription_id": "",
+  "azure_tenant_id": "",
+  "azure_region": "",
   "python_cmd": "",
   "company_name": "",
   "github_repos": [],
@@ -8,5 +11,5 @@
   "jira_base_url": "",
   "jira_email": "",
   "jira_project_key": "",
-  "_comment": "Leave python_cmd empty for auto-detection (py on Windows, python3 on Unix). Set aws_profile to your AWS CLI profile name."
+  "_comment": "Leave python_cmd empty for auto-detection (py on Windows, python3 on Unix). Set aws_profile to your AWS CLI profile name. Set azure_subscription_id and azure_tenant_id for Azure scanning."
 }

@@ -1,11 +1,12 @@
 # Shasta Deployment Guide
 
-Deploy Shasta to scan your AWS environment for SOC 2 compliance. This guide walks you through setup in under 30 minutes.
+Deploy Shasta to scan your AWS and/or Azure environment for SOC 2 and ISO 27001 compliance. This guide walks you through setup in under 30 minutes.
 
 ## Prerequisites
 
 - **Python 3.11+** installed
-- **AWS CLI** configured with SSO or IAM credentials
+- **AWS CLI** configured with SSO or IAM credentials (for AWS scanning)
+- **Azure CLI** configured with `az login` (for Azure scanning)
 - **Terraform** installed (for deploying monitoring infrastructure)
 - **Claude Code** installed (for interactive compliance guidance)
 - **Git** (to clone the repo)
@@ -15,14 +16,17 @@ Deploy Shasta to scan your AWS environment for SOC 2 compliance. This guide walk
 ## Step 1: Clone and Install
 
 ```bash
-git clone https://github.com/kkmookhey/shasta
+git clone https://github.com/kkmookhey/shasta.git
 cd shasta
-pip install -e ".[dev]"
+pip install -e ".[dev]"           # Core + dev tools
+pip install -e ".[azure]"         # Add Azure support (optional)
+pip install -e ".[dev,azure]"     # Everything
 ```
 
 Verify installation:
 ```bash
 python -c "import shasta; print('Shasta installed successfully')"
+python -c "from shasta.azure.client import AzureClient; print('Azure support installed')"
 ```
 
 ---
@@ -209,12 +213,43 @@ export AWS_DEFAULT_REGION=us-east-1
 
 ---
 
+## Step 3b: Configure Azure Access (Optional)
+
+If you're scanning Azure environments in addition to or instead of AWS:
+
+### Login and identify your subscription
+
+```bash
+az login
+az account show
+# Note: subscription_id, tenant_id from the output
+```
+
+### Set your active subscription (if you have multiple)
+
+```bash
+az account set --subscription "YOUR_SUBSCRIPTION_ID"
+```
+
+Azure scanning uses `DefaultAzureCredential` from the Azure SDK, which automatically picks up your `az login` session. No service principal is needed for dev/testing.
+
+**Permissions required:** Reader role on the subscription (for infrastructure checks) plus Graph API permissions for Entra ID checks:
+- `User.Read.All` — user enumeration and activity
+- `Policy.Read.All` — Conditional Access policies (requires Entra ID P1/P2)
+- `RoleManagement.Read.Directory` — privileged role assignments
+- `Application.Read.All` — app registration credential audit
+
+If Graph API permissions are missing, the corresponding checks will return `NOT_ASSESSED` (not errors).
+
+---
+
 ## Step 4: Verify Connection
 
 Open Claude Code in the `shasta/` directory and run:
 
 ```
-/connect-aws
+/connect-aws      # For AWS
+/connect-azure    # For Azure
 ```
 
 Or manually:

@@ -32,6 +32,7 @@ def _detect_python_cmd() -> str:
         return "python"
     return "python3"
 
+
 # Search upward from CWD to find config
 def _find_config() -> Path | None:
     cwd = Path.cwd()
@@ -47,6 +48,9 @@ def load_config() -> dict[str, Any]:
     defaults = {
         "aws_profile": "",
         "aws_region": "us-east-1",
+        "azure_subscription_id": "",
+        "azure_tenant_id": "",
+        "azure_region": "",
         "python_cmd": _detect_python_cmd(),
         "company_name": "",
         "github_repos": [],
@@ -84,7 +88,23 @@ def save_config(config: dict[str, Any]) -> Path:
 def get_aws_client():
     """Convenience: create an AWSClient from config."""
     from shasta.aws.client import AWSClient
+
     cfg = load_config()
     profile = cfg["aws_profile"] if cfg["aws_profile"] else None
     region = cfg["aws_region"] or "us-east-1"
     return AWSClient(profile_name=profile, region=region)
+
+
+def get_azure_client():
+    """Convenience: create an AzureClient from config."""
+    from shasta.azure.client import AzureClient
+
+    cfg = load_config()
+    subscription_id = cfg.get("azure_subscription_id") or None
+    tenant_id = cfg.get("azure_tenant_id") or None
+    region = cfg.get("azure_region") or None
+    return AzureClient(
+        subscription_id=subscription_id,
+        tenant_id=tenant_id,
+        region=region,
+    )

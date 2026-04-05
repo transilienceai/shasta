@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 
@@ -107,6 +108,19 @@ class ShastaDB:
     def initialize(self) -> None:
         """Create tables if they don't exist."""
         self.conn.executescript(SCHEMA_SQL)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """Run schema migrations for new columns."""
+        cursor = self.conn.execute("PRAGMA table_info(findings)")
+        columns = {row["name"] for row in cursor.fetchall()}
+        if "cloud_provider" not in columns:
+            self.conn.execute("ALTER TABLE findings ADD COLUMN cloud_provider TEXT DEFAULT 'aws'")
+        cursor = self.conn.execute("PRAGMA table_info(scans)")
+        columns = {row["name"] for row in cursor.fetchall()}
+        if "cloud_provider" not in columns:
+            self.conn.execute("ALTER TABLE scans ADD COLUMN cloud_provider TEXT DEFAULT 'aws'")
+        self.conn.commit()
 
     def save_scan(self, scan: ScanResult) -> None:
         """Save a scan result and all its findings."""
@@ -130,7 +144,7 @@ class ShastaDB:
 
     def _save_finding(self, scan_id: str, finding: Finding) -> None:
         self.conn.execute(
-            "INSERT OR REPLACE INTO findings (id, scan_id, check_id, title, description, severity, status, domain, resource_type, resource_id, region, account_id, remediation, details, soc2_controls, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO findings (id, scan_id, check_id, title, description, severity, status, domain, resource_type, resource_id, region, account_id, cloud_provider, remediation, details, soc2_controls, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 finding.id,
                 scan_id,
@@ -144,6 +158,7 @@ class ShastaDB:
                 finding.resource_id,
                 finding.region,
                 finding.account_id,
+                finding.cloud_provider.value,
                 finding.remediation,
                 json.dumps(finding.details),
                 json.dumps(finding.soc2_controls),
@@ -199,6 +214,7 @@ class ShastaDB:
 
         findings = []
         for row in rows:
+            cloud = row["cloud_provider"] if "cloud_provider" in row.keys() else "aws"
             findings.append(
                 Finding(
                     id=row["id"],
@@ -212,6 +228,7 @@ class ShastaDB:
                     resource_id=row["resource_id"],
                     region=row["region"],
                     account_id=row["account_id"],
+                    cloud_provider=cloud,
                     remediation=row["remediation"],
                     details=json.loads(row["details"]) if row["details"] else {},
                     soc2_controls=json.loads(row["soc2_controls"]) if row["soc2_controls"] else [],
@@ -238,7 +255,26 @@ class ShastaDB:
         for item in items:
             self.conn.execute(
                 "INSERT OR REPLACE INTO risk_items (risk_id, account_id, title, description, category, likelihood, impact, risk_score, risk_level, owner, treatment, treatment_plan, status, soc2_controls, related_finding, created_date, last_reviewed, review_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (item.risk_id, account_id, item.title, item.description, item.category, item.likelihood, item.impact, item.risk_score, item.risk_level, item.owner, item.treatment, item.treatment_plan, item.status, json.dumps(item.soc2_controls), item.related_finding, item.created_date, item.last_reviewed, item.review_notes),
+                (
+                    item.risk_id,
+                    account_id,
+                    item.title,
+                    item.description,
+                    item.category,
+                    item.likelihood,
+                    item.impact,
+                    item.risk_score,
+                    item.risk_level,
+                    item.owner,
+                    item.treatment,
+                    item.treatment_plan,
+                    item.status,
+                    json.dumps(item.soc2_controls),
+                    item.related_finding,
+                    item.created_date,
+                    item.last_reviewed,
+                    item.review_notes,
+                ),
             )
         self.conn.commit()
 
@@ -249,13 +285,15 @@ class ShastaDB:
         ).fetchall()
         return [dict(row) for row in rows]
 
-    def get_recent_scan(self, max_age_minutes: int = 60, account_id: str | None = None) -> ScanResult | None:
+    def get_recent_scan(
+        self, max_age_minutes: int = 60, account_id: str | None = None
+    ) -> ScanResult | None:
         """Get the most recent scan if it's within max_age_minutes.
 
         Returns None if no scan exists or the latest is too old.
         Used by skills to avoid re-scanning when recent data exists.
         """
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
 
         scan = self.get_latest_scan(account_id)
         if not scan or not scan.completed_at:
@@ -265,9 +303,9 @@ class ShastaDB:
         if isinstance(completed, str):
             completed = datetime.fromisoformat(completed)
         if completed.tzinfo is None:
-            completed = completed.replace(tzinfo=timezone.utc)
+            completed = completed.replace(tzinfo=UTC)
 
-        cutoff = datetime.now(timezone.utc) - timedelta(minutes=max_age_minutes)
+        cutoff = datetime.now(UTC) - timedelta(minutes=max_age_minutes)
         if completed >= cutoff:
             return scan
         return None

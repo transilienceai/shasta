@@ -1,6 +1,6 @@
 ---
 name: scan
-description: Run SOC 2 compliance checks against the connected AWS account and display findings.
+description: Run SOC 2 compliance checks against connected cloud accounts (AWS and/or Azure) and display findings.
 user-invocable: true
 ---
 
@@ -10,7 +10,13 @@ You are running a SOC 2 compliance scan for a semi-technical founder. Explain fi
 
 ## What to do
 
-Read `shasta.config.json` for `python_cmd`. Use that for all commands (shown as `<PYTHON_CMD>`).
+Read `shasta.config.json` for `python_cmd`, `aws_profile`, and `azure_subscription_id`. Use that for all commands (shown as `<PYTHON_CMD>`).
+
+**Determine which clouds to scan:**
+- If `aws_profile` is set (non-empty) → scan AWS
+- If `azure_subscription_id` is set (non-empty) → scan Azure
+- If both are set → scan both
+- If neither is set → tell the user to run `/connect-aws` or `/connect-azure` first
 
 ### Check for a recent scan first
 
@@ -33,6 +39,9 @@ If a recent scan exists, tell the user and ask if they want to reuse it or run f
 
 ### Run fresh scan + generate reports
 
+Construct the Python command based on which clouds are configured. The scanner supports both AWS and Azure simultaneously.
+
+**For AWS only:**
 ```bash
 <PYTHON_CMD> -c "
 import json
@@ -46,8 +55,88 @@ from shasta.db.schema import ShastaDB
 
 client = get_aws_client()
 client.validate_credentials()
-print('Running full compliance scan...')
+print('Running full compliance scan (AWS)...')
 scan = run_full_scan(client)
+db = ShastaDB(); db.initialize(); db.save_scan(scan)
+
+md = save_markdown_report(scan)
+html = save_html_report(scan)
+print(f'Reports saved: {md} | {html}')
+
+score = calculate_score(scan.findings)
+summary = summarize_scan(scan)
+summary['score'] = {
+    'percentage': score.score_percentage,
+    'grade': score.grade,
+    'controls_passing': score.passing,
+    'controls_failing': score.failing,
+}
+summary['control_summary'] = {
+    k: {'title': v['title'], 'overall_status': v['overall_status'], 'pass_count': v['pass_count'], 'fail_count': v['fail_count']}
+    for k, v in get_control_summary(scan.findings).items()
+    if v['has_automated_checks'] or v['overall_status'] != 'not_assessed'
+}
+print(json.dumps(summary, indent=2))
+"
+```
+
+**For Azure only:**
+```bash
+<PYTHON_CMD> -c "
+import json
+from shasta.config import get_azure_client
+from shasta.scanner import run_full_scan
+from shasta.compliance.mapper import get_control_summary
+from shasta.compliance.scorer import calculate_score
+from shasta.reports.summary import summarize_scan
+from shasta.reports.generator import save_markdown_report, save_html_report
+from shasta.db.schema import ShastaDB
+
+azure_client = get_azure_client()
+azure_client.validate_credentials()
+print('Running full compliance scan (Azure)...')
+scan = run_full_scan(azure_client=azure_client)
+db = ShastaDB(); db.initialize(); db.save_scan(scan)
+
+md = save_markdown_report(scan)
+html = save_html_report(scan)
+print(f'Reports saved: {md} | {html}')
+
+score = calculate_score(scan.findings)
+summary = summarize_scan(scan)
+summary['score'] = {
+    'percentage': score.score_percentage,
+    'grade': score.grade,
+    'controls_passing': score.passing,
+    'controls_failing': score.failing,
+}
+summary['control_summary'] = {
+    k: {'title': v['title'], 'overall_status': v['overall_status'], 'pass_count': v['pass_count'], 'fail_count': v['fail_count']}
+    for k, v in get_control_summary(scan.findings).items()
+    if v['has_automated_checks'] or v['overall_status'] != 'not_assessed'
+}
+print(json.dumps(summary, indent=2))
+"
+```
+
+**For both AWS + Azure:**
+```bash
+<PYTHON_CMD> -c "
+import json
+from shasta.config import get_aws_client, get_azure_client
+from shasta.scanner import run_full_scan
+from shasta.compliance.mapper import get_control_summary
+from shasta.compliance.scorer import calculate_score
+from shasta.reports.summary import summarize_scan
+from shasta.reports.generator import save_markdown_report, save_html_report
+from shasta.db.schema import ShastaDB
+
+client = get_aws_client()
+client.validate_credentials()
+azure_client = get_azure_client()
+azure_client.validate_credentials()
+print('Running full compliance scan (AWS + Azure)...')
+scan = run_full_scan(client, azure_client=azure_client)
 db = ShastaDB(); db.initialize(); db.save_scan(scan)
 
 md = save_markdown_report(scan)

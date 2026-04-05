@@ -1,7 +1,7 @@
 [project]
 name = "shasta"
 version = "0.1.0"
-description = "AWS compliance automation platform — SOC 2 gap analysis, remediation, and continuous compliance"
+description = "Multi-cloud compliance automation platform — SOC 2 and ISO 27001 gap analysis, remediation, and continuous compliance"
 requires-python = ">=3.11"
 dependencies = [
     "boto3>=1.35.0",
@@ -12,6 +12,20 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+azure = [
+    "azure-identity>=1.17.0",
+    "azure-mgmt-resource>=23.0.0",
+    "azure-mgmt-resource-subscriptions>=3.0.0",
+    "azure-mgmt-compute>=31.0.0",
+    "azure-mgmt-network>=25.0.0",
+    "azure-mgmt-storage>=21.0.0",
+    "azure-mgmt-monitor>=6.0.0",
+    "azure-mgmt-sql>=4.0.0",
+    "azure-mgmt-keyvault>=10.0.0",
+    "azure-mgmt-authorization>=4.0.0",
+    "azure-mgmt-security>=6.0.0",
+    "msgraph-sdk>=1.5.0",
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
