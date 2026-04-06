@@ -1,8 +1,8 @@
-# Shasta — Multi-Cloud Compliance Automation Platform for SOC 2 & ISO 27001
+# Shasta + Whitney — Multi-Cloud Compliance & AI Governance Platform
 
-**An AI-native compliance toolkit that enables startup founders to achieve and maintain SOC 2 and ISO 27001 compliance across AWS and Azure through their terminal.**
+**An AI-native compliance toolkit that enables startup founders to achieve and maintain SOC 2, ISO 27001, HIPAA, ISO 42001, and EU AI Act compliance across AWS and Azure — through conversation, not dashboards.**
 
-Shasta is not a SaaS dashboard. It's a set of Claude Code skills, Python libraries, and cloud infrastructure that uses AI as the interface — explaining findings in plain English, generating tailored policies, producing Terraform remediation code, and delivering personalized threat intelligence. Built for founders running <50 employee companies who need SOC 2 without the $30K/year Vanta bill.
+Shasta scans your cloud infrastructure. Whitney scans your AI systems and code. Together, they cover 5 compliance frameworks, 117 automated checks, and 199 security questionnaire answers — with a web dashboard, Terraform remediation, and auditor-grade evidence. Built for founders running <50 employee companies who need compliance without the $30K/year Vanta bill.
 
 ---
 
@@ -250,6 +250,9 @@ Skills are the building blocks Claude uses behind the scenes. You can invoke the
 | `/pentest` | Automated security assessment — attack surface and exposure analysis | Security assessment report |
 | `/risk-register` | Create and manage risk register — auto-seeds from scan findings, tracks treatment | Risk register report |
 | `/iso27001` | Run ISO 27001:2022 Annex A gap analysis across AWS and Azure | ISO 27001 gap analysis report |
+| `/hipaa` | Run HIPAA Security Rule gap analysis (Administrative, Physical, Technical safeguards) | HIPAA gap analysis report |
+| `/questionnaire` | Auto-fill security questionnaires (SIG Lite, CAIQ, Enterprise) from scan evidence | Filled CSV + Markdown |
+| `/dashboard` | Launch web dashboard at localhost:8080 (scores, findings, controls, trends) | Browser-based UI |
 | **Whitney (AI Governance)** | | |
 | `/discover-ai` | Scan cloud accounts and code repos for AI/ML services | AI system inventory |
 | `/ai-scan` | Run AI governance checks (cloud + code) against ISO 42001 and EU AI Act | AI governance score + findings |
@@ -259,20 +262,25 @@ Skills are the building blocks Claude uses behind the scenes. You can invoke the
 
 ## SOC 2 Coverage
 
-For a **<50 employee startup** pursuing **SOC 2 Type II Security**:
+For a **<50 employee startup** pursuing compliance:
 
 | Category | Coverage | Method |
 |----------|----------|--------|
-| Technical cloud controls | ~90% | 60+ automated checks across AWS and Azure (5 domains each) |
+| Technical cloud controls | ~90% | 72 automated checks across AWS and Azure (5 domains each) |
 | Policy/process controls | ~80% | 8 generated policy documents |
 | Continuous monitoring | ~90% | 12 Config Rules + 6 EventBridge rules + GuardDuty + Inspector + Azure Defender + Azure Policy |
 | Audit evidence | ~85% | Control tests, evidence snapshots (AWS + Azure), access reviews, reports |
 | Vulnerability management | ~85% | Inspector + SBOM + OSV.dev + CISA KEV |
 | Supply chain security | ~80% | SBOM discovery + known-compromised DB + live scanning |
 | Change management | ~80% | GitHub integration + CloudTrail + Config + Azure Activity Log |
-| Remediation guidance | ~90% | 36 Terraform templates (14 AWS azurerm + 22 Azure) |
+| Remediation guidance | ~90% | 36 Terraform templates (14 AWS + 22 Azure) |
+| Security questionnaires | ~70% | 199 questions auto-filled from scan evidence (SIG Lite, CAIQ, Enterprise) |
+| AI governance | ~80% | 45 AI checks (code + cloud), ISO 42001, EU AI Act mapping |
+| Visual dashboard | Yes | FastAPI + Tailwind + Chart.js at localhost:8080 |
 
-**Overall: ~85% of SOC 2 Type II Security automated or templated across AWS and Azure.**
+**Frameworks supported:** SOC 2, ISO 27001, HIPAA, ISO 42001, EU AI Act
+
+**Overall: ~85% of SOC 2 Type II Security + ~75% of HIPAA Technical Safeguards automated or templated.**
 
 ### What's NOT Covered (Founder Handles Manually)
 
@@ -586,7 +594,7 @@ Tier 2 and 3 used 4 parallel agents in isolated worktrees for maximum throughput
 | Automated checks | 40+ | 72 | **72** |
 | Terraform templates | 14 | 36 | **36** |
 | Unit tests | 9 | 100 | **100** |
-| Compliance frameworks | 1 (SOC 2) | 2 (SOC 2 + ISO 27001) | **2** |
+| Compliance frameworks | 1 (SOC 2) | 2 (SOC 2 + ISO 27001) | **5** (+ HIPAA, ISO 42001, EU AI Act) |
 | Cloud providers | 1 (AWS) | 2 (AWS + Azure) | **2** |
 
 ### Token Consumption Estimate
@@ -756,23 +764,29 @@ shasta/
 - [x] ~~Azure Bastion detection~~ — checks if Bastion is deployed
 - [x] ~~Azure PIM status~~ — checks Privileged Identity Management activation
 - [x] ~~Azure AKS security~~ — RBAC, network policies, API server access
+- [x] ~~HIPAA compliance framework~~ — 29 controls across 3 safeguards, maps to existing checks
+- [x] ~~Security questionnaire auto-fill~~ — 199 questions (SIG Lite, CAIQ, Enterprise), ~70% auto-fill rate
+- [x] ~~Web dashboard~~ — FastAPI + Tailwind + HTMX + Chart.js, 7 routes, live at localhost:8080
+- [x] ~~Project Whitney (AI governance)~~ — ISO 42001, EU AI Act, 45 checks (code + cloud), code scanner
+- [x] ~~Competitive analysis~~ — research-backed comparison vs. Vanta, Drata, Secureframe, Wiz, Noma, etc.
 - [ ] Vendor inventory management (active tracking, not just policy)
 - [ ] Network ACL checks (AWS)
 
 ### Medium Term
 - [ ] GCP scanning modules
-- [ ] HIPAA control framework
-- [ ] Security questionnaire auto-fill from evidence
-- [ ] Employee onboarding/offboarding tracking
+- [ ] Okta integration (identity provider checks)
+- [ ] Google Workspace integration
 - [ ] Trust center page generation
-- [ ] Azure Bastion / App Service / AKS security checks
+- [ ] Employee onboarding/offboarding tracking
+- [ ] AI runtime guardrails (Whitney)
+- [ ] Custom control framework builder
 
 ### Long Term
 - [ ] Multi-account AWS Organizations support
-- [ ] Compliance score trending dashboard (HTML)
 - [ ] Audit management workflow (auditor request tracking)
-- [ ] Custom control framework definitions
 - [ ] CI/CD compliance gate (fail pipeline if non-compliant)
+- [ ] AI vendor security scorecards (OpenAI, Anthropic, Cohere)
+- [ ] Bias/fairness assessment framework
 
 ---
 

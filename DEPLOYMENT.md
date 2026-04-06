@@ -450,7 +450,59 @@ If these permissions are missing, the corresponding checks return `NOT_ASSESSED`
 
 ---
 
-## Step 10 (Optional): Deploy Continuous Monitoring
+## Step 10 (Optional): Launch the Web Dashboard
+
+Shasta includes a local web dashboard for visual compliance monitoring.
+
+### Install dashboard dependencies
+
+```bash
+pip install -e ".[dashboard]"
+```
+
+### Launch
+
+```bash
+python -m shasta.dashboard
+# Or in Claude Code:
+/dashboard
+```
+
+The dashboard runs at **http://127.0.0.1:8080** and shows:
+- Compliance score gauges (SOC 2, ISO 27001, HIPAA) with letter grades
+- Score trend chart over time (last 10 scans)
+- Findings severity breakdown with filtering (by cloud, domain, severity, status)
+- Control status grid with framework tabs
+- Scan history with grade badges
+- Risk register table
+
+The dashboard reads from the same SQLite database that `/scan` writes to — no additional configuration needed.
+
+---
+
+## Step 11 (Optional): Auto-Fill Security Questionnaires
+
+When a customer or prospect sends you a security questionnaire, Shasta can auto-fill ~70% of the answers from your latest scan data.
+
+```
+/questionnaire
+```
+
+Choose from:
+- **SIG Lite** (79 questions) — Standardized Information Gathering
+- **CAIQ** (80 questions) — Cloud Security Alliance Consensus Assessment
+- **Generic Enterprise** (40 questions) — Common enterprise buyer questions
+
+Output is saved to `data/questionnaires/` as both CSV (for spreadsheet import) and Markdown (for review). Each answer includes:
+- Yes/No/Partial determination based on scan findings
+- Confidence level (high/medium/low/manual)
+- Evidence references (e.g., "See control test CT-IAM-003")
+
+Questions that can't be auto-filled are marked "Manual review required."
+
+---
+
+## Step 12 (Optional): Deploy Continuous Monitoring
 
 This is the **only step that requires write access** to your AWS account, and it's done via Terraform that you review and apply yourself.
 
@@ -494,10 +546,13 @@ terraform apply \
 |------|-----------|---------|
 | Full compliance scan (cloud) | Weekly | `/scan` |
 | AI governance scan | Weekly | `/ai-scan` |
+| HIPAA gap analysis | Monthly | `/hipaa` |
 | Gap analysis | Monthly | `/gap-analysis` |
 | Access review | Quarterly | `/review-access` |
 | Evidence collection | Monthly | `/evidence` |
 | Report generation | As needed | `/report` |
+| Security questionnaires | As received | `/questionnaire` |
+| Dashboard review | Anytime | `/dashboard` |
 | Policy review | Annually | Review files in `data/policies/` |
 | AI code review | Per release / PR | `/ai-code-review` |
 | Risk register review | Quarterly | `/risk-register` |
