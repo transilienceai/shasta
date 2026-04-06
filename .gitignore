@@ -42,3 +42,10 @@ shasta.config.json
 # Internal strategy docs (not for public repo)
 COMPETITIVE_ANALYSIS.md
 NextSteps.md
+
+# Whitney (AI governance) — releasing separately
+src/whitney/
+
+# Rainier (vendor risk) — releasing separately
+src/rainier/
+tests/test_rainier/

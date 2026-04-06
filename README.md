@@ -1,8 +1,8 @@
-# Shasta + Whitney — Multi-Cloud Compliance & AI Governance Platform
+# Shasta — Multi-Cloud Compliance Automation
 
-**An AI-native compliance toolkit that enables startup founders to achieve and maintain SOC 2, ISO 27001, HIPAA, ISO 42001, and EU AI Act compliance across AWS and Azure — through conversation, not dashboards.**
+**An AI-native compliance toolkit that enables startup founders to achieve and maintain SOC 2, ISO 27001, and HIPAA compliance across AWS and Azure — through conversation, not dashboards.**
 
-Shasta scans your cloud infrastructure. Whitney scans your AI systems and code. Together, they cover 5 compliance frameworks, 117 automated checks, and 199 security questionnaire answers — with a web dashboard, Terraform remediation, and auditor-grade evidence. Built for founders running <50 employee companies who need compliance without the $30K/year Vanta bill.
+Shasta scans your cloud infrastructure, maps findings to compliance controls, generates remediation guidance (with Terraform), and produces compliance policies and reports. It covers 3 compliance frameworks, 72+ automated checks, and 199 security questionnaire answers — with a web dashboard, Terraform remediation, and auditor-grade evidence. Built for founders running <50 employee companies who need compliance without the $30K/year Vanta bill.
 
 ---
 
@@ -17,6 +17,7 @@ Shasta scans your cloud infrastructure. Whitney scans your AI systems and code. 
 - [Vibe Coding Best Practices for Security Projects](#vibe-coding-best-practices-for-security-projects)
 - [Build Metrics](#build-metrics)
 - [What's Next](#whats-next)
+- [Coming Soon: Whitney — AI Governance](#coming-soon-whitney--ai-governance)
 
 ---
 
@@ -188,7 +189,7 @@ Automated risk management workflow required for SOC 2 Risk Assessment:
 
 ### Design Principles
 
-- **Read-only by default** — Shasta never modifies your AWS environment. All remediation is provided as Terraform/CLI for you to review and apply.
+- **Read-only by default** — Shasta never modifies your cloud environment. All remediation is provided as Terraform/CLI for you to review and apply.
 - **AI-native interface** — Claude's reasoning explains findings, generates policies tailored to your environment, and walks you through fixes interactively.
 - **Zero infrastructure** — runs locally, stores data in SQLite + JSON. No SaaS dependency.
 - **Evidence-first** — every check produces timestamped, auditor-reviewable evidence artifacts.
@@ -226,7 +227,7 @@ az account show   # Note your subscription_id and tenant_id
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for the complete setup guide including exact IAM permissions.
 
-> **You don't need to memorize slash commands.** Shasta and Whitney are AI-native — just describe what you need in plain English inside Claude Code. Say *"Connect to my AWS and run a full SOC 2 gap analysis with remediation Terraform"* and Claude orchestrates everything. See **[CONVERSATIONS.md](CONVERSATIONS.md)** for 15 real conversation examples.
+> **You don't need to memorize slash commands.** Shasta is AI-native — just describe what you need in plain English inside Claude Code. Say *"Connect to my AWS and run a full SOC 2 gap analysis with remediation Terraform"* and Claude orchestrates everything. See **[CONVERSATIONS.md](CONVERSATIONS.md)** for real conversation examples.
 
 ---
 
@@ -253,10 +254,6 @@ Skills are the building blocks Claude uses behind the scenes. You can invoke the
 | `/hipaa` | Run HIPAA Security Rule gap analysis (Administrative, Physical, Technical safeguards) | HIPAA gap analysis report |
 | `/questionnaire` | Auto-fill security questionnaires (SIG Lite, CAIQ, Enterprise) from scan evidence | Filled CSV + Markdown |
 | `/dashboard` | Launch web dashboard at localhost:8080 (scores, findings, controls, trends) | Browser-based UI |
-| **Whitney (AI Governance)** | | |
-| `/discover-ai` | Scan cloud accounts and code repos for AI/ML services | AI system inventory |
-| `/ai-scan` | Run AI governance checks (cloud + code) against ISO 42001 and EU AI Act | AI governance score + findings |
-| `/ai-code-review` | Deep code scan for AI security issues with file paths and fix guidance | Code security findings |
 
 ---
 
@@ -275,10 +272,9 @@ For a **<50 employee startup** pursuing compliance:
 | Change management | ~80% | GitHub integration + CloudTrail + Config + Azure Activity Log |
 | Remediation guidance | ~90% | 36 Terraform templates (14 AWS + 22 Azure) |
 | Security questionnaires | ~70% | 199 questions auto-filled from scan evidence (SIG Lite, CAIQ, Enterprise) |
-| AI governance | ~80% | 45 AI checks (code + cloud), ISO 42001, EU AI Act mapping |
 | Visual dashboard | Yes | FastAPI + Tailwind + Chart.js at localhost:8080 |
 
-**Frameworks supported:** SOC 2, ISO 27001, HIPAA, ISO 42001, EU AI Act
+**Frameworks supported:** SOC 2, ISO 27001, HIPAA
 
 **Overall: ~85% of SOC 2 Type II Security + ~75% of HIPAA Technical Safeguards automated or templated.**
 
@@ -515,10 +511,10 @@ In every case, the pattern was: error → diagnose → fix → continue. No erro
 
 Session 2 demonstrated a different vibe coding pattern: **extending an existing system rather than building from scratch**. The conversation had four distinct phases.
 
-**Phase 1 — Azure Planning & Architecture (Turns 1–4)**
+**Phase 1 — Azure Planning & Architecture (Turns 1-4)**
 The human asked to "build similar support for SOC 2 and ISO 27001 for Azure environments." Claude entered plan mode, launched 3 parallel exploration agents to understand the existing AWS patterns, then designed a phased implementation plan with 22 Azure checks mapped to all SOC 2 and ISO 27001 controls. The human reviewed the plan, added a requirement to "build it half secure, half insecure as you did the AWS one" for a test environment, and provided their Azure credentials.
 
-**Phase 2 — Azure Implementation (Turns 5–10)**
+**Phase 2 — Azure Implementation (Turns 5-10)**
 Built in rapid succession:
 - Azure test environment (Terraform) with intentionally secure + insecure resources
 - `AzureClient` with `DefaultAzureCredential`, Graph API async wrapper, service discovery
@@ -556,7 +552,7 @@ The audit also cataloged ~20 missing AWS checks (role trust policies, Network AC
 
 This self-assessment prompt — asking the AI to critique its own work as an independent expert — proved as valuable in Session 2 as it was in Session 1. Both times, it prevented premature "done" by surfacing real gaps.
 
-**Phase 4 — Fix Implementation (Turns 12–14)**
+**Phase 4 — Fix Implementation (Turns 12-14)**
 Fixes were organized into tiers and implemented bottom-up:
 
 *Tier 1 (6 critical/high fixes):* Scorer edge case, drift null check, GuardDuty severity parser, TLS 1.3, NSG prefixes list, Azure risk mappings (21 entries).
@@ -594,7 +590,7 @@ Tier 2 and 3 used 4 parallel agents in isolated worktrees for maximum throughput
 | Automated checks | 40+ | 72 | **72** |
 | Terraform templates | 14 | 36 | **36** |
 | Unit tests | 9 | 100 | **100** |
-| Compliance frameworks | 1 (SOC 2) | 2 (SOC 2 + ISO 27001) | **5** (+ HIPAA, ISO 42001, EU AI Act) |
+| Compliance frameworks | 1 (SOC 2) | 2 (SOC 2 + ISO 27001) | **3** (+ HIPAA) |
 | Cloud providers | 1 (AWS) | 2 (AWS + Azure) | **2** |
 
 ### Token Consumption Estimate
@@ -671,7 +667,7 @@ shasta/
 │   │   ├── storage.py                     # Storage account checks (4 functions)
 │   │   ├── encryption.py                  # Disk/SQL/KeyVault checks (4 functions)
 │   │   └── monitoring.py                  # Activity Log/Defender/Policy checks (4 functions)
-│   ├── compliance/                        # SOC 2 + ISO 27001 framework
+│   ├── compliance/                        # SOC 2 + ISO 27001 + HIPAA framework
 │   │   ├── framework.py                   # Control definitions (13 controls)
 │   │   ├── mapper.py                      # Finding → control mapping
 │   │   ├── scorer.py                      # Compliance scoring engine
@@ -767,8 +763,6 @@ shasta/
 - [x] ~~HIPAA compliance framework~~ — 29 controls across 3 safeguards, maps to existing checks
 - [x] ~~Security questionnaire auto-fill~~ — 199 questions (SIG Lite, CAIQ, Enterprise), ~70% auto-fill rate
 - [x] ~~Web dashboard~~ — FastAPI + Tailwind + HTMX + Chart.js, 7 routes, live at localhost:8080
-- [x] ~~Project Whitney (AI governance)~~ — ISO 42001, EU AI Act, 45 checks (code + cloud), code scanner
-- [x] ~~Competitive analysis~~ — research-backed comparison vs. Vanta, Drata, Secureframe, Wiz, Noma, etc.
 - [ ] Vendor inventory management (active tracking, not just policy)
 - [ ] Network ACL checks (AWS)
 
@@ -778,15 +772,29 @@ shasta/
 - [ ] Google Workspace integration
 - [ ] Trust center page generation
 - [ ] Employee onboarding/offboarding tracking
-- [ ] AI runtime guardrails (Whitney)
 - [ ] Custom control framework builder
 
 ### Long Term
 - [ ] Multi-account AWS Organizations support
 - [ ] Audit management workflow (auditor request tracking)
 - [ ] CI/CD compliance gate (fail pipeline if non-compliant)
-- [ ] AI vendor security scorecards (OpenAI, Anthropic, Cohere)
-- [ ] Bias/fairness assessment framework
+
+---
+
+## Coming Soon: Whitney — AI Governance
+
+**Whitney** is Shasta's companion module for AI/ML security and compliance. It extends the platform to cover **ISO 42001** (AI Management Systems), **EU AI Act**, and **NIST AI RMF** — the emerging frameworks that regulate how organizations build, deploy, and monitor AI systems.
+
+### What Whitney will cover
+
+- **AI Code Security** — scans your repositories for hardcoded AI API keys, prompt injection vulnerabilities, PII leakage in prompts, and unguarded AI agents
+- **Cloud AI Service Checks** — audits AWS Bedrock guardrails, SageMaker security, Azure OpenAI content filters, and Azure ML workspace configurations
+- **AI System Discovery** — automatically inventories all AI/ML services across your cloud accounts and code repos
+- **Framework Scoring** — maps findings to ISO 42001 and EU AI Act requirements with compliance scoring
+
+Whitney will ship with dedicated Claude Code skills (`/discover-ai`, `/ai-scan`, `/ai-code-review`) and integrate seamlessly with Shasta's existing reporting, evidence collection, and risk register.
+
+**Target release: April 2026.**
 
 ---
 

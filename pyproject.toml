@@ -1,7 +1,7 @@
 [project]
 name = "shasta"
 version = "0.1.0"
-description = "Multi-cloud compliance and AI governance platform — SOC 2, ISO 27001, HIPAA, ISO 42001, and EU AI Act"
+description = "Multi-cloud compliance automation — SOC 2, ISO 27001, and HIPAA across AWS and Azure"
 requires-python = ">=3.11"
 dependencies = [
     "boto3>=1.35.0",
@@ -42,7 +42,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/shasta", "src/whitney"]
+packages = ["src/shasta"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -54,3 +54,5 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.ruff.lint.per-file-ignores]

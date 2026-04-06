@@ -216,8 +216,19 @@ SOC2_CONTROLS: dict[str, SOC2Control] = {
         title="Risk Mitigation",
         description="The entity identifies, selects, and develops risk mitigation activities for risks arising from potential business disruptions.",
         category=ControlCategory.SECURITY,
+        check_ids=[
+            "vendor-dns-spf",
+            "vendor-dns-dmarc",
+            "vendor-ssl-validity",
+            "vendor-ssl-version",
+            "vendor-http-hsts",
+            "vendor-http-https-redirect",
+            "vendor-breach-history",
+            "vendor-trust-certifications",
+            "vendor-ports-summary",
+        ],
         requires_policy=True,
-        guidance="This requires vendor management, business continuity planning, disaster recovery procedures, and appropriate insurance.",
+        guidance="This requires vendor management (use /vendor-risk to assess vendors), business continuity planning, disaster recovery procedures, and appropriate insurance.",
     ),
 }
 

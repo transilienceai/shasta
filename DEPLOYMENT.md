@@ -1,6 +1,6 @@
 # Shasta Deployment Guide
 
-Deploy Shasta and Whitney to scan your cloud environments and AI systems for SOC 2, ISO 27001, ISO 42001, and EU AI Act compliance. This guide walks you through setup in under 30 minutes.
+Deploy Shasta to scan your cloud environments for SOC 2, ISO 27001, and HIPAA compliance. This guide walks you through setup in under 30 minutes.
 
 ## Prerequisites
 
@@ -10,7 +10,7 @@ Deploy Shasta and Whitney to scan your cloud environments and AI systems for SOC
 - **Terraform** installed (for deploying monitoring infrastructure)
 - **Claude Code** installed (for interactive compliance guidance)
 - **Git** (to clone the repo)
-- **GitHub Personal Access Token** (optional — for GitHub integration and Whitney code scanning of private repos)
+- **GitHub Personal Access Token** (optional — for GitHub integration)
 
 ---
 
@@ -301,7 +301,7 @@ Generates 8 SOC 2 policy documents tailored to your company name. Review and cus
 
 ### GitHub Integration
 
-Shasta checks GitHub branch protection, required PR reviews, and CI/CD status checks (CC8.1 — Change Management). Whitney scans code repositories for AI security issues.
+Shasta checks GitHub branch protection, required PR reviews, and CI/CD status checks (CC8.1 — Change Management).
 
 **1. Create a GitHub Personal Access Token (PAT):**
 - Go to GitHub > Settings > Developer settings > Personal access tokens > Fine-grained tokens
@@ -326,7 +326,6 @@ export GITHUB_TOKEN=ghp_...
 **3. Verify:**
 ```
 /scan              # Includes GitHub checks if github_repos is configured
-/ai-code-review    # Whitney scans the current directory for AI security issues
 ```
 
 **Note:** For a production setup, use a **GitHub App** instead of PATs. GitHub Apps provide:
@@ -394,63 +393,7 @@ Update `shasta.config.json`:
 
 ---
 
-## Step 9 (Optional): Set Up Whitney AI Governance
-
-Whitney scans your AI/ML services and code repositories for AI-specific security and compliance issues.
-
-### What Whitney covers
-
-- **Code scanning:** Hardcoded AI API keys, prompt injection risks, PII in prompts, unguarded AI agents (15 checks)
-- **AWS AI services:** Bedrock guardrails, SageMaker security, Lambda AI key exposure (15 checks)
-- **Azure AI services:** OpenAI content filters, ML workspace security, Cognitive Services (15 checks)
-- **Frameworks:** ISO 42001 (AI Management Systems), EU AI Act, NIST AI RMF
-
-### Setup
-
-No additional installation needed — Whitney is included in the Shasta package.
-
-**1. Run AI discovery:**
-```
-/discover-ai
-```
-This scans your cloud accounts for AI/ML services (SageMaker, Bedrock, Azure OpenAI, etc.) and your code for AI SDK usage.
-
-**2. Run AI governance scan:**
-```
-/ai-scan
-```
-Runs all AI checks (cloud + code) and scores against ISO 42001 and EU AI Act.
-
-**3. Deep code review:**
-```
-/ai-code-review
-```
-Detailed AI security review of the current repository with file paths, line numbers, and fix suggestions.
-
-### Permissions for AI cloud checks
-
-**AWS (additional to Step 2 permissions):**
-
-| Service | Permissions | Why |
-|---------|-------------|-----|
-| Bedrock | `bedrock:ListFoundationModels`, `bedrock:ListGuardrails`, `bedrock:GetGuardrail` | Check guardrails and content filters |
-| SageMaker | `sagemaker:ListEndpoints`, `sagemaker:ListModels`, `sagemaker:ListNotebookInstances`, `sagemaker:DescribeEndpoint` | Check model security and access |
-| Lambda | `lambda:ListFunctions`, `lambda:GetFunction` | Detect AI API keys in env vars |
-| CloudTrail | `cloudtrail:GetEventSelectors` | Verify AI event logging |
-
-**Azure (additional to Step 3b permissions):**
-
-| Service | Permissions | Why |
-|---------|-------------|-----|
-| Cognitive Services | `Microsoft.CognitiveServices/accounts/read` | Check OpenAI and Cognitive Service configs |
-| Machine Learning | `Microsoft.MachineLearningServices/workspaces/read` | Check ML workspace security |
-| Monitor | `Microsoft.Insights/diagnosticSettings/read` | Verify AI service logging |
-
-If these permissions are missing, the corresponding checks return `NOT_ASSESSED` — not errors.
-
----
-
-## Step 10 (Optional): Launch the Web Dashboard
+## Step 9 (Optional): Launch the Web Dashboard
 
 Shasta includes a local web dashboard for visual compliance monitoring.
 
@@ -480,7 +423,7 @@ The dashboard reads from the same SQLite database that `/scan` writes to — no 
 
 ---
 
-## Step 11 (Optional): Auto-Fill Security Questionnaires
+## Step 10 (Optional): Auto-Fill Security Questionnaires
 
 When a customer or prospect sends you a security questionnaire, Shasta can auto-fill ~70% of the answers from your latest scan data.
 
@@ -502,7 +445,7 @@ Questions that can't be auto-filled are marked "Manual review required."
 
 ---
 
-## Step 12 (Optional): Deploy Continuous Monitoring
+## Step 11 (Optional): Deploy Continuous Monitoring
 
 This is the **only step that requires write access** to your AWS account, and it's done via Terraform that you review and apply yourself.
 
@@ -545,7 +488,6 @@ terraform apply \
 | Task | Frequency | Command |
 |------|-----------|---------|
 | Full compliance scan (cloud) | Weekly | `/scan` |
-| AI governance scan | Weekly | `/ai-scan` |
 | HIPAA gap analysis | Monthly | `/hipaa` |
 | Gap analysis | Monthly | `/gap-analysis` |
 | Access review | Quarterly | `/review-access` |
@@ -554,7 +496,6 @@ terraform apply \
 | Security questionnaires | As received | `/questionnaire` |
 | Dashboard review | Anytime | `/dashboard` |
 | Policy review | Annually | Review files in `data/policies/` |
-| AI code review | Per release / PR | `/ai-code-review` |
 | Risk register review | Quarterly | `/risk-register` |
 
 ---
@@ -577,11 +518,9 @@ terraform apply \
 | `AccessDenied` on a check | Verify the IAM policy has the required permissions (see tables above) |
 | `LoginRefreshRequired` | Run `aws sso login --profile <profile>` |
 | Azure `AzureClientError` | Run `az login` or `az account set --subscription <ID>` |
-| Inspector checks fail | Inspector may not be enabled — deploy monitoring infra (Step 10) |
+| Inspector checks fail | Inspector may not be enabled — deploy monitoring infra (Step 11) |
 | PDF generation fails | Install system dependencies: `pip install xhtml2pdf` |
 | Azure SDK not installed | Run `pip install -e ".[azure]"` |
 | GitHub checks return empty | Verify `github_repos` in config and that the PAT has `repo` scope |
 | Slack messages not arriving | Verify the webhook URL is correct and the channel exists |
 | Jira tickets not created | Verify `jira_base_url` starts with `https://`, email and API token are correct |
-| Whitney NOT_ASSESSED on AI checks | AI services (Bedrock, SageMaker, Azure OpenAI) may not be deployed — this is expected |
-| Code scan finds nothing | Your repo may not use AI SDKs — this means zero AI security issues (good!) |
