@@ -226,9 +226,13 @@ az account show   # Note your subscription_id and tenant_id
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for the complete setup guide including exact IAM permissions.
 
+> **You don't need to memorize slash commands.** Shasta and Whitney are AI-native — just describe what you need in plain English inside Claude Code. Say *"Connect to my AWS and run a full SOC 2 gap analysis with remediation Terraform"* and Claude orchestrates everything. See **[CONVERSATIONS.md](CONVERSATIONS.md)** for 15 real conversation examples.
+
 ---
 
 ## Skills Reference
+
+Skills are the building blocks Claude uses behind the scenes. You can invoke them directly with `/skill-name`, but it's usually easier to just describe what you want in natural language.
 
 | Skill | Description | Output |
 |-------|-------------|--------|
@@ -246,6 +250,10 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for the complete setup guide including exact 
 | `/pentest` | Automated security assessment — attack surface and exposure analysis | Security assessment report |
 | `/risk-register` | Create and manage risk register — auto-seeds from scan findings, tracks treatment | Risk register report |
 | `/iso27001` | Run ISO 27001:2022 Annex A gap analysis across AWS and Azure | ISO 27001 gap analysis report |
+| **Whitney (AI Governance)** | | |
+| `/discover-ai` | Scan cloud accounts and code repos for AI/ML services | AI system inventory |
+| `/ai-scan` | Run AI governance checks (cloud + code) against ISO 42001 and EU AI Act | AI governance score + findings |
+| `/ai-code-review` | Deep code scan for AI security issues with file paths and fix guidance | Code security findings |
 
 ---
 
