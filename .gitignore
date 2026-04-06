@@ -38,3 +38,7 @@ Thumbs.db
 
 # User-specific config (template is shasta.config.template.json)
 shasta.config.json
+
+# Internal strategy docs (not for public repo)
+COMPETITIVE_ANALYSIS.md
+NextSteps.md
