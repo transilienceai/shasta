@@ -800,7 +800,7 @@ Whitney will ship with dedicated Claude Code skills (`/discover-ai`, `/ai-scan`,
 
 ## License
 
-Private repository. Contact kkmookhey for access.
+MIT License. See `LICENSE`.
 
 ---
 
