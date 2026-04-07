@@ -2,7 +2,7 @@
 
 **The first open-source toolkit that audits your AI stack the same way you audit your cloud.**
 
-Whitney scans your cloud AI services (AWS Bedrock, SageMaker, Azure OpenAI, Azure ML) and your GitHub repositories for AI security issues — prompt injection risks, hardcoded API keys, PII in prompts, unguarded AI agents, and more. Findings are mapped to ISO 42001, the EU AI Act, and NIST AI RMF simultaneously.
+Whitney scans your cloud AI services (AWS Bedrock, SageMaker, Azure OpenAI, Azure ML) and your GitHub repositories for AI security issues — prompt injection risks, hardcoded API keys, PII in prompts, unguarded AI agents, and more. Findings are mapped to ISO 42001 and the EU AI Act simultaneously.
 
 Part of the Shasta mountain range: **Shasta** (14,179 ft) secures your cloud. **Whitney** (14,505 ft) secures your AI.
 
@@ -93,7 +93,6 @@ Whitney scans your actual source code for AI security issues. This is the differ
 |-----------|---------|---------------|
 | **ISO 42001** (AI Management Systems) | 11 controls (7 automated + 4 policy) | AI policy, risk assessment, system lifecycle, data governance, monitoring, security, third-party AI |
 | **EU AI Act** | 8 obligations | Risk management, data governance, documentation, record-keeping, transparency, human oversight, robustness |
-| **NIST AI RMF** | Mapped via ISO 42001 | GOVERN, MAP, MEASURE, MANAGE functions |
 
 ### 4. AI Service Discovery
 
@@ -265,11 +264,15 @@ whitney/
 ├── cloud/                  # Cloud AI service checks
 │   ├── aws_checks.py       # 15 AWS checks (Bedrock, SageMaker, Lambda, S3)
 │   └── azure_checks.py     # 15 Azure checks (OpenAI, ML, Cognitive, AI Search)
-└── compliance/             # AI governance frameworks
-    ├── iso42001.py          # 11 ISO 42001 control definitions
-    ├── eu_ai_act.py         # 8 EU AI Act obligation definitions
-    ├── mapper.py            # Finding enrichment (check_id → controls)
-    └── scorer.py            # Combined scoring (ISO 42001 + EU AI Act)
+├── compliance/             # AI governance frameworks
+│   ├── iso42001.py          # 11 ISO 42001 control definitions
+│   ├── eu_ai_act.py         # 8 EU AI Act obligation definitions
+│   ├── mapper.py            # Finding enrichment (check_id → controls)
+│   └── scorer.py            # Combined scoring (ISO 42001 + EU AI Act)
+├── policies/               # AI governance policy generator
+│   └── generator.py        # 7 policy templates (Jinja2)
+└── sbom/                   # AI Model Bill of Materials
+    └── scanner.py           # CycloneDX 1.5 SBOM for AI SDKs, models, services
 ```
 
 Whitney shares Shasta's core infrastructure:
@@ -314,12 +317,22 @@ Whitney shares Shasta's core infrastructure:
 
 ---
 
+## What's Included
+
+- [x] 15 code security checks for AI repositories
+- [x] 15 AWS cloud checks (Bedrock, SageMaker, Lambda, S3, CloudTrail)
+- [x] 15 Azure cloud checks (OpenAI, ML, Cognitive Services, AI Search)
+- [x] AI service discovery (AWS + Azure)
+- [x] ISO 42001 framework (11 controls, scoring, mapping)
+- [x] EU AI Act framework (8 obligations, scoring, mapping)
+- [x] AI governance policy generator (7 templates covering all policy-required controls)
+- [x] AI SBOM scanner (CycloneDX 1.5 output for SDKs, models, cloud services)
+- [x] 340 tests (319 unit + 21 integration), validated against live AWS and Azure
+
 ## What's Next
 
-- [ ] AI-specific policy templates (8 documents: AI Acceptable Use, Risk Management, Data Governance, Model Governance, Transparency, Incident Response, Vendor Assessment, Ethics & Fairness)
 - [ ] Architecture review engine (automated assessment of 8 security patterns)
-- [ ] AI SBOM (Model Bill of Materials) with CycloneDX output
 - [ ] AI vendor security scorecards (OpenAI, Anthropic, Cohere, Google)
-- [ ] NIST AI RMF framework mapping
+- [ ] NIST AI RMF framework mapping (19 categories, 71 subcategories)
 - [ ] Bias and fairness assessment framework
 - [ ] Prompt injection testing framework

@@ -101,7 +101,7 @@ class AzureClient:
 
             # Get tenant ID from subscription if not provided
             if not self._tenant_id:
-                self._tenant_id = sub.tenant_id
+                self._tenant_id = getattr(sub, "tenant_id", None) or ""
 
             # Get user principal name from the token
             user_principal = self._get_user_principal()
@@ -109,7 +109,7 @@ class AzureClient:
             self._account_info = AzureAccountInfo(
                 subscription_id=sub.subscription_id,
                 subscription_name=sub.display_name or "",
-                tenant_id=self._tenant_id or sub.tenant_id or "",
+                tenant_id=self._tenant_id or getattr(sub, "tenant_id", "") or "",
                 user_principal=user_principal,
                 region=self._region,
             )
