@@ -6,6 +6,14 @@ Whitney scans your cloud AI services (AWS Bedrock, SageMaker, Azure OpenAI, Azur
 
 Part of the Shasta mountain range: **Shasta** (14,179 ft) secures your cloud. **Whitney** (14,505 ft) secures your AI.
 
+### Deterministic by Design
+
+Whitney uses **zero LLM calls**. Every finding is produced by regex pattern matching, AWS/Azure SDK API calls, dictionary lookups, and arithmetic. There is no probabilistic model, no prompt, no token consumption in the scanning pipeline.
+
+This is a deliberate architectural choice and a differentiator. Most AI security vendors (Straiker, Lakera, CalypsoAI) use LLMs in their detection pipeline, which means their results vary between runs. Whitney's results are **100% reproducible**: same code + same infrastructure = same findings, every time.
+
+Claude Code serves as the user interface — it calls Whitney's Python functions and formats the output. But the compliance engine itself is pure deterministic code.
+
 ---
 
 ## Why Whitney?

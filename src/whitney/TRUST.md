@@ -120,6 +120,43 @@ Azure checks validated: 13/15 (87%)
 Code checks validated:  15/15 (100%)
 ```
 
+---
+
+## Deterministic by Design — No LLM in the Pipeline
+
+A common concern with AI-built tools: "if it was built with AI, does it use AI to produce results, and can those results be trusted?"
+
+Whitney uses **zero LLM calls**. We verified this by searching the entire codebase:
+
+```
+$ grep -r "import openai\|import anthropic\|from openai\|from anthropic" src/
+(no results)
+```
+
+Every Whitney module is pure deterministic code:
+
+| Module | What it does | How |
+|--------|-------------|-----|
+| Code scanner | Finds AI security issues in source code | Regex pattern matching against file contents |
+| Cloud checks | Evaluates AWS/Azure AI service configuration | boto3 / Azure SDK describe/list API calls |
+| Compliance mapper | Maps findings to ISO 42001, EU AI Act, OWASP, NIST, MITRE | Dictionary lookups by check_id |
+| Scorer | Calculates compliance percentages and grades | Arithmetic: (pass + partial*0.5) / assessed * 100 |
+| Policy generator | Produces governance policy documents | Jinja2 template rendering with company name substitution |
+| AI SBOM | Inventories AI SDKs, models, cloud services | File parsing + dict construction, CycloneDX JSON output |
+
+**Why this matters:**
+
+1. **Reproducibility.** Same code + same infrastructure = identical findings. No model temperature, no token sampling, no run-to-run variance.
+2. **Auditability.** Every finding traces to a specific regex pattern, API response, or dict lookup. An auditor can inspect the check function and understand exactly why a finding was produced.
+3. **No hallucination risk.** The scanner cannot invent findings that don't exist or miss findings that do. Pattern matched or not matched — binary.
+4. **No cost per scan.** No API tokens consumed. Scans can run as frequently as needed at zero marginal cost.
+
+Most AI security vendors (Straiker, Lakera, CalypsoAI, Promptfoo) use LLMs in their detection pipelines. This gives them flexibility but introduces non-determinism. Whitney chose the opposite trade-off: less flexible, but every result is explainable and reproducible.
+
+Claude Code is used as the **user interface layer** only — it calls Whitney's Python functions and presents results in natural language. The compliance engine itself is pure code.
+
+---
+
 **How to verify yourself:**
 
 ```bash

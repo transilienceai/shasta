@@ -46,6 +46,14 @@ Shasta scans your cloud infrastructure. Whitney scans your AI systems and code. 
 
 Every check produces a `Finding` object with: severity, compliance status, resource ID, cloud provider, SOC 2 control mapping, plain-English description, and remediation guidance.
 
+### Deterministic by Design — No LLM in the Detection Pipeline
+
+Shasta and Whitney are **100% deterministic**. Every finding is produced by regex pattern matching, AWS/Azure SDK API calls, dictionary lookups, and arithmetic. There is no LLM inference, no probabilistic model, and no token consumption in the scanning, scoring, mapping, policy generation, or SBOM output.
+
+Same infrastructure + same scan = same results, every time.
+
+Claude Code is used as the **user interface layer** — it calls Shasta and Whitney's Python functions and presents the results in natural language. But the compliance engine itself is pure code. This matters for audit: results are reproducible, explainable, and not subject to model drift or hallucination.
+
 ### 2. SOC 2 Compliance Framework
 
 - **Control definitions** for CC1.1 through CC9.1 with automated check mappings
