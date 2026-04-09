@@ -16,65 +16,107 @@ from shasta.evidence.models import CheckDomain, ComplianceStatus, Finding, Sever
 
 
 def run_all_encryption_checks(client: AWSClient) -> list[Finding]:
-    """Run all EBS and RDS encryption checks."""
+    """Run all EBS and RDS encryption checks across every enabled region."""
     findings: list[Finding] = []
     account_id = client.account_info.account_id if client.account_info else "unknown"
     region = client.account_info.region if client.account_info else "us-east-1"
 
-    findings.extend(check_ebs_encryption_default(client, account_id, region))
-    findings.extend(check_ebs_volumes(client, account_id, region))
-    findings.extend(check_rds_encryption(client, account_id, region))
-    findings.extend(check_rds_public_access(client, account_id, region))
-    findings.extend(check_rds_backups(client, account_id, region))
+    try:
+        regions = client.get_enabled_regions()
+    except ClientError:
+        regions = [region]
+
+    # Multi-region rollup checks (per-region settings)
+    findings.extend(check_ebs_encryption_default(client, account_id, region, regions))
+
+    # Per-region resource checks
+    for r in regions:
+        try:
+            rc = client.for_region(r)
+            findings.extend(check_ebs_volumes(rc, account_id, r))
+            findings.extend(check_rds_encryption(rc, account_id, r))
+            findings.extend(check_rds_public_access(rc, account_id, r))
+            findings.extend(check_rds_backups(rc, account_id, r))
+        except ClientError:
+            continue
 
     return findings
 
 
-def check_ebs_encryption_default(client: AWSClient, account_id: str, region: str) -> list[Finding]:
-    """CC6.7 — Check that EBS encryption by default is enabled."""
-    ec2 = client.client("ec2")
+def check_ebs_encryption_default(
+    client: AWSClient,
+    account_id: str,
+    region: str,
+    regions: list[str] | None = None,
+) -> list[Finding]:
+    """CC6.7 — Check EBS encryption-by-default across every enabled region.
 
-    try:
-        response = ec2.get_ebs_encryption_by_default()
-        enabled = response.get("EbsEncryptionByDefault", False)
+    Emits one PASS finding listing regions where it's enabled, and one FAIL
+    finding per region where it's disabled.
+    """
+    findings: list[Finding] = []
 
-        if enabled:
-            return [
-                Finding(
-                    check_id="ebs-encryption-by-default",
-                    title="EBS encryption by default is enabled",
-                    description="EBS encryption by default is enabled in this region. All new EBS volumes will be automatically encrypted.",
-                    severity=Severity.INFO,
-                    status=ComplianceStatus.PASS,
-                    domain=CheckDomain.ENCRYPTION,
-                    resource_type="AWS::EC2::EBSEncryption",
-                    resource_id=f"arn:aws:ec2:{region}:{account_id}:ebs-default-encryption",
-                    region=region,
-                    account_id=account_id,
-                    soc2_controls=["CC6.7"],
-                    details={"enabled": True},
-                )
-            ]
-        else:
-            return [
-                Finding(
-                    check_id="ebs-encryption-by-default",
-                    title="EBS encryption by default is NOT enabled",
-                    description="EBS encryption by default is disabled in this region. New EBS volumes will be created unencrypted unless explicitly specified. This means an engineer could accidentally create an unencrypted volume.",
-                    severity=Severity.HIGH,
-                    status=ComplianceStatus.FAIL,
-                    domain=CheckDomain.ENCRYPTION,
-                    resource_type="AWS::EC2::EBSEncryption",
-                    resource_id=f"arn:aws:ec2:{region}:{account_id}:ebs-default-encryption",
-                    region=region,
-                    account_id=account_id,
-                    remediation="Enable EBS encryption by default: AWS Console > EC2 > Settings > EBS encryption > Enable. Or via CLI: aws ec2 enable-ebs-encryption-by-default",
-                    soc2_controls=["CC6.7"],
-                    details={"enabled": False},
-                )
-            ]
-    except ClientError:
-        return []
+    if regions is None:
+        try:
+            regions = client.get_enabled_regions()
+        except ClientError:
+            regions = [region]
+
+    enabled_regions: list[str] = []
+    disabled_regions: list[str] = []
+
+    for r in regions:
+        try:
+            ec2 = client.for_region(r).client("ec2")
+            response = ec2.get_ebs_encryption_by_default()
+            if response.get("EbsEncryptionByDefault", False):
+                enabled_regions.append(r)
+            else:
+                disabled_regions.append(r)
+        except ClientError:
+            continue
+
+    if enabled_regions:
+        findings.append(
+            Finding(
+                check_id="ebs-encryption-by-default",
+                title=f"EBS encryption by default is enabled in {len(enabled_regions)} region(s)",
+                description=f"EBS encryption by default is enabled in: {', '.join(sorted(enabled_regions))}. All new EBS volumes in these regions will be automatically encrypted.",
+                severity=Severity.INFO,
+                status=ComplianceStatus.PASS,
+                domain=CheckDomain.ENCRYPTION,
+                resource_type="AWS::EC2::EBSEncryption",
+                resource_id=f"arn:aws:ec2:{enabled_regions[0]}:{account_id}:ebs-default-encryption",
+                region=enabled_regions[0],
+                account_id=account_id,
+                soc2_controls=["CC6.7"],
+                details={
+                    "enabled_regions": sorted(enabled_regions),
+                    "disabled_regions": sorted(disabled_regions),
+                },
+            )
+        )
+
+    for r in sorted(disabled_regions):
+        findings.append(
+            Finding(
+                check_id="ebs-encryption-by-default",
+                title=f"EBS encryption by default is NOT enabled in {r}",
+                description=f"EBS encryption by default is disabled in {r}. New EBS volumes will be created unencrypted unless explicitly specified. An engineer could accidentally create an unencrypted volume.",
+                severity=Severity.HIGH,
+                status=ComplianceStatus.FAIL,
+                domain=CheckDomain.ENCRYPTION,
+                resource_type="AWS::EC2::EBSEncryption",
+                resource_id=f"arn:aws:ec2:{r}:{account_id}:ebs-default-encryption",
+                region=r,
+                account_id=account_id,
+                remediation=f"Enable EBS encryption by default in {r}: AWS Console > EC2 > Settings > EBS encryption > Enable. Or via CLI: aws ec2 enable-ebs-encryption-by-default --region {r}",
+                soc2_controls=["CC6.7"],
+                details={"enabled": False, "region": r},
+            )
+        )
+
+    return findings
 
 
 def check_ebs_volumes(client: AWSClient, account_id: str, region: str) -> list[Finding]:

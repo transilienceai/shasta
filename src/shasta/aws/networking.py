@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from botocore.exceptions import ClientError
+
 from shasta.aws.client import AWSClient
 from shasta.evidence.models import CheckDomain, ComplianceStatus, Finding, Severity
 
@@ -26,16 +28,24 @@ DANGEROUS_PORTS = {
 
 
 def run_all_networking_checks(client: AWSClient) -> list[Finding]:
-    """Run all networking compliance checks."""
+    """Run all networking compliance checks across every enabled region."""
     findings: list[Finding] = []
     account_id = client.account_info.account_id if client.account_info else "unknown"
     region = client.account_info.region if client.account_info else "us-east-1"
 
-    ec2 = client.client("ec2")
+    try:
+        regions = client.get_enabled_regions()
+    except ClientError:
+        regions = [region]
 
-    findings.extend(check_security_groups(ec2, account_id, region))
-    findings.extend(check_vpc_flow_logs(ec2, account_id, region))
-    findings.extend(check_default_security_groups(ec2, account_id, region))
+    for r in regions:
+        try:
+            ec2 = client.for_region(r).client("ec2")
+            findings.extend(check_security_groups(ec2, account_id, r))
+            findings.extend(check_vpc_flow_logs(ec2, account_id, r))
+            findings.extend(check_default_security_groups(ec2, account_id, r))
+        except ClientError:
+            continue
 
     return findings
 

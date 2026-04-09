@@ -28,11 +28,11 @@ Shasta scans your cloud infrastructure. Whitney scans your AI systems and code. 
 
 | Domain | Checks | SOC 2 Controls |
 |--------|--------|----------------|
-| **IAM** | Password policy, root MFA, user MFA, access key rotation, inactive users, direct policies, overprivileged users | CC6.1, CC6.2, CC6.3 |
+| **IAM** | Password policy, root MFA, root account recent-activity (90-day), user MFA, access key rotation, inactive users, direct policies, overprivileged users | CC6.1, CC6.2, CC6.3 |
 | **Networking** | Security group ingress rules, VPC flow logs, default SG lockdown, public subnet analysis | CC6.6 |
 | **Storage** | S3 encryption, versioning, public access blocks, SSL-only policies | CC6.7 |
 | **Encryption** | EBS encryption by default, EBS volume encryption, RDS encryption at rest, RDS public access, RDS backups | CC6.6, CC6.7 |
-| **Monitoring** | CloudTrail configuration, GuardDuty status, AWS Config recording, Inspector vulnerability scanning | CC7.1, CC7.2, CC8.1 |
+| **Monitoring** | CloudTrail configuration, GuardDuty status (multi-region with top severity-ranked active findings), AWS Config recording, Inspector vulnerability scanning | CC7.1, CC7.2, CC8.1 |
 
 #### Azure Checks (22)
 
@@ -764,6 +764,9 @@ shasta/
 
 ### Immediate Improvements
 - [x] ~~Multi-region scanning support~~ — scans all enabled AWS regions, IAM global + regional checks
+- [x] ~~Multi-region encryption / networking / vulnerabilities / pentest~~ — `run_all_*` helpers iterate every enabled region with rollup PASS findings + per-region FAIL findings
+- [x] ~~Root account activity detection~~ — parses credential report `password_last_used` + `access_key_*_last_used_date`, fails HIGH if root used within 90 days (CC6.1/CC6.3)
+- [x] ~~GuardDuty top findings surfacing~~ — pulls highest-severity active findings per region with critical-type prefix detection (credential exfiltration, cryptomining, trojans, backdoors, Impact/Exfiltration tactics)
 - [x] ~~Role trust policy analysis~~ — detects overpermissive `Principal: "*"` in IAM role trust policies
 - [x] ~~EBS snapshot public exposure~~ — flags snapshots shared with `all`
 - [x] ~~RDS snapshot public access~~ — flags publicly shared database snapshots

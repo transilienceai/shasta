@@ -34,6 +34,7 @@ def run_all_iam_checks(client: AWSClient) -> list[Finding]:
 
     findings.extend(check_password_policy(iam, account_id, region))
     findings.extend(check_root_account(iam, account_id, region))
+    findings.extend(check_root_account_activity(iam, account_id, region))
     findings.extend(check_user_mfa(iam, account_id, region))
     findings.extend(check_access_key_rotation(iam, account_id, region))
     findings.extend(check_inactive_users(iam, account_id, region))
@@ -187,6 +188,138 @@ def check_root_account(iam: Any, account_id: str, region: str) -> list[Finding]:
                 )
     except Exception:
         pass  # Credential report may not be available
+
+    return findings
+
+
+# Threshold for flagging recent root account usage
+ROOT_RECENT_USE_DAYS = 90
+
+
+def check_root_account_activity(iam: Any, account_id: str, region: str) -> list[Finding]:
+    """CC6.1/CC6.3 — Check whether the root account has been used recently.
+
+    Reads password_last_used and access_key_last_used_date from the credential
+    report's <root_account> entry. Any usage in the last 90 days is flagged
+    HIGH because root should be used only for break-glass / billing tasks.
+    """
+    findings: list[Finding] = []
+    try:
+        _generate_credential_report(iam)
+        report = _parse_credential_report(iam)
+    except Exception:
+        return findings
+
+    root_entry = next((u for u in report if u["user"] == "<root_account>"), None)
+    if not root_entry:
+        return findings
+
+    now = datetime.now(timezone.utc)
+    threshold = now - timedelta(days=ROOT_RECENT_USE_DAYS)
+
+    last_activity: datetime | None = None
+    activity_sources: list[str] = []
+
+    pwd_last_used = root_entry.get("password_last_used", "N/A")
+    if pwd_last_used not in ("N/A", "no_information", "not_supported", ""):
+        try:
+            pwd_date = datetime.fromisoformat(pwd_last_used.replace("Z", "+00:00"))
+            if last_activity is None or pwd_date > last_activity:
+                last_activity = pwd_date
+            activity_sources.append(f"console login on {pwd_date.date().isoformat()}")
+        except (ValueError, TypeError):
+            pass
+
+    for key_num in ("1", "2"):
+        key_active = root_entry.get(f"access_key_{key_num}_active", "false")
+        key_last_used = root_entry.get(f"access_key_{key_num}_last_used_date", "N/A")
+        if key_active == "true" and key_last_used not in ("N/A", "no_information", ""):
+            try:
+                key_date = datetime.fromisoformat(key_last_used.replace("Z", "+00:00"))
+                if last_activity is None or key_date > last_activity:
+                    last_activity = key_date
+                activity_sources.append(
+                    f"access key {key_num} on {key_date.date().isoformat()}"
+                )
+            except (ValueError, TypeError):
+                pass
+
+    if last_activity is None:
+        findings.append(
+            Finding(
+                check_id="iam-root-not-used",
+                title="Root account has no recorded recent usage",
+                description="The root account has no record of recent console logins or access key usage. This is the desired state — root should be used only for break-glass scenarios.",
+                severity=Severity.INFO,
+                status=ComplianceStatus.PASS,
+                domain=CheckDomain.IAM,
+                resource_type="AWS::IAM::RootAccount",
+                resource_id=f"arn:aws:iam::{account_id}:root",
+                region=region,
+                account_id=account_id,
+                soc2_controls=["CC6.1", "CC6.3"],
+                details={"sources_checked": ["password_last_used", "access_key_last_used_date"]},
+            )
+        )
+        return findings
+
+    days_ago = (now - last_activity).days
+    is_recent = last_activity >= threshold
+
+    if is_recent:
+        findings.append(
+            Finding(
+                check_id="iam-root-not-used",
+                title=f"Root account was used {days_ago} day(s) ago",
+                description=(
+                    f"The root account has been used recently ({'; '.join(activity_sources)}). "
+                    "Root should be reserved for break-glass / billing tasks only — day-to-day "
+                    "operations should use IAM users or roles. SOC 2 CC6.1/CC6.3 expects root usage "
+                    "to be rare, audited, and alerted on."
+                ),
+                severity=Severity.HIGH,
+                status=ComplianceStatus.FAIL,
+                domain=CheckDomain.IAM,
+                resource_type="AWS::IAM::RootAccount",
+                resource_id=f"arn:aws:iam::{account_id}:root",
+                region=region,
+                account_id=account_id,
+                remediation=(
+                    "Audit recent root activity in CloudTrail (filter userIdentity.type=Root). "
+                    "Move whatever the root account was doing to an IAM user or role with scoped "
+                    "permissions. Set up a CloudWatch alarm on RootAccountUsage metric and "
+                    "ensure root credentials are stored in a vault with break-glass procedures."
+                ),
+                soc2_controls=["CC6.1", "CC6.3"],
+                details={
+                    "days_since_last_use": days_ago,
+                    "last_activity_iso": last_activity.isoformat(),
+                    "activity_sources": activity_sources,
+                    "threshold_days": ROOT_RECENT_USE_DAYS,
+                },
+            )
+        )
+    else:
+        findings.append(
+            Finding(
+                check_id="iam-root-not-used",
+                title=f"Root account last used {days_ago} day(s) ago (outside threshold)",
+                description=f"Root was last used {days_ago} days ago — outside the {ROOT_RECENT_USE_DAYS}-day recency window.",
+                severity=Severity.INFO,
+                status=ComplianceStatus.PASS,
+                domain=CheckDomain.IAM,
+                resource_type="AWS::IAM::RootAccount",
+                resource_id=f"arn:aws:iam::{account_id}:root",
+                region=region,
+                account_id=account_id,
+                soc2_controls=["CC6.1", "CC6.3"],
+                details={
+                    "days_since_last_use": days_ago,
+                    "last_activity_iso": last_activity.isoformat(),
+                    "threshold_days": ROOT_RECENT_USE_DAYS,
+                },
+            )
+        )
 
     return findings
 

@@ -36,6 +36,74 @@ def _guardduty_severity(severity_counts: dict[str, Any]) -> Severity:
     return Severity.MEDIUM
 
 
+# Finding type prefixes that should always be treated as critical regardless of
+# GuardDuty's numeric severity. These represent active compromise / data
+# exfiltration / cryptomining and warrant immediate response.
+_GUARDDUTY_CRITICAL_TYPE_PREFIXES = (
+    "UnauthorizedAccess:IAMUser/InstanceCredentialExfiltration",
+    "UnauthorizedAccess:IAMUser/AnomalousBehavior",
+    "UnauthorizedAccess:EC2/MaliciousIPCaller",
+    "CryptoCurrency:EC2/BitcoinTool",
+    "CryptoCurrency:Lambda/BitcoinTool",
+    "Trojan:EC2/",
+    "Backdoor:EC2/",
+    "Impact:",
+    "Exfiltration:",
+)
+
+
+def _is_critical_guardduty_type(finding_type: str) -> bool:
+    return any(finding_type.startswith(p) for p in _GUARDDUTY_CRITICAL_TYPE_PREFIXES)
+
+
+def _list_top_guardduty_findings(
+    gd: Any, detector_id: str, limit: int = 10
+) -> list[dict[str, Any]]:
+    """Return the most severe + recent active GuardDuty findings.
+
+    Sorted by severity descending so the most dangerous types appear first.
+    Only fetches non-archived findings.
+    """
+    try:
+        listed = gd.list_findings(
+            DetectorId=detector_id,
+            FindingCriteria={
+                "Criterion": {
+                    "service.archived": {"Eq": ["false"]},
+                }
+            },
+            SortCriteria={"AttributeName": "severity", "OrderBy": "DESC"},
+            MaxResults=limit,
+        )
+        finding_ids = listed.get("FindingIds", [])
+    except ClientError:
+        return []
+
+    if not finding_ids:
+        return []
+
+    try:
+        resp = gd.get_findings(DetectorId=detector_id, FindingIds=finding_ids)
+    except ClientError:
+        return []
+
+    out = []
+    for f in resp.get("Findings", []):
+        out.append(
+            {
+                "id": f.get("Id"),
+                "type": f.get("Type", ""),
+                "title": f.get("Title", ""),
+                "severity": f.get("Severity", 0),
+                "resource": (f.get("Resource") or {}).get("ResourceType", ""),
+                "region": f.get("Region", ""),
+                "updated_at": f.get("UpdatedAt", ""),
+                "count": (f.get("Service") or {}).get("Count", 1),
+            }
+        )
+    return out
+
+
 def run_all_logging_checks(client: AWSClient) -> list[Finding]:
     """Run all logging and monitoring compliance checks."""
     findings: list[Finding] = []
@@ -167,18 +235,65 @@ def check_cloudtrail(client: AWSClient, account_id: str, region: str) -> list[Fi
 
 
 def check_guardduty(client: AWSClient, account_id: str, region: str) -> list[Finding]:
-    """CC7.1/CC7.2 — Check that GuardDuty is enabled."""
-    findings = []
-    gd = client.client("guardduty")
+    """CC7.1/CC7.2 — Check that GuardDuty is enabled across all enabled regions.
+
+    Probes every region returned by ec2:DescribeRegions. Reports PASS if at
+    least one region has an ENABLED detector, and surfaces uncovered regions
+    in the finding details. Per-region active findings are emitted separately.
+    """
+    findings: list[Finding] = []
 
     try:
-        detectors = gd.list_detectors()["DetectorIds"]
+        regions = client.get_enabled_regions()
     except ClientError:
+        regions = [region]
+
+    # region -> {"status": ENABLED|DISABLED, "detector_id": str, "severity_counts": dict}
+    per_region: dict[str, dict[str, Any]] = {}
+    probe_errors = 0
+
+    for r in regions:
+        try:
+            gd = client.for_region(r).client("guardduty")
+            detector_ids = gd.list_detectors().get("DetectorIds", [])
+        except ClientError:
+            probe_errors += 1
+            continue
+
+        if not detector_ids:
+            continue
+
+        detector_id = detector_ids[0]
+        try:
+            detector = gd.get_detector(DetectorId=detector_id)
+            status = detector.get("Status", "DISABLED")
+            severity_counts: dict[str, Any] = {}
+            top_findings: list[dict[str, Any]] = []
+            if status == "ENABLED":
+                stats = gd.get_findings_statistics(
+                    DetectorId=detector_id,
+                    FindingStatisticTypes=["COUNT_BY_SEVERITY"],
+                )
+                severity_counts = stats.get("FindingStatistics", {}).get("CountBySeverity", {})
+                # Pull the actual top findings (highest severity first, most recent)
+                top_findings = _list_top_guardduty_findings(gd, detector_id, limit=10)
+            per_region[r] = {
+                "status": status,
+                "detector_id": detector_id,
+                "severity_counts": severity_counts,
+                "top_findings": top_findings,
+            }
+        except ClientError:
+            probe_errors += 1
+            continue
+
+    # If we couldn't query anywhere, return NOT_ASSESSED
+    if not per_region and probe_errors == len(regions):
         return [
             Finding(
                 check_id="guardduty-enabled",
                 title="Unable to check GuardDuty status",
-                description="Could not query GuardDuty. Ensure the scanning role has guardduty:ListDetectors permission.",
+                description="Could not query GuardDuty in any region. Ensure the scanning role has guardduty:ListDetectors permission.",
                 severity=Severity.MEDIUM,
                 status=ComplianceStatus.NOT_ASSESSED,
                 domain=CheckDomain.MONITORING,
@@ -190,12 +305,17 @@ def check_guardduty(client: AWSClient, account_id: str, region: str) -> list[Fin
             )
         ]
 
-    if not detectors:
+    enabled_regions = sorted(r for r, d in per_region.items() if d["status"] == "ENABLED")
+    disabled_regions = sorted(r for r, d in per_region.items() if d["status"] != "ENABLED")
+    uncovered_regions = sorted(set(regions) - set(per_region.keys()))
+
+    if not per_region:
+        # No detectors anywhere — true fail
         return [
             Finding(
                 check_id="guardduty-enabled",
-                title="GuardDuty is NOT enabled",
-                description="Amazon GuardDuty is not enabled in this account/region. GuardDuty uses machine learning to detect threats, compromised instances, and anomalous behavior — it's a critical layer of automated threat detection.",
+                title="GuardDuty is NOT enabled in any region",
+                description=f"Amazon GuardDuty has no detectors in any of the {len(regions)} enabled region(s). GuardDuty uses machine learning to detect threats, compromised instances, and anomalous behavior — it's a critical layer of automated threat detection.",
                 severity=Severity.HIGH,
                 status=ComplianceStatus.FAIL,
                 domain=CheckDomain.MONITORING,
@@ -203,113 +323,204 @@ def check_guardduty(client: AWSClient, account_id: str, region: str) -> list[Fin
                 resource_id=f"arn:aws:guardduty:{region}:{account_id}",
                 region=region,
                 account_id=account_id,
-                remediation="Enable GuardDuty in this region. It starts analyzing immediately with no configuration needed.",
+                remediation="Enable GuardDuty in your primary operating region(s). It starts analyzing immediately with no configuration needed.",
                 soc2_controls=["CC7.1", "CC7.2"],
+                details={"regions_checked": regions},
             )
         ]
 
-    # Check first detector's details
-    detector_id = detectors[0]
-    try:
-        detector = gd.get_detector(DetectorId=detector_id)
-        detector_status = detector.get("Status", "DISABLED")
-
-        if detector_status == "ENABLED":
-            # Check for active findings
-            finding_stats = gd.get_findings_statistics(
-                DetectorId=detector_id,
-                FindingStatisticTypes=["COUNT_BY_SEVERITY"],
-            )
-            severity_counts = finding_stats.get("FindingStatistics", {}).get("CountBySeverity", {})
-            total_findings = sum(int(v) for v in severity_counts.values())
-
-            findings.append(
-                Finding(
-                    check_id="guardduty-enabled",
-                    title="GuardDuty is enabled and active",
-                    description=f"GuardDuty is enabled (detector {detector_id}). "
+    if enabled_regions:
+        primary = enabled_regions[0]
+        primary_detector = per_region[primary]["detector_id"]
+        total_active_findings = sum(
+            int(v)
+            for r in enabled_regions
+            for v in per_region[r]["severity_counts"].values()
+        )
+        findings.append(
+            Finding(
+                check_id="guardduty-enabled",
+                title=f"GuardDuty is enabled in {len(enabled_regions)} region(s): {', '.join(enabled_regions)}",
+                description=(
+                    f"GuardDuty is actively monitoring in: {', '.join(enabled_regions)}. "
                     + (
-                        f"There are {total_findings} active finding(s) that should be reviewed."
-                        if total_findings > 0
+                        f"There are {total_active_findings} active finding(s) across enabled regions."
+                        if total_active_findings > 0
                         else "No active findings."
-                    ),
-                    severity=Severity.INFO,
-                    status=ComplianceStatus.PASS,
-                    domain=CheckDomain.MONITORING,
-                    resource_type="AWS::GuardDuty::Detector",
-                    resource_id=f"arn:aws:guardduty:{region}:{account_id}:detector/{detector_id}",
-                    region=region,
-                    account_id=account_id,
-                    soc2_controls=["CC7.1", "CC7.2"],
-                    details={
-                        "detector_id": detector_id,
-                        "status": detector_status,
-                        "active_findings": total_findings,
-                        "severity_counts": severity_counts,
-                    },
-                )
+                    )
+                ),
+                severity=Severity.INFO,
+                status=ComplianceStatus.PASS,
+                domain=CheckDomain.MONITORING,
+                resource_type="AWS::GuardDuty::Detector",
+                resource_id=f"arn:aws:guardduty:{primary}:{account_id}:detector/{primary_detector}",
+                region=primary,
+                account_id=account_id,
+                soc2_controls=["CC7.1", "CC7.2"],
+                details={
+                    "enabled_regions": enabled_regions,
+                    "disabled_regions": disabled_regions,
+                    "uncovered_regions": uncovered_regions,
+                    "active_findings": total_active_findings,
+                },
             )
+        )
 
-            # If there are active findings, flag them
-            if total_findings > 0:
+        # Per-region active findings — surface actual finding types so users
+        # can see WHAT is happening, not just a count.
+        for r in enabled_regions:
+            severity_counts = per_region[r]["severity_counts"]
+            total = sum(int(v) for v in severity_counts.values())
+            top_findings = per_region[r].get("top_findings", [])
+            if total > 0:
+                detector_id = per_region[r]["detector_id"]
+
+                # Determine severity: bump to CRITICAL if any top finding has a
+                # critical-class type, regardless of GuardDuty's numeric scale.
+                has_critical_type = any(
+                    _is_critical_guardduty_type(tf.get("type", "")) for tf in top_findings
+                )
+                has_high_numeric = any(
+                    float(tf.get("severity") or 0) >= 7.0 for tf in top_findings
+                )
+                if has_critical_type:
+                    severity = Severity.CRITICAL
+                elif has_high_numeric:
+                    severity = Severity.HIGH
+                else:
+                    severity = _guardduty_severity(severity_counts)
+
+                # Build a description listing the actual finding types
+                if top_findings:
+                    type_summary = "; ".join(
+                        f"{tf['type']} (sev={tf['severity']}, x{tf.get('count', 1)})"
+                        for tf in top_findings[:5]
+                    )
+                    description = (
+                        f"GuardDuty has detected {total} active threat(s) in {r}. "
+                        f"Top finding types: {type_summary}"
+                    )
+                else:
+                    description = (
+                        f"GuardDuty has detected {total} active threat(s) in {r}. "
+                        "Active findings require investigation and response."
+                    )
+
                 findings.append(
                     Finding(
                         check_id="guardduty-no-active-findings",
-                        title=f"GuardDuty has {total_findings} active finding(s)",
-                        description=f"GuardDuty has detected {total_findings} potential threat(s). Active findings require investigation and response.",
-                        severity=_guardduty_severity(severity_counts),
+                        title=f"GuardDuty has {total} active finding(s) in {r}",
+                        description=description,
+                        severity=severity,
                         status=ComplianceStatus.FAIL,
                         domain=CheckDomain.MONITORING,
                         resource_type="AWS::GuardDuty::Detector",
-                        resource_id=f"arn:aws:guardduty:{region}:{account_id}:detector/{detector_id}",
-                        region=region,
+                        resource_id=f"arn:aws:guardduty:{r}:{account_id}:detector/{detector_id}",
+                        region=r,
                         account_id=account_id,
-                        remediation="Review and address all GuardDuty findings. Archive resolved findings after investigation.",
+                        remediation="Review and address all GuardDuty findings in the AWS Console (GuardDuty > Findings). Archive resolved findings after investigation.",
                         soc2_controls=["CC7.2"],
                         details={
-                            "total_findings": total_findings,
+                            "total_findings": total,
                             "severity_counts": severity_counts,
+                            "top_findings": top_findings,
                         },
                     )
                 )
-        else:
-            findings.append(
-                Finding(
-                    check_id="guardduty-enabled",
-                    title="GuardDuty detector exists but is DISABLED",
-                    description=f"GuardDuty detector {detector_id} exists but is disabled. It is not actively monitoring for threats.",
-                    severity=Severity.HIGH,
-                    status=ComplianceStatus.FAIL,
-                    domain=CheckDomain.MONITORING,
-                    resource_type="AWS::GuardDuty::Detector",
-                    resource_id=f"arn:aws:guardduty:{region}:{account_id}:detector/{detector_id}",
-                    region=region,
-                    account_id=account_id,
-                    remediation="Re-enable the GuardDuty detector.",
-                    soc2_controls=["CC7.1", "CC7.2"],
-                    details={"detector_id": detector_id, "status": detector_status},
-                )
+    else:
+        # Detectors exist but all are disabled
+        findings.append(
+            Finding(
+                check_id="guardduty-enabled",
+                title=f"GuardDuty detectors exist but are DISABLED in {len(disabled_regions)} region(s)",
+                description=f"GuardDuty detectors are present in {', '.join(disabled_regions)} but none are enabled. They are not actively monitoring for threats.",
+                severity=Severity.HIGH,
+                status=ComplianceStatus.FAIL,
+                domain=CheckDomain.MONITORING,
+                resource_type="AWS::GuardDuty::Detector",
+                resource_id=f"arn:aws:guardduty:{disabled_regions[0]}:{account_id}",
+                region=disabled_regions[0],
+                account_id=account_id,
+                remediation="Re-enable the GuardDuty detector(s).",
+                soc2_controls=["CC7.1", "CC7.2"],
+                details={"disabled_regions": disabled_regions},
             )
-
-    except ClientError:
-        pass
+        )
 
     return findings
 
 
 def check_aws_config(client: AWSClient, account_id: str, region: str) -> list[Finding]:
-    """CC7.1/CC8.1 — Check that AWS Config is enabled and recording."""
-    findings = []
-    config = client.client("config")
+    """CC7.1/CC8.1 — Check AWS Config is enabled and recording across all enabled regions.
+
+    Probes every region returned by ec2:DescribeRegions. Reports PASS if at
+    least one region has an actively recording recorder, and surfaces uncovered
+    regions in the finding details. Per-region recorder issues are emitted as
+    PARTIAL findings tagged with the region.
+    """
+    findings: list[Finding] = []
 
     try:
-        recorders = config.describe_configuration_recorders()["ConfigurationRecorders"]
+        regions = client.get_enabled_regions()
     except ClientError:
+        regions = [region]
+
+    # region -> list of {"name", "recording", "all_supported", "include_global", "issues"}
+    per_region: dict[str, list[dict[str, Any]]] = {}
+    probe_errors = 0
+
+    for r in regions:
+        try:
+            cfg = client.for_region(r).client("config")
+            recorders = cfg.describe_configuration_recorders().get("ConfigurationRecorders", [])
+        except ClientError:
+            probe_errors += 1
+            continue
+
+        if not recorders:
+            continue
+
+        try:
+            statuses = cfg.describe_configuration_recorder_status().get(
+                "ConfigurationRecordersStatus", []
+            )
+        except ClientError:
+            statuses = []
+
+        recorder_infos: list[dict[str, Any]] = []
+        for recorder in recorders:
+            recorder_name = recorder.get("name", "default")
+            recording_group = recorder.get("recordingGroup", {})
+            all_supported = recording_group.get("allSupported", False)
+            include_global = recording_group.get("includeGlobalResourceTypes", False)
+            status_entry = next((s for s in statuses if s.get("name") == recorder_name), {})
+            is_recording = status_entry.get("recording", False)
+
+            issues = []
+            if not is_recording:
+                issues.append("Recording is currently STOPPED")
+            if not all_supported:
+                issues.append("Not recording all supported resource types")
+            if not include_global:
+                issues.append("Not recording global resources (IAM, etc.)")
+
+            recorder_infos.append(
+                {
+                    "name": recorder_name,
+                    "recording": is_recording,
+                    "all_supported": all_supported,
+                    "include_global": include_global,
+                    "issues": issues,
+                }
+            )
+        per_region[r] = recorder_infos
+
+    if not per_region and probe_errors == len(regions):
         return [
             Finding(
                 check_id="config-enabled",
                 title="Unable to check AWS Config status",
-                description="Could not query AWS Config. Ensure the scanning role has config:DescribeConfigurationRecorders permission.",
+                description="Could not query AWS Config in any region. Ensure the scanning role has config:DescribeConfigurationRecorders permission.",
                 severity=Severity.MEDIUM,
                 status=ComplianceStatus.NOT_ASSESSED,
                 domain=CheckDomain.MONITORING,
@@ -321,12 +532,12 @@ def check_aws_config(client: AWSClient, account_id: str, region: str) -> list[Fi
             )
         ]
 
-    if not recorders:
+    if not per_region:
         return [
             Finding(
                 check_id="config-enabled",
-                title="AWS Config is NOT enabled",
-                description="AWS Config is not set up in this account/region. Config continuously records resource configurations and changes — essential for change management auditing and drift detection.",
+                title="AWS Config is NOT enabled in any region",
+                description=f"AWS Config has no recorders in any of the {len(regions)} enabled region(s). Config continuously records resource configurations and changes — essential for change management auditing and drift detection.",
                 severity=Severity.HIGH,
                 status=ComplianceStatus.FAIL,
                 domain=CheckDomain.MONITORING,
@@ -334,80 +545,89 @@ def check_aws_config(client: AWSClient, account_id: str, region: str) -> list[Fi
                 resource_id=f"arn:aws:config:{region}:{account_id}",
                 region=region,
                 account_id=account_id,
-                remediation="Enable AWS Config with a recorder that captures all resource types, including global resources.",
+                remediation="Enable AWS Config in your primary operating region(s) with a recorder that captures all resource types, including global resources.",
                 soc2_controls=["CC7.1", "CC8.1"],
+                details={"regions_checked": regions},
             )
         ]
 
-    for recorder in recorders:
-        recorder_name = recorder.get("name", "default")
-        recording_group = recorder.get("recordingGroup", {})
-        all_supported = recording_group.get("allSupported", False)
-        include_global = recording_group.get("includeGlobalResourceTypes", False)
+    healthy_regions = sorted(
+        r for r, infos in per_region.items() if any(not i["issues"] for i in infos)
+    )
+    uncovered_regions = sorted(set(regions) - set(per_region.keys()))
 
-        # Check if recording is active
-        try:
-            statuses = config.describe_configuration_recorder_status()[
-                "ConfigurationRecordersStatus"
-            ]
-            recorder_status = next((s for s in statuses if s.get("name") == recorder_name), {})
-            is_recording = recorder_status.get("recording", False)
-        except ClientError:
-            is_recording = False
+    if healthy_regions:
+        primary = healthy_regions[0]
+        primary_recorder = next(i for i in per_region[primary] if not i["issues"])["name"]
+        findings.append(
+            Finding(
+                check_id="config-enabled",
+                title=f"AWS Config is enabled and recording in {len(healthy_regions)} region(s): {', '.join(healthy_regions)}",
+                description=f"AWS Config recorders are actively recording all resource types (including global resources) in: {', '.join(healthy_regions)}.",
+                severity=Severity.INFO,
+                status=ComplianceStatus.PASS,
+                domain=CheckDomain.MONITORING,
+                resource_type="AWS::Config::ConfigurationRecorder",
+                resource_id=f"arn:aws:config:{primary}:{account_id}:config-recorder/{primary_recorder}",
+                region=primary,
+                account_id=account_id,
+                soc2_controls=["CC7.1", "CC8.1"],
+                details={
+                    "healthy_regions": healthy_regions,
+                    "uncovered_regions": uncovered_regions,
+                },
+            )
+        )
 
-        issues = []
-        if not is_recording:
-            issues.append("Recording is currently STOPPED")
-        if not all_supported:
-            issues.append("Not recording all supported resource types")
-        if not include_global:
-            issues.append("Not recording global resources (IAM, etc.)")
-
-        if issues:
+    # Per-region issues (PARTIAL findings) — only for recorders that have problems
+    for r, infos in sorted(per_region.items()):
+        for info in infos:
+            if not info["issues"]:
+                continue
+            # Skip "STOPPED" issues if a healthy recorder exists in the same region
             findings.append(
                 Finding(
                     check_id="config-enabled",
-                    title=f"AWS Config recorder '{recorder_name}' has issues",
-                    description=f"Config recorder '{recorder_name}' has issues: {'; '.join(issues)}",
-                    severity=Severity.HIGH if "STOPPED" in str(issues) else Severity.MEDIUM,
+                    title=f"AWS Config recorder '{info['name']}' in {r} has issues",
+                    description=f"Config recorder '{info['name']}' in {r} has issues: {'; '.join(info['issues'])}",
+                    severity=Severity.HIGH if "STOPPED" in str(info["issues"]) else Severity.MEDIUM,
                     status=ComplianceStatus.PARTIAL,
                     domain=CheckDomain.MONITORING,
                     resource_type="AWS::Config::ConfigurationRecorder",
-                    resource_id=f"arn:aws:config:{region}:{account_id}:config-recorder/{recorder_name}",
-                    region=region,
+                    resource_id=f"arn:aws:config:{r}:{account_id}:config-recorder/{info['name']}",
+                    region=r,
                     account_id=account_id,
-                    remediation=f"Fix Config recorder: " + "; ".join(issues),
+                    remediation="Fix Config recorder: " + "; ".join(info["issues"]),
                     soc2_controls=["CC7.1", "CC8.1"],
                     details={
-                        "recorder_name": recorder_name,
-                        "issues": issues,
-                        "recording": is_recording,
-                        "all_supported": all_supported,
-                        "include_global": include_global,
+                        "recorder_name": info["name"],
+                        "issues": info["issues"],
+                        "recording": info["recording"],
+                        "all_supported": info["all_supported"],
+                        "include_global": info["include_global"],
                     },
                 )
             )
-        else:
-            findings.append(
-                Finding(
-                    check_id="config-enabled",
-                    title=f"AWS Config is enabled and recording all resources",
-                    description=f"Config recorder '{recorder_name}' is active, recording all resource types including global resources.",
-                    severity=Severity.INFO,
-                    status=ComplianceStatus.PASS,
-                    domain=CheckDomain.MONITORING,
-                    resource_type="AWS::Config::ConfigurationRecorder",
-                    resource_id=f"arn:aws:config:{region}:{account_id}:config-recorder/{recorder_name}",
-                    region=region,
-                    account_id=account_id,
-                    soc2_controls=["CC7.1", "CC8.1"],
-                    details={
-                        "recorder_name": recorder_name,
-                        "recording": True,
-                        "all_supported": True,
-                        "include_global": True,
-                    },
-                )
-            )
+
+    # If no healthy region at all, add a FAIL rollup
+    if not healthy_regions:
+        findings.insert(
+            0,
+            Finding(
+                check_id="config-enabled",
+                title="AWS Config is enabled but no recorder is healthy",
+                description=f"Config recorders exist in {', '.join(sorted(per_region.keys()))} but all have issues (stopped, partial coverage, or missing global resources).",
+                severity=Severity.HIGH,
+                status=ComplianceStatus.FAIL,
+                domain=CheckDomain.MONITORING,
+                resource_type="AWS::Config::ConfigurationRecorder",
+                resource_id=f"arn:aws:config:{sorted(per_region.keys())[0]}:{account_id}",
+                region=sorted(per_region.keys())[0],
+                account_id=account_id,
+                remediation="Resolve recorder issues so at least one region has a fully healthy recorder.",
+                soc2_controls=["CC7.1", "CC8.1"],
+                details={"regions_with_issues": sorted(per_region.keys())},
+            ),
+        )
 
     return findings

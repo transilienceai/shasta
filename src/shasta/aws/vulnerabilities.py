@@ -15,73 +15,112 @@ from shasta.evidence.models import CheckDomain, ComplianceStatus, Finding, Sever
 
 
 def run_all_vulnerability_checks(client: AWSClient) -> list[Finding]:
-    """Run all vulnerability management checks."""
+    """Run all vulnerability management checks across every enabled region."""
     findings: list[Finding] = []
     account_id = client.account_info.account_id if client.account_info else "unknown"
     region = client.account_info.region if client.account_info else "us-east-1"
 
-    findings.extend(check_inspector_enabled(client, account_id, region))
-    findings.extend(check_inspector_findings(client, account_id, region))
+    try:
+        regions = client.get_enabled_regions()
+    except ClientError:
+        regions = [region]
+
+    # Multi-region rollup
+    enabled_regions, disabled_regions = _inspector_status_per_region(
+        client, account_id, regions
+    )
+    findings.extend(_inspector_enable_findings(account_id, region, enabled_regions, disabled_regions))
+
+    # Per-region findings — only query regions where Inspector is enabled
+    for r in sorted(enabled_regions.keys()):
+        try:
+            rc = client.for_region(r)
+            findings.extend(check_inspector_findings(rc, account_id, r))
+        except ClientError:
+            continue
 
     return findings
 
 
+def _inspector_status_per_region(
+    client: AWSClient, account_id: str, regions: list[str]
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Probe Inspector status in each region.
+
+    Returns (enabled_regions_map, disabled_regions). enabled_regions_map maps
+    region -> {state, ec2, ecr, lambda} for regions where Inspector is on.
+    """
+    enabled: dict[str, dict[str, Any]] = {}
+    disabled: list[str] = []
+    for r in regions:
+        try:
+            inspector = client.for_region(r).client("inspector2")
+            status = inspector.batch_get_account_status(accountIds=[account_id])
+            accounts = status.get("accounts", [])
+            if not accounts:
+                disabled.append(r)
+                continue
+            acct = accounts[0]
+            state = acct.get("state", {}).get("status", "DISABLED")
+            if state in ("ENABLED", "ENABLING"):
+                rs = acct.get("resourceState", {})
+                enabled[r] = {
+                    "state": state,
+                    "ec2": rs.get("ec2", {}).get("status", "DISABLED"),
+                    "ecr": rs.get("ecr", {}).get("status", "DISABLED"),
+                    "lambda": rs.get("lambda", {}).get("status", "DISABLED"),
+                }
+            else:
+                disabled.append(r)
+        except ClientError as e:
+            if "AccessDenied" in str(e) or "not enabled" in str(e).lower():
+                disabled.append(r)
+            # Otherwise silently skip this region
+    return enabled, disabled
+
+
+def _inspector_enable_findings(
+    account_id: str,
+    default_region: str,
+    enabled_regions: dict[str, dict[str, Any]],
+    disabled_regions: list[str],
+) -> list[Finding]:
+    findings: list[Finding] = []
+    if enabled_regions:
+        regions_str = ", ".join(sorted(enabled_regions.keys()))
+        primary = sorted(enabled_regions.keys())[0]
+        findings.append(
+            Finding(
+                check_id="inspector-enabled",
+                title=f"AWS Inspector is enabled in {len(enabled_regions)} region(s): {regions_str}",
+                description=f"AWS Inspector is actively scanning in: {regions_str}.",
+                severity=Severity.INFO,
+                status=ComplianceStatus.PASS,
+                domain=CheckDomain.MONITORING,
+                resource_type="AWS::Inspector2::Detector",
+                resource_id=f"arn:aws:inspector2:{primary}:{account_id}",
+                region=primary,
+                account_id=account_id,
+                soc2_controls=["CC7.1"],
+                details={
+                    "enabled_regions": {r: enabled_regions[r] for r in sorted(enabled_regions)},
+                    "disabled_regions": sorted(disabled_regions),
+                },
+            )
+        )
+    else:
+        findings.append(_inspector_not_enabled(account_id, default_region))
+    return findings
+
+
 def check_inspector_enabled(client: AWSClient, account_id: str, region: str) -> list[Finding]:
-    """CC7.1 — Check that AWS Inspector is enabled for vulnerability scanning."""
-    try:
-        inspector = client.client("inspector2")
-        status = inspector.batch_get_account_status(accountIds=[account_id])
+    """CC7.1 — Check that AWS Inspector is enabled for vulnerability scanning.
 
-        accounts = status.get("accounts", [])
-        if not accounts:
-            return [_inspector_not_enabled(account_id, region)]
-
-        acct = accounts[0]
-        state = acct.get("state", {}).get("status", "DISABLED")
-
-        if state in ("ENABLED", "ENABLING"):
-            # Check which scan types are active
-            resource_state = acct.get("resourceState", {})
-            ec2_status = resource_state.get("ec2", {}).get("status", "DISABLED")
-            ecr_status = resource_state.get("ecr", {}).get("status", "DISABLED")
-            lambda_status = resource_state.get("lambda", {}).get("status", "DISABLED")
-
-            active_types = []
-            if ec2_status in ("ENABLED", "ENABLING"):
-                active_types.append("EC2")
-            if ecr_status in ("ENABLED", "ENABLING"):
-                active_types.append("ECR")
-            if lambda_status in ("ENABLED", "ENABLING"):
-                active_types.append("Lambda")
-
-            return [
-                Finding(
-                    check_id="inspector-enabled",
-                    title=f"AWS Inspector is enabled (scanning: {', '.join(active_types) or 'none'})",
-                    description=f"AWS Inspector is active and scanning {', '.join(active_types)} resources for vulnerabilities.",
-                    severity=Severity.INFO,
-                    status=ComplianceStatus.PASS,
-                    domain=CheckDomain.MONITORING,
-                    resource_type="AWS::Inspector2::Detector",
-                    resource_id=f"arn:aws:inspector2:{region}:{account_id}",
-                    region=region,
-                    account_id=account_id,
-                    soc2_controls=["CC7.1"],
-                    details={
-                        "status": state,
-                        "ec2": ec2_status,
-                        "ecr": ecr_status,
-                        "lambda": lambda_status,
-                    },
-                )
-            ]
-        else:
-            return [_inspector_not_enabled(account_id, region)]
-
-    except ClientError as e:
-        if "AccessDenied" in str(e) or "not enabled" in str(e).lower():
-            return [_inspector_not_enabled(account_id, region)]
-        raise
+    Single-region wrapper kept for backward-compatibility / direct callers.
+    Use run_all_vulnerability_checks for multi-region scanning.
+    """
+    enabled, disabled = _inspector_status_per_region(client, account_id, [region])
+    return _inspector_enable_findings(account_id, region, enabled, disabled)
 
 
 def _inspector_not_enabled(account_id: str, region: str) -> Finding:
