@@ -178,3 +178,82 @@ def test_networking_modern_flow_logs_check_callable() -> None:
 
     assert callable(getattr(networking, "check_vnet_flow_logs_modern"))
     assert callable(getattr(networking, "check_network_watcher_per_region"))
+
+
+def test_azure_terraform_templates_registered() -> None:
+    """Every Stage 1-3 check that has a TF-amenable fix should have a template."""
+    from shasta.remediation.engine import EXPLANATIONS, TERRAFORM_TEMPLATES
+
+    azure_tf = [k for k in TERRAFORM_TEMPLATES if k.startswith("azure-")]
+    azure_exp = [k for k in EXPLANATIONS if k.startswith("azure-")]
+
+    assert len(azure_tf) >= 25, (
+        f"Expected at least 25 Azure Terraform templates, found {len(azure_tf)}"
+    )
+    # Every Azure TF template must have a matching explanation
+    missing_exp = [k for k in azure_tf if k not in EXPLANATIONS]
+    assert not missing_exp, f"Azure TF templates missing EXPLANATIONS: {missing_exp}"
+
+    # And every Azure explanation should have a TF template (or be intentionally TF-less)
+    assert len(azure_exp) >= len(azure_tf)
+
+
+@pytest.mark.parametrize(
+    "check_id",
+    [
+        "azure-storage-shared-key-access",
+        "azure-storage-cross-tenant-replication",
+        "azure-storage-network-default-deny",
+        "azure-keyvault-rbac-mode",
+        "azure-keyvault-public-access",
+        "azure-sql-min-tls",
+        "azure-sql-auditing",
+        "azure-sql-entra-admin",
+        "azure-postgres-secure-transport",
+        "azure-postgres-log-settings",
+        "azure-mysql-secure-transport",
+        "azure-cosmos-disable-local-auth",
+        "azure-appservice-https-only",
+        "azure-appservice-managed-identity",
+        "azure-rsv-immutability",
+        "azure-vnet-flow-logs-modern",
+        "azure-defender-per-plan",
+        "azure-activity-log-alerts",
+        "azure-resource-locks",
+        "azure-security-initiative",
+    ],
+)
+def test_azure_terraform_template_renders(check_id: str) -> None:
+    """Each Azure template renders to non-empty Terraform when fed a synthetic Finding."""
+    from shasta.remediation.engine import TERRAFORM_TEMPLATES
+
+    fn = TERRAFORM_TEMPLATES[check_id]
+    f = Finding(
+        check_id=check_id,
+        title="t",
+        description="d",
+        severity=Severity.HIGH,
+        status="fail",
+        domain=CheckDomain.STORAGE,
+        resource_type="X",
+        resource_id="r",
+        region="eastus",
+        account_id="sub",
+        cloud_provider=CloudProvider.AZURE,
+        details={
+            "storage_account": "mysa",
+            "vault": "mykv",
+            "server": "mysrv",
+            "app": "myapp",
+            "account": "mycos",
+            "resource_group": "rg1",
+            "missing_regions": ["eastus", "westus"],
+            "disabled": [{"plan": "KeyVaults"}],
+        },
+    )
+    out = fn(f)
+    assert isinstance(out, str)
+    assert out.strip(), f"{check_id} produced empty output"
+    assert "azurerm_" in out or "azurerm." in out, (
+        f"{check_id} output does not look like azurerm Terraform"
+    )

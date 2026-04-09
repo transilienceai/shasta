@@ -282,14 +282,14 @@ For a **<50 employee startup** pursuing compliance:
 
 | Category | Coverage | Method |
 |----------|----------|--------|
-| Technical cloud controls | ~90% | 72 automated checks across AWS and Azure (5 domains each) |
+| Technical cloud controls | ~90% | 125+ automated checks across AWS and Azure (5 domains each, full CIS Azure v3.0) |
 | Policy/process controls | ~80% | 8 generated policy documents |
-| Continuous monitoring | ~90% | 12 Config Rules + 6 EventBridge rules + GuardDuty + Inspector + Azure Defender + Azure Policy |
+| Continuous monitoring | ~90% | 12 Config Rules + 6 EventBridge rules + GuardDuty + Inspector + Azure Defender (per-plan) + Azure Policy + CIS 5.2.x Activity Log alerts |
 | Audit evidence | ~85% | Control tests, evidence snapshots (AWS + Azure), access reviews, reports |
 | Vulnerability management | ~85% | Inspector + SBOM + OSV.dev + CISA KEV |
 | Supply chain security | ~80% | SBOM discovery + known-compromised DB + live scanning |
 | Change management | ~80% | GitHub integration + CloudTrail + Config + Azure Activity Log |
-| Remediation guidance | ~90% | 36 Terraform templates (14 AWS + 22 Azure) |
+| Remediation guidance | ~90% | 42 Terraform templates (11 AWS + 31 Azure azurerm) covering Storage, Key Vault, SQL, Cosmos, PostgreSQL, MySQL, App Service, Recovery Services Vault, networking, Defender plans, Activity Log alerts, governance |
 | Security questionnaires | ~70% | 199 questions auto-filled from scan evidence (SIG Lite, CAIQ, Enterprise) |
 | AI governance | ~80% | 45 AI checks (code + cloud), ISO 42001, EU AI Act mapping |
 | Visual dashboard | Yes | FastAPI + Tailwind + Chart.js at localhost:8080 |
@@ -778,6 +778,7 @@ shasta/
 - [x] ~~Azure parity sweep — Stage 3 (cross-cutting walkers)~~ — Private Endpoint walker (KV/Storage/SQL/Cosmos/ACR/App Service/Cognitive), diagnostic settings matrix walker, governance auditor (management groups, security initiative, locks, required tags)
 - [x] ~~Azure multi-subscription scanning~~ — `AzureClient.list_subscriptions` / `for_subscription` and `run_azure_multi_subscription` mirror the AWS multi-region pattern
 - [x] ~~CIS Azure + MCSB control mapping on every finding~~ — added `cis_azure_controls` and `mcsb_controls` to the Finding model
+- [x] ~~Azure Terraform remediation templates~~ — 31 `azurerm_*` templates registered in `engine.py` covering the Stage 1-3 checks (Storage shared-key/cross-tenant/default-deny, Key Vault RBAC + PNA, SQL TLS/auditing/Entra-admin, PostgreSQL/MySQL secure transport + logging, Cosmos local-auth/PNA/firewall, App Service HTTPS/TLS/FTPS/debug/MSI, RSV soft-delete/immutability/redundancy, VNet flow logs, Network Watcher, Defender per-plan, Activity Log alerts, resource locks, required-tag policy, MCSB initiative)
 - [x] ~~Role trust policy analysis~~ — detects overpermissive `Principal: "*"` in IAM role trust policies
 - [x] ~~EBS snapshot public exposure~~ — flags snapshots shared with `all`
 - [x] ~~RDS snapshot public access~~ — flags publicly shared database snapshots
