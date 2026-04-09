@@ -4,7 +4,7 @@
 
 Whitney scans your cloud AI services (AWS Bedrock, SageMaker, Azure OpenAI, Azure ML) and your GitHub repositories for AI security issues — prompt injection risks, hardcoded API keys, PII in prompts, unguarded AI agents, and more. Findings are mapped to ISO 42001 and the EU AI Act simultaneously.
 
-Part of the Shasta mountain range: **Shasta** (14,179 ft) secures your cloud. **Whitney** (14,505 ft) secures your AI.
+Part of the Sierra Nevada mountain range: **Shasta** (14,179 ft) secures your cloud. **Whitney** (14,505 ft) secures your AI.
 
 ### Deterministic by Design
 
