@@ -4,11 +4,20 @@ All notable changes to Shasta are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — AWS-to-Azure parity sweep (Stage 1 in flight)
+## [1.6.0] — 2026-04-09 — AWS-to-Azure parity sweep (Stage 1 + Stage 2)
 
-Stage 1 of an explicit parity sweep against the Azure scanner has landed.
-Stage 2 (CloudFront, Redshift/ElastiCache, Lambda Function URL auth, S3
-Object Ownership, etc.) is in flight in the same release branch.
+Two stages of an explicit parity sweep against the Azure scanner. Stage 1
+closes the categorical gaps (no compute module, no KMS module, no CIS 4.x
+CloudWatch alarms). Stage 2 adds the missing service-type modules
+(CloudFront, Redshift, ElastiCache, Neptune) and deepens existing modules
+with the high-leverage hardening checks (Lambda Function URL auth, S3
+Object Ownership, RDS parameter enforcement, AWS Backup cross-region
+copy + access policy).
+
+Net effect: AWS check functions go from 62 → 107 (+45), AWS Terraform
+templates from 42 → 81 (+39). The AWS scanner is now ahead of the Azure
+scanner in absolute coverage, which is the right shape for real-world
+deployments where AWS is the larger surface area.
 
 ### Added — Stage 1 (AWS check_* 62 → 80)
 - New module `src/shasta/aws/compute.py` (9 checks): EC2 IMDSv2 enforcement
@@ -58,13 +67,116 @@ Object Ownership, etc.) is in flight in the same release branch.
   technical-controls row 129+ → 147+; remediation row 73 templates → 86
   templates (55 AWS + 31 Azure).
 
-### Numbers after Stage 1
-- AWS check functions: **62 → 80** (+18)
-- AWS scanner modules: **12 → 14** (+ compute.py, + kms.py)
-- AWS Terraform templates: **42 → 55** (+13)
-- Total Shasta + Whitney check functions: **129 → 147**
-- Total Terraform templates: **73 → 86**
-- Total tests: **624 → 718** (new sweep tests + drift)
+### Added — Stage 2 (AWS check_* 80 → 107)
+- New module `src/shasta/aws/cloudfront.py` (5 checks, IS_GLOBAL=True so
+  the structural multi-region smoke test correctly skips region iteration):
+  HTTPS-only viewer protocol policy, MinimumProtocolVersion >= TLSv1.2_2021,
+  WAFv2 Web ACL attached (scope=CLOUDFRONT), geo restrictions
+  (informational), Origin Access Control for S3 origins.
+- New module `src/shasta/aws/data_warehouse.py` (8 checks for Redshift,
+  ElastiCache, Neptune): Redshift cluster encryption + public access +
+  audit logging + require_ssl parameter, ElastiCache Redis transit
+  encryption + at-rest encryption + AUTH token, Neptune cluster
+  encryption.
+- `src/shasta/aws/databases.py` extensions (3 checks): RDS
+  `rds.force_ssl` / `require_secure_transport` parameter group enforcement
+  (mirrors Azure's secure_transport check), PostgreSQL log_connections /
+  log_disconnections / log_checkpoints (mirrors Azure's
+  check_postgresql_log_settings), SQL Server `rds.tls_version` minimum
+  (mirrors Azure's check_sql_min_tls).
+- `src/shasta/aws/serverless.py` extensions (6 checks):
+  - `check_lambda_function_url_auth` — flags Lambda Function URLs with
+    `AuthType=NONE`. This is one of the most common new AWS
+    misconfigurations as of 2026; bot scanners find these public
+    endpoints within hours of creation.
+  - `check_lambda_layer_origin` — flags layers from foreign AWS accounts
+    (supply chain risk).
+  - `check_apigw_client_certificate`, `check_apigw_authorizer_required`
+    (mirrors Azure App Service Easy Auth), `check_apigw_throttling`
+    (cost / abuse protection), `check_apigw_request_validation` (edge
+    rejection of malformed requests).
+- `src/shasta/aws/storage.py` extensions (3 checks):
+  - `check_s3_object_ownership_enforced` — Object Ownership =
+    BucketOwnerEnforced (disables ACLs entirely; modern AWS recommendation).
+  - `check_s3_access_logging` — server access logging enabled.
+  - `check_s3_kms_cmk_encryption` — stricter than the existing
+    check_s3_encryption (which accepts SSE-S3); requires customer-managed
+    KMS encryption.
+- `src/shasta/aws/backup.py` extensions (2 checks):
+  - `check_backup_cross_region_copy` — at least one Backup plan must
+    have a cross-region copy action (mirrors Azure RSV cross-region
+    restore).
+  - `check_backup_vault_access_policy` — vault must have a deny-style
+    resource policy denying destructive operations to non-break-glass
+    principals (AWS analog of Azure RSV Multi-User Authorization).
+- 26 new `aws_*` Terraform remediation templates registered in `engine.py`,
+  each matched to an `EXPLANATIONS` entry: cloudfront-https-only / min-tls
+  / waf / oac, redshift encryption / public-access / audit / require-ssl,
+  elasticache transit / at-rest / auth-token, neptune-encryption,
+  rds-force-ssl / log-settings / min-tls, lambda-function-url-auth /
+  layer-origin, apigw-client-cert / authorizer / throttling /
+  request-validation, s3-object-ownership / access-logging / kms-cmk,
+  aws-backup-cross-region-copy / vault-access-policy.
+- `tests/test_aws/test_aws_sweep_smoke.py` updated: cloudfront and
+  data_warehouse added to `NEW_AWS_MODULES` and `EXPECTED_RUNNERS`;
+  cloudfront added to `GLOBAL_AWS_MODULES`; 24 new parametrized
+  template-render tests; new constant assertions
+  (`test_cloudfront_module_is_global`,
+  `test_data_warehouse_module_is_regional`); template-count threshold
+  bumped to ≥75.
+
+### Wiring — scanner.py
+`_run_aws_extras` now dispatches `cloudfront.py` when
+`CheckDomain.NETWORKING` is requested and `data_warehouse.py` when
+`CheckDomain.STORAGE` or `CheckDomain.ENCRYPTION` is requested. Both new
+modules respect the global / regional distinction.
+
+### Numbers after Stage 1 + Stage 2
+- AWS check functions: **62 → 107** (+45 total: +18 Stage 1, +27 Stage 2)
+- AWS scanner modules: **12 → 16** (+ compute.py, + kms.py, + cloudfront.py,
+  + data_warehouse.py)
+- AWS Terraform templates: **42 → 81** (+39 total: +13 Stage 1, +26 Stage 2)
+- Total Shasta + Whitney check functions: **129 → 174**
+- Total Terraform templates: **73 → 112**
+- Total tests: **624 → 745** (new sweep tests + structural multi-region
+  enforcement)
+
+### Engineering Principles honored
+
+This release was developed against the discipline encoded in
+`ENGINEERING_PRINCIPLES.md`:
+
+- **#1 (numbers as tests)** — every README count update was driven by
+  the doc-drift integrity test failing first; the test then re-passed
+  after the README was corrected. The test caught two stale-count
+  attempts during Stage 2 development.
+- **#2 (no stub functions)** — every check function in the new modules
+  has a real body; smoke tests verify import + signature + structure.
+- **#3 (multi-region default)** — every regional runner iterates
+  `client.get_enabled_regions()` via `client.for_region(r)`. The
+  structural smoke test `test_runner_iterates_regions_unless_global`
+  fails the build for any single-region runner without an explicit
+  `IS_GLOBAL = True` marker. CloudFront opts out via the marker (it
+  is a genuinely global service); the CIS 4.x CloudWatch alarms check
+  uses a special anchored-to-trail-home-region pattern (also documented
+  in the principle's #3 caveats).
+- **#5 (empty results vs errors)** — every new check uses
+  `NOT_ASSESSED` for permission errors / missing prerequisites,
+  `NOT_APPLICABLE` for empty inventories, `FAIL` for actual
+  non-compliance.
+- **#7 (cross-cutting walkers)** — Stage 1 + 2 are deliberately
+  per-service. Stage 3 (the diagnostic settings matrix walker) is the
+  walker phase and was scoped out of this release.
+- **#8 (configuration tables)** — `CLOUDWATCH_CIS_4_X_EVENTS`,
+  `WEAK_TLS_POLICIES`, `DEPRECATED_LAMBDA_RUNTIMES`, `EXPECTED_VPC_ENDPOINTS`
+  are all module-level data tables that drive the checks.
+- **#9 (frameworks on the model)** — every new Finding populates
+  `cis_aws_controls` with the relevant CIS section (1.16, 1.18, 1.20,
+  2.x, 2.3.x, 2.4–2.6, 3.5, 3.8, 3.x, 4.1–4.15, 4.x, 5.4.x, 5.6, 5.x).
+- **#10 (additive backwards compat)** — no existing field types or
+  function signatures changed.
+- **#15 (actionable failure messages)** — every assertion in the smoke
+  tests references the exact file or constant to update on failure.
 
 ---
 

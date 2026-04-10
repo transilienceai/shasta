@@ -36,9 +36,188 @@ def run_all_aws_backup_checks(client: AWSClient) -> list[Finding]:
             findings.extend(check_backup_vault_lock(rc, account_id, r))
             findings.extend(check_backup_vault_encryption(rc, account_id, r))
             findings.extend(check_backup_plans(rc, account_id, r))
+            findings.extend(check_backup_cross_region_copy(rc, account_id, r))
+            findings.extend(check_backup_vault_access_policy(rc, account_id, r))
         except ClientError:
             continue
 
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# Stage 2 of parity sweep: cross-region copy + access policy (mirrors Azure RSV)
+# ---------------------------------------------------------------------------
+
+
+def check_backup_cross_region_copy(
+    client: AWSClient, account_id: str, region: str
+) -> list[Finding]:
+    """At least one Backup plan should have a cross-region copy action.
+
+    Mirrors Azure's check_rsv_cross_region_restore. Without cross-region
+    copies, a single-region disaster destroys the backups along with the
+    primary data. AWS Backup supports copy actions in backup plans that
+    replicate recovery points to a destination vault in another region.
+    """
+    try:
+        bk = client.client("backup")
+        plans_list = bk.list_backup_plans().get("BackupPlansList", [])
+    except ClientError:
+        return []
+    if not plans_list:
+        return []
+
+    plans_with_copy: list[str] = []
+    plans_without_copy: list[str] = []
+    for entry in plans_list:
+        plan_id = entry.get("BackupPlanId")
+        plan_name = entry.get("BackupPlanName", "unknown")
+        if not plan_id:
+            continue
+        try:
+            plan = bk.get_backup_plan(BackupPlanId=plan_id).get("BackupPlan", {})
+        except ClientError:
+            continue
+        rules = plan.get("Rules", []) or []
+        has_copy = False
+        for rule in rules:
+            copy_actions = rule.get("CopyActions", []) or []
+            for action in copy_actions:
+                dest = action.get("DestinationBackupVaultArn", "")
+                # Cross-region copy = destination ARN is in a different region
+                # ARN format: arn:aws:backup:REGION:ACCOUNT:backup-vault:NAME
+                parts = dest.split(":")
+                if len(parts) >= 4 and parts[3] != region:
+                    has_copy = True
+                    break
+            if has_copy:
+                break
+        if has_copy:
+            plans_with_copy.append(plan_name)
+        else:
+            plans_without_copy.append(plan_name)
+
+    if not plans_without_copy:
+        return [
+            Finding(
+                check_id="aws-backup-cross-region-copy",
+                title=f"All {len(plans_with_copy)} Backup plan(s) have cross-region copy",
+                description="Every backup plan ships at least one rule's recovery points to a vault in a different region.",
+                severity=Severity.INFO,
+                status=ComplianceStatus.PASS,
+                domain=CheckDomain.LOGGING,
+                resource_type="AWS::Backup::BackupPlan",
+                resource_id=f"arn:aws:backup:{region}:{account_id}:backup-plan:*",
+                region=region,
+                account_id=account_id,
+                soc2_controls=["A1.1", "A1.2"],
+                cis_aws_controls=["2.x"],
+            )
+        ]
+    return [
+        Finding(
+            check_id="aws-backup-cross-region-copy",
+            title=f"{len(plans_without_copy)} Backup plan(s) lack cross-region copy",
+            description=(
+                "Without cross-region copy actions, a single-region disaster (control plane "
+                "outage, account compromise, ransomware) destroys both your primary data and "
+                "your backups simultaneously. AWS Backup supports copy actions in plan rules "
+                "that replicate recovery points to a destination vault in another region."
+            ),
+            severity=Severity.MEDIUM,
+            status=ComplianceStatus.FAIL,
+            domain=CheckDomain.LOGGING,
+            resource_type="AWS::Backup::BackupPlan",
+            resource_id=f"arn:aws:backup:{region}:{account_id}:backup-plan:*",
+            region=region,
+            account_id=account_id,
+            remediation=(
+                "Edit each backup plan to add a copy action to every rule: "
+                "CopyActions=[{DestinationBackupVaultArn=arn:aws:backup:<dest-region>:"
+                "<acct>:backup-vault:<vault>,Lifecycle={DeleteAfterDays=30}}]"
+            ),
+            soc2_controls=["A1.1", "A1.2"],
+            cis_aws_controls=["2.x"],
+            details={"plans_without_copy": plans_without_copy[:20]},
+        )
+    ]
+
+
+def check_backup_vault_access_policy(
+    client: AWSClient, account_id: str, region: str
+) -> list[Finding]:
+    """Backup vaults should have an access policy that denies risky operations.
+
+    Mirrors Azure's check_rsv_mua. AWS Backup supports vault access policies
+    (resource-based policies) that can deny DeleteBackupVault, DeleteRecoveryPoint,
+    and StartCopyJob to all principals except a designated break-glass role.
+    Combined with Vault Lock, this is the AWS analog of Multi-User Authorization.
+    """
+    findings: list[Finding] = []
+    try:
+        bk = client.client("backup")
+    except ClientError:
+        return []
+    for v in _list_vaults(client):
+        name = v.get("BackupVaultName", "unknown")
+        arn = v.get("BackupVaultArn", "")
+        try:
+            policy_resp = bk.get_backup_vault_access_policy(BackupVaultName=name)
+            policy_doc = policy_resp.get("Policy", "")
+        except ClientError as e:
+            code = e.response.get("Error", {}).get("Code", "")
+            if code == "ResourceNotFoundException":
+                policy_doc = ""
+            else:
+                continue
+
+        has_deny_policy = bool(policy_doc) and '"Effect":"Deny"' in policy_doc.replace(" ", "")
+        if has_deny_policy:
+            findings.append(
+                Finding(
+                    check_id="aws-backup-vault-access-policy",
+                    title=f"Backup vault '{name}' has a deny-style access policy",
+                    description="Vault has a resource-based policy with a Deny statement.",
+                    severity=Severity.INFO,
+                    status=ComplianceStatus.PASS,
+                    domain=CheckDomain.LOGGING,
+                    resource_type="AWS::Backup::BackupVault",
+                    resource_id=arn,
+                    region=region,
+                    account_id=account_id,
+                    soc2_controls=["A1.1", "A1.2"],
+                    cis_aws_controls=["2.x"],
+                )
+            )
+        else:
+            findings.append(
+                Finding(
+                    check_id="aws-backup-vault-access-policy",
+                    title=f"Backup vault '{name}' has no deny-style access policy",
+                    description=(
+                        "Without a resource-based policy denying DeleteBackupVault, "
+                        "DeleteRecoveryPoint, and StartCopyJob to non-break-glass principals, "
+                        "a compromised admin can wipe backups even with Vault Lock in "
+                        "GOVERNANCE mode. This is the AWS analog of Azure RSV's "
+                        "Multi-User Authorization."
+                    ),
+                    severity=Severity.MEDIUM,
+                    status=ComplianceStatus.FAIL,
+                    domain=CheckDomain.LOGGING,
+                    resource_type="AWS::Backup::BackupVault",
+                    resource_id=arn,
+                    region=region,
+                    account_id=account_id,
+                    remediation=(
+                        f"aws backup put-backup-vault-access-policy --backup-vault-name {name} "
+                        '--policy file://deny-policy.json. The policy should Deny '
+                        'backup:DeleteBackupVault, backup:DeleteRecoveryPoint, and '
+                        'backup:StartCopyJob with a NotPrincipal of your break-glass role ARN.'
+                    ),
+                    soc2_controls=["A1.1", "A1.2"],
+                    cis_aws_controls=["2.x"],
+                )
+            )
     return findings
 
 

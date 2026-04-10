@@ -30,6 +30,8 @@ NEW_AWS_MODULES = [
     "shasta.aws.organizations",
     "shasta.aws.compute",
     "shasta.aws.kms",
+    "shasta.aws.cloudfront",
+    "shasta.aws.data_warehouse",
 ]
 
 EXPECTED_RUNNERS = {
@@ -41,15 +43,18 @@ EXPECTED_RUNNERS = {
     "shasta.aws.organizations": "run_all_aws_organizations_checks",
     "shasta.aws.compute": "run_all_aws_compute_checks",
     "shasta.aws.kms": "run_all_aws_kms_checks",
+    "shasta.aws.cloudfront": "run_all_aws_cloudfront_checks",
+    "shasta.aws.data_warehouse": "run_all_aws_data_warehouse_checks",
 }
 
 # Modules that are intentionally GLOBAL — no per-region iteration. The
-# multi-region structural smoke test below skips these. AWS Organizations is
-# global; IAM is also global but lives in src/shasta/aws/iam.py which has
-# many existing checks and is wired through the main scanner path, not
-# _run_aws_extras.
+# multi-region structural smoke test below skips these. CloudFront is
+# global. Organizations is global. IAM is also global but lives in
+# src/shasta/aws/iam.py which is wired through the main scanner path,
+# not _run_aws_extras.
 GLOBAL_AWS_MODULES = {
     "shasta.aws.organizations",
+    "shasta.aws.cloudfront",
 }
 
 
@@ -132,11 +137,24 @@ def test_aws_terraform_templates_registered() -> None:
     from shasta.remediation.engine import EXPLANATIONS, TERRAFORM_TEMPLATES
 
     aws_tf = [k for k in TERRAFORM_TEMPLATES if not k.startswith("azure-")]
-    # After Stage 1 of the parity sweep, we expect at least 50 AWS templates
-    assert len(aws_tf) >= 50, f"Expected >=50 AWS Terraform templates, found {len(aws_tf)}"
+    # After Stage 2 of the parity sweep, we expect at least 75 AWS templates
+    assert len(aws_tf) >= 75, f"Expected >=75 AWS Terraform templates, found {len(aws_tf)}"
 
     missing_exp = [k for k in aws_tf if k not in EXPLANATIONS]
     assert not missing_exp, f"AWS TF templates missing EXPLANATIONS: {missing_exp}"
+
+
+def test_cloudfront_module_is_global() -> None:
+    """CloudFront is a global service — module must declare IS_GLOBAL = True."""
+    from shasta.aws.cloudfront import IS_GLOBAL
+
+    assert IS_GLOBAL is True
+
+
+def test_data_warehouse_module_is_regional() -> None:
+    from shasta.aws.data_warehouse import IS_GLOBAL
+
+    assert IS_GLOBAL is False
 
 
 def test_compute_module_constants_exist() -> None:
@@ -202,6 +220,31 @@ def test_cloudwatch_cis_4_x_table_complete() -> None:
         "iam-role-trust-external",
         "cloudwatch-alarms-cis-4",
         "aws-config-conformance-packs",
+        # Stage 2 of the parity sweep
+        "cloudfront-https-only",
+        "cloudfront-min-tls",
+        "cloudfront-waf",
+        "cloudfront-oac",
+        "redshift-encryption",
+        "redshift-public-access",
+        "redshift-audit-logging",
+        "elasticache-transit-encryption",
+        "elasticache-at-rest-encryption",
+        "elasticache-auth-token",
+        "neptune-encryption",
+        "rds-force-ssl",
+        "rds-postgres-log-settings",
+        "lambda-function-url-auth",
+        "lambda-layer-origin",
+        "apigw-client-cert",
+        "apigw-authorizer",
+        "apigw-throttling",
+        "apigw-request-validation",
+        "s3-object-ownership",
+        "s3-access-logging",
+        "s3-kms-cmk",
+        "aws-backup-cross-region-copy",
+        "aws-backup-vault-access-policy",
     ],
 )
 def test_aws_terraform_template_renders(check_id: str) -> None:

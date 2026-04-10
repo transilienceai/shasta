@@ -33,8 +33,226 @@ def run_all_storage_checks(client: AWSClient) -> list[Finding]:
         findings.extend(check_s3_versioning(s3, bucket_name, account_id, region))
         findings.extend(check_s3_public_access_block(s3, bucket_name, account_id, region))
         findings.extend(check_s3_ssl_only(s3, bucket_name, account_id, region))
+        findings.extend(check_s3_object_ownership_enforced(s3, bucket_name, account_id, region))
+        findings.extend(check_s3_access_logging(s3, bucket_name, account_id, region))
+        findings.extend(check_s3_kms_cmk_encryption(s3, bucket_name, account_id, region))
 
     return findings
+
+
+# ---------------------------------------------------------------------------
+# CIS AWS v3.0 Stage 2 — S3 Object Ownership / Access Logging / KMS CMK
+# ---------------------------------------------------------------------------
+
+
+def check_s3_object_ownership_enforced(
+    s3: Any, bucket_name: str, account_id: str, region: str
+) -> list[Finding]:
+    """[CIS AWS 2.x] S3 Object Ownership should be set to BucketOwnerEnforced.
+
+    BucketOwnerEnforced disables ACLs entirely. Without it, objects uploaded
+    by other accounts can have ACLs that exclude the bucket owner — making
+    auditing and lifecycle management harder.
+    """
+    try:
+        resp = s3.get_bucket_ownership_controls(Bucket=bucket_name)
+        rules = resp.get("OwnershipControls", {}).get("Rules", [])
+        ownership = rules[0].get("ObjectOwnership", "ObjectWriter") if rules else "ObjectWriter"
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code == "OwnershipControlsNotFoundError":
+            ownership = "ObjectWriter"  # Legacy default
+        else:
+            return []
+
+    if ownership == "BucketOwnerEnforced":
+        return [
+            Finding(
+                check_id="s3-object-ownership",
+                title=f"S3 bucket '{bucket_name}' has ACLs disabled (BucketOwnerEnforced)",
+                description="Object Ownership = BucketOwnerEnforced; ACLs are disabled and the bucket owner owns every object.",
+                severity=Severity.INFO,
+                status=ComplianceStatus.PASS,
+                domain=CheckDomain.STORAGE,
+                resource_type="AWS::S3::Bucket",
+                resource_id=f"arn:aws:s3:::{bucket_name}",
+                region=region,
+                account_id=account_id,
+                soc2_controls=["CC6.1", "CC6.7"],
+                cis_aws_controls=["2.x"],
+            )
+        ]
+    return [
+        Finding(
+            check_id="s3-object-ownership",
+            title=f"S3 bucket '{bucket_name}' allows ACLs (Object Ownership = {ownership})",
+            description=(
+                f"Object Ownership is {ownership}. Per-object ACLs are still allowed. The "
+                "modern AWS recommendation is BucketOwnerEnforced — it disables ACLs entirely "
+                "and forces all access control through bucket policies and IAM, which are "
+                "easier to audit."
+            ),
+            severity=Severity.LOW,
+            status=ComplianceStatus.PARTIAL,
+            domain=CheckDomain.STORAGE,
+            resource_type="AWS::S3::Bucket",
+            resource_id=f"arn:aws:s3:::{bucket_name}",
+            region=region,
+            account_id=account_id,
+            remediation=(
+                f"aws s3api put-bucket-ownership-controls --bucket {bucket_name} "
+                "--ownership-controls Rules=[{ObjectOwnership=BucketOwnerEnforced}]"
+            ),
+            soc2_controls=["CC6.1", "CC6.7"],
+            cis_aws_controls=["2.x"],
+        )
+    ]
+
+
+def check_s3_access_logging(
+    s3: Any, bucket_name: str, account_id: str, region: str
+) -> list[Finding]:
+    """[CIS AWS 2.x] S3 buckets should have server access logging enabled.
+
+    Mirrors check_elb_access_logs. Without S3 access logs, you can't
+    reconstruct who accessed which objects during an incident — no source
+    IPs, no requester ARNs, no operation history beyond CloudTrail data
+    events (which most accounts don't enable for cost reasons).
+    """
+    try:
+        resp = s3.get_bucket_logging(Bucket=bucket_name)
+        logging_enabled = resp.get("LoggingEnabled")
+    except ClientError:
+        return []
+
+    if logging_enabled and logging_enabled.get("TargetBucket"):
+        target = logging_enabled.get("TargetBucket")
+        return [
+            Finding(
+                check_id="s3-access-logging",
+                title=f"S3 bucket '{bucket_name}' has access logging enabled",
+                description=f"Access logs delivered to s3://{target}/{logging_enabled.get('TargetPrefix', '')}",
+                severity=Severity.INFO,
+                status=ComplianceStatus.PASS,
+                domain=CheckDomain.LOGGING,
+                resource_type="AWS::S3::Bucket",
+                resource_id=f"arn:aws:s3:::{bucket_name}",
+                region=region,
+                account_id=account_id,
+                soc2_controls=["CC7.1"],
+                cis_aws_controls=["2.x"],
+            )
+        ]
+    return [
+        Finding(
+            check_id="s3-access-logging",
+            title=f"S3 bucket '{bucket_name}' has no server access logging",
+            description=(
+                "Without access logs, you can't reconstruct who accessed objects in this "
+                "bucket during a security incident. CloudTrail data events are the alternative "
+                "but cost ~10x more for the same coverage."
+            ),
+            severity=Severity.LOW,
+            status=ComplianceStatus.PARTIAL,
+            domain=CheckDomain.LOGGING,
+            resource_type="AWS::S3::Bucket",
+            resource_id=f"arn:aws:s3:::{bucket_name}",
+            region=region,
+            account_id=account_id,
+            remediation=(
+                "Create a dedicated log destination bucket with Object Lock + lifecycle rules, "
+                f"then aws s3api put-bucket-logging --bucket {bucket_name} --bucket-logging-status "
+                "'{\"LoggingEnabled\":{\"TargetBucket\":\"<log-bucket>\",\"TargetPrefix\":"
+                f"\"{bucket_name}/\"}}'"
+            ),
+            soc2_controls=["CC7.1"],
+            cis_aws_controls=["2.x"],
+        )
+    ]
+
+
+def check_s3_kms_cmk_encryption(
+    s3: Any, bucket_name: str, account_id: str, region: str
+) -> list[Finding]:
+    """[CIS AWS 2.x] S3 buckets holding compliance-relevant data should use KMS-CMK encryption.
+
+    The existing check_s3_encryption accepts SSE-S3 (AES-256 with the
+    AWS-owned key). This stricter check requires SSE-KMS with a customer-
+    managed KMS key, which gives key-level audit and the ability to revoke
+    decrypt access independently of the bucket policy.
+    """
+    try:
+        enc = s3.get_bucket_encryption(Bucket=bucket_name)
+        rules = enc.get("ServerSideEncryptionConfiguration", {}).get("Rules", [])
+        if not rules:
+            return [
+                Finding(
+                    check_id="s3-kms-cmk",
+                    title=f"S3 bucket '{bucket_name}' has no encryption configured",
+                    description="No SSE configuration at all — covered separately by check_s3_encryption.",
+                    severity=Severity.HIGH,
+                    status=ComplianceStatus.FAIL,
+                    domain=CheckDomain.ENCRYPTION,
+                    resource_type="AWS::S3::Bucket",
+                    resource_id=f"arn:aws:s3:::{bucket_name}",
+                    region=region,
+                    account_id=account_id,
+                    soc2_controls=["CC6.7"],
+                    cis_aws_controls=["2.x"],
+                )
+            ]
+        first_rule = rules[0]
+        sse_default = first_rule.get("ApplyServerSideEncryptionByDefault", {})
+        algo = sse_default.get("SSEAlgorithm", "")
+        kms_key = sse_default.get("KMSMasterKeyID", "")
+    except ClientError:
+        return []
+
+    if algo == "aws:kms" and kms_key and "alias/aws/s3" not in kms_key:
+        return [
+            Finding(
+                check_id="s3-kms-cmk",
+                title=f"S3 bucket '{bucket_name}' uses customer-managed KMS",
+                description=f"SSE-KMS with key {kms_key}.",
+                severity=Severity.INFO,
+                status=ComplianceStatus.PASS,
+                domain=CheckDomain.ENCRYPTION,
+                resource_type="AWS::S3::Bucket",
+                resource_id=f"arn:aws:s3:::{bucket_name}",
+                region=region,
+                account_id=account_id,
+                soc2_controls=["CC6.7"],
+                cis_aws_controls=["2.x"],
+            )
+        ]
+    return [
+        Finding(
+            check_id="s3-kms-cmk",
+            title=f"S3 bucket '{bucket_name}' uses AWS-managed encryption only ({algo or 'AES-256'})",
+            description=(
+                f"Bucket has {algo or 'AES-256'} encryption with no customer-managed KMS key. "
+                "Compliance frameworks (SOC 2, PCI, HIPAA) increasingly require customer-"
+                "managed keys so the customer can audit decrypt calls and revoke access "
+                "independently of the bucket policy."
+            ),
+            severity=Severity.LOW,
+            status=ComplianceStatus.PARTIAL,
+            domain=CheckDomain.ENCRYPTION,
+            resource_type="AWS::S3::Bucket",
+            resource_id=f"arn:aws:s3:::{bucket_name}",
+            region=region,
+            account_id=account_id,
+            remediation=(
+                "Create a customer-managed KMS key with rotation enabled, then "
+                f"aws s3api put-bucket-encryption --bucket {bucket_name} "
+                "--server-side-encryption-configuration "
+                "'{\"Rules\":[{\"ApplyServerSideEncryptionByDefault\":"
+                "{\"SSEAlgorithm\":\"aws:kms\",\"KMSMasterKeyID\":\"<key-arn>\"}}]}'"
+            ),
+            soc2_controls=["CC6.7"],
+            cis_aws_controls=["2.x"],
+        )
+    ]
 
 
 def check_s3_encryption(s3: Any, bucket_name: str, account_id: str, region: str) -> list[Finding]:

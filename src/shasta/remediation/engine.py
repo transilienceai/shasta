@@ -1305,6 +1305,535 @@ resource "aws_config_conformance_pack" "cis_aws_v3" {
 
 
 # ---------------------------------------------------------------------------
+# AWS Stage 2 (parity sweep): CloudFront, Redshift, ElastiCache, Lambda
+# Function URLs, API Gateway hardening, S3 hardening, AWS Backup
+# ---------------------------------------------------------------------------
+
+
+@_tf("cloudfront-https-only")
+def _tf_aws_cf_https(f: Finding) -> str:
+    return '''\
+resource "aws_cloudfront_distribution" "main" {
+  # ... existing config ...
+
+  default_cache_behavior {
+    viewer_protocol_policy = "redirect-to-https"
+    # ... existing behavior config ...
+  }
+
+  # Repeat on every additional cache behavior:
+  ordered_cache_behavior {
+    path_pattern           = "*"
+    viewer_protocol_policy = "redirect-to-https"
+    # ... rest of behavior ...
+  }
+}'''
+
+
+@_tf("cloudfront-min-tls")
+def _tf_aws_cf_tls(f: Finding) -> str:
+    return '''\
+resource "aws_cloudfront_distribution" "main" {
+  # ... existing config ...
+
+  viewer_certificate {
+    acm_certificate_arn      = aws_acm_certificate.main.arn
+    ssl_support_method       = "sni-only"
+    minimum_protocol_version = "TLSv1.2_2021"
+  }
+}
+
+# ACM certificate for CloudFront must live in us-east-1
+resource "aws_acm_certificate" "main" {
+  provider          = aws.us_east_1
+  domain_name       = "example.com"
+  validation_method = "DNS"
+}'''
+
+
+@_tf("cloudfront-waf")
+def _tf_aws_cf_waf(f: Finding) -> str:
+    return '''\
+# Web ACL must be in us-east-1 for CloudFront
+resource "aws_wafv2_web_acl" "cloudfront" {
+  provider = aws.us_east_1
+  name     = "cloudfront-waf"
+  scope    = "CLOUDFRONT"
+  default_action { allow {} }
+
+  rule {
+    name     = "AWSManagedRulesCommonRuleSet"
+    priority = 1
+    override_action { none {} }
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesCommonRuleSet"
+        vendor_name = "AWS"
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "common"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "cloudfront-waf"
+    sampled_requests_enabled   = true
+  }
+}
+
+resource "aws_cloudfront_distribution" "main" {
+  web_acl_id = aws_wafv2_web_acl.cloudfront.arn
+  # ... existing config ...
+}'''
+
+
+@_tf("cloudfront-oac")
+def _tf_aws_cf_oac(f: Finding) -> str:
+    return '''\
+resource "aws_cloudfront_origin_access_control" "s3" {
+  name                              = "s3-oac"
+  description                       = "OAC for S3 origin"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
+resource "aws_cloudfront_distribution" "main" {
+  origin {
+    domain_name              = aws_s3_bucket.content.bucket_regional_domain_name
+    origin_access_control_id = aws_cloudfront_origin_access_control.s3.id
+    origin_id                = "s3-content"
+  }
+  # ... existing config ...
+}
+
+# Restrict S3 bucket policy to allow only the CloudFront distribution
+resource "aws_s3_bucket_policy" "content" {
+  bucket = aws_s3_bucket.content.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "cloudfront.amazonaws.com" }
+      Action    = "s3:GetObject"
+      Resource  = "${aws_s3_bucket.content.arn}/*"
+      Condition = {
+        StringEquals = {
+          "AWS:SourceArn" = aws_cloudfront_distribution.main.arn
+        }
+      }
+    }]
+  })
+}'''
+
+
+@_tf("redshift-encryption")
+def _tf_aws_redshift_encrypt(f: Finding) -> str:
+    return '''\
+resource "aws_kms_key" "redshift" {
+  description             = "Redshift cluster encryption"
+  enable_key_rotation     = true
+  deletion_window_in_days = 30
+}
+
+resource "aws_redshift_cluster" "main" {
+  cluster_identifier = "main"
+  encrypted          = true
+  kms_key_id         = aws_kms_key.redshift.arn
+  # ... existing config ...
+}'''
+
+
+@_tf("redshift-public-access")
+def _tf_aws_redshift_private(f: Finding) -> str:
+    return '''\
+resource "aws_redshift_cluster" "main" {
+  cluster_identifier  = "main"
+  publicly_accessible = false
+  # Place in a private subnet group
+  cluster_subnet_group_name = aws_redshift_subnet_group.private.name
+  vpc_security_group_ids    = [aws_security_group.redshift.id]
+  # ... existing config ...
+}'''
+
+
+@_tf("redshift-audit-logging")
+def _tf_aws_redshift_logging(f: Finding) -> str:
+    return '''\
+resource "aws_s3_bucket" "redshift_logs" {
+  bucket = "company-redshift-audit-logs"
+}
+
+resource "aws_redshift_cluster" "main" {
+  cluster_identifier = "main"
+  # ... existing config ...
+
+  logging {
+    enable        = true
+    bucket_name   = aws_s3_bucket.redshift_logs.id
+    s3_key_prefix = "redshift-audit/"
+  }
+}'''
+
+
+@_tf("redshift-require-ssl")
+def _tf_aws_redshift_ssl(f: Finding) -> str:
+    return '''\
+resource "aws_redshift_parameter_group" "secure" {
+  family = "redshift-1.0"
+  name   = "redshift-secure"
+
+  parameter {
+    name  = "require_ssl"
+    value = "true"
+  }
+}
+
+resource "aws_redshift_cluster" "main" {
+  cluster_identifier        = "main"
+  cluster_parameter_group_name = aws_redshift_parameter_group.secure.name
+  # ... existing config ...
+}'''
+
+
+@_tf("elasticache-transit-encryption")
+def _tf_aws_ec_transit(f: Finding) -> str:
+    return '''\
+resource "aws_elasticache_replication_group" "main" {
+  replication_group_id       = "main"
+  description                = "Redis with TLS"
+  transit_encryption_enabled = true
+  at_rest_encryption_enabled = true
+  auth_token                 = "REDIS_AUTH_TOKEN"
+  # ... existing config ...
+}'''
+
+
+@_tf("elasticache-at-rest-encryption")
+def _tf_aws_ec_at_rest(f: Finding) -> str:
+    return '''\
+resource "aws_kms_key" "elasticache" {
+  description         = "ElastiCache encryption"
+  enable_key_rotation = true
+}
+
+resource "aws_elasticache_replication_group" "main" {
+  replication_group_id       = "main"
+  description                = "Redis with at-rest encryption"
+  at_rest_encryption_enabled = true
+  kms_key_id                 = aws_kms_key.elasticache.arn
+  # ... existing config ...
+}'''
+
+
+@_tf("elasticache-auth-token")
+def _tf_aws_ec_auth(f: Finding) -> str:
+    return '''\
+resource "aws_elasticache_replication_group" "main" {
+  replication_group_id       = "main"
+  description                = "Redis with AUTH"
+  transit_encryption_enabled = true
+  auth_token                 = data.aws_secretsmanager_secret_version.redis_auth.secret_string
+  # ... existing config ...
+}
+
+# Store the auth token in Secrets Manager
+data "aws_secretsmanager_secret_version" "redis_auth" {
+  secret_id = "redis-auth-token"
+}'''
+
+
+@_tf("neptune-encryption")
+def _tf_aws_neptune_encrypt(f: Finding) -> str:
+    return '''\
+resource "aws_kms_key" "neptune" {
+  description         = "Neptune cluster encryption"
+  enable_key_rotation = true
+}
+
+resource "aws_neptune_cluster" "main" {
+  cluster_identifier  = "main"
+  storage_encrypted   = true
+  kms_key_arn         = aws_kms_key.neptune.arn
+  # ... existing config ...
+}'''
+
+
+@_tf("rds-force-ssl")
+def _tf_aws_rds_force_ssl(f: Finding) -> str:
+    engine = f.details.get("engine", "postgres")
+    if "mysql" in engine or "mariadb" in engine:
+        param_name = "require_secure_transport"
+        value = "ON"
+    else:
+        param_name = "rds.force_ssl"
+        value = "1"
+    return f'''\
+resource "aws_db_parameter_group" "secure" {{
+  name   = "rds-secure"
+  family = "{engine}15"  # adjust to match engine version
+
+  parameter {{
+    name         = "{param_name}"
+    value        = "{value}"
+    apply_method = "pending-reboot"
+  }}
+}}
+
+resource "aws_db_instance" "main" {{
+  parameter_group_name = aws_db_parameter_group.secure.name
+  # ... existing config ...
+}}'''
+
+
+@_tf("rds-postgres-log-settings")
+def _tf_aws_rds_pg_logs(f: Finding) -> str:
+    return '''\
+resource "aws_db_parameter_group" "postgres_audit" {
+  name   = "postgres-audit"
+  family = "postgres15"  # adjust to your version
+
+  parameter {
+    name  = "log_connections"
+    value = "1"
+  }
+  parameter {
+    name  = "log_disconnections"
+    value = "1"
+  }
+  parameter {
+    name  = "log_checkpoints"
+    value = "1"
+  }
+  parameter {
+    name  = "log_statement"
+    value = "ddl"  # log all DDL changes
+  }
+}
+
+resource "aws_db_instance" "main" {
+  parameter_group_name = aws_db_parameter_group.postgres_audit.name
+  enabled_cloudwatch_logs_exports = ["postgresql"]
+  # ... existing config ...
+}'''
+
+
+@_tf("rds-min-tls")
+def _tf_aws_rds_min_tls(f: Finding) -> str:
+    return '''\
+# SQL Server RDS only
+resource "aws_db_parameter_group" "sqlserver_tls" {
+  name   = "sqlserver-tls"
+  family = "sqlserver-se-15.0"  # adjust to engine version
+
+  parameter {
+    name         = "rds.tls_version"
+    value        = "1.2"
+    apply_method = "pending-reboot"
+  }
+}'''
+
+
+@_tf("lambda-function-url-auth")
+def _tf_aws_lambda_url_auth(f: Finding) -> str:
+    return '''\
+resource "aws_lambda_function_url" "secured" {
+  function_name      = aws_lambda_function.example.function_name
+  authorization_type = "AWS_IAM"  # never NONE for production endpoints
+}'''
+
+
+@_tf("lambda-layer-origin")
+def _tf_aws_lambda_layer(f: Finding) -> str:
+    return '''\
+# Re-publish foreign-account layers in your own account so you control updates
+resource "aws_lambda_layer_version" "vendored" {
+  layer_name          = "vendored-third-party"
+  compatible_runtimes = ["python3.12"]
+  filename            = "third-party-layer.zip"  # downloaded from the foreign layer
+  source_code_hash    = filebase64sha256("third-party-layer.zip")
+}
+
+resource "aws_lambda_function" "example" {
+  function_name = "example"
+  layers        = [aws_lambda_layer_version.vendored.arn]
+  # ... existing config ...
+}'''
+
+
+@_tf("apigw-client-cert")
+def _tf_aws_apigw_client_cert(f: Finding) -> str:
+    return '''\
+resource "aws_api_gateway_client_certificate" "main" {
+  description = "Client cert for backend integration auth"
+}
+
+resource "aws_api_gateway_stage" "prod" {
+  rest_api_id           = aws_api_gateway_rest_api.main.id
+  stage_name            = "prod"
+  client_certificate_id = aws_api_gateway_client_certificate.main.id
+  # ... existing config ...
+}'''
+
+
+@_tf("apigw-authorizer")
+def _tf_aws_apigw_authorizer(f: Finding) -> str:
+    return '''\
+# IAM auth on every method (replace AWS_IAM with COGNITO_USER_POOLS or CUSTOM as needed)
+resource "aws_api_gateway_method" "secured_get" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.example.id
+  http_method   = "GET"
+  authorization = "AWS_IAM"  # or COGNITO_USER_POOLS / CUSTOM
+}'''
+
+
+@_tf("apigw-throttling")
+def _tf_aws_apigw_throttle(f: Finding) -> str:
+    return '''\
+resource "aws_api_gateway_method_settings" "throttle" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  stage_name  = aws_api_gateway_stage.prod.stage_name
+  method_path = "*/*"
+
+  settings {
+    throttling_burst_limit = 200
+    throttling_rate_limit  = 100
+  }
+}'''
+
+
+@_tf("apigw-request-validation")
+def _tf_aws_apigw_validate(f: Finding) -> str:
+    return '''\
+resource "aws_api_gateway_request_validator" "body_and_params" {
+  name                        = "body-and-params"
+  rest_api_id                 = aws_api_gateway_rest_api.main.id
+  validate_request_body       = true
+  validate_request_parameters = true
+}
+
+resource "aws_api_gateway_method" "validated" {
+  rest_api_id          = aws_api_gateway_rest_api.main.id
+  resource_id          = aws_api_gateway_resource.example.id
+  http_method          = "POST"
+  authorization        = "AWS_IAM"
+  request_validator_id = aws_api_gateway_request_validator.body_and_params.id
+}'''
+
+
+@_tf("s3-object-ownership")
+def _tf_aws_s3_oo(f: Finding) -> str:
+    return '''\
+resource "aws_s3_bucket_ownership_controls" "enforce" {
+  bucket = aws_s3_bucket.main.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"  # disables ACLs entirely
+  }
+}'''
+
+
+@_tf("s3-access-logging")
+def _tf_aws_s3_logging(f: Finding) -> str:
+    return '''\
+# A dedicated log destination bucket with Object Lock + lifecycle
+resource "aws_s3_bucket" "logs" {
+  bucket              = "company-s3-access-logs"
+  object_lock_enabled = true
+}
+
+resource "aws_s3_bucket_logging" "main" {
+  bucket        = aws_s3_bucket.main.id
+  target_bucket = aws_s3_bucket.logs.id
+  target_prefix = "main/"
+}'''
+
+
+@_tf("s3-kms-cmk")
+def _tf_aws_s3_kms_cmk(f: Finding) -> str:
+    return '''\
+resource "aws_kms_key" "s3" {
+  description         = "S3 bucket encryption"
+  enable_key_rotation = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "main" {
+  bucket = aws_s3_bucket.main.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.s3.arn
+    }
+    bucket_key_enabled = true  # Reduces KMS API costs
+  }
+}'''
+
+
+@_tf("aws-backup-cross-region-copy")
+def _tf_aws_backup_crr(f: Finding) -> str:
+    return '''\
+resource "aws_backup_vault" "secondary" {
+  provider    = aws.us_west_2  # destination region
+  name        = "secondary"
+  kms_key_arn = aws_kms_key.backup_secondary.arn
+}
+
+resource "aws_backup_plan" "with_copy" {
+  name = "with-cross-region-copy"
+
+  rule {
+    rule_name         = "daily"
+    target_vault_name = aws_backup_vault.primary.name
+    schedule          = "cron(0 5 ? * * *)"
+
+    lifecycle {
+      delete_after = 35
+    }
+
+    copy_action {
+      destination_vault_arn = aws_backup_vault.secondary.arn
+
+      lifecycle {
+        delete_after = 35
+      }
+    }
+  }
+}'''
+
+
+@_tf("aws-backup-vault-access-policy")
+def _tf_aws_backup_access_policy(f: Finding) -> str:
+    return '''\
+resource "aws_backup_vault_policy" "deny_destructive" {
+  backup_vault_name = aws_backup_vault.primary.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid    = "DenyDestructiveActionsExceptBreakGlass"
+      Effect = "Deny"
+      NotPrincipal = {
+        AWS = "arn:aws:iam::ACCOUNT_ID:role/break-glass-backup-admin"
+      }
+      Action = [
+        "backup:DeleteBackupVault",
+        "backup:DeleteRecoveryPoint",
+        "backup:StartCopyJob",
+        "backup:UpdateRecoveryPointLifecycle",
+      ]
+      Resource = "*"
+    }]
+  })
+}'''
+
+
+# ---------------------------------------------------------------------------
 # Azure (azurerm) Terraform templates — covers the Stage 1/2/3 CIS Azure
 # v3.0 checks. Each template is a focused snippet that the operator drops
 # into the matching resource block; full resource definitions are intentionally
@@ -2564,6 +3093,239 @@ EXPLANATIONS: dict[str, dict] = {
             "Review the compliance score in Config > Aggregators after the rules evaluate",
         ],
         "effort": "quick",
+    },
+    # ----- AWS Stage 2 of parity sweep -----
+    "cloudfront-https-only": {
+        "explanation": "A CloudFront cache behavior with ViewerProtocolPolicy=allow-all accepts plain HTTP requests, exposing credentials, session cookies, and request bodies in transit. Even one weak behavior on a distribution defeats every other behavior's TLS posture for matching paths.",
+        "steps": [
+            "For each weak cache behavior, set ViewerProtocolPolicy = redirect-to-https",
+            "Verify clients can handle the 301 redirect (some legacy SDKs do not)",
+        ],
+        "effort": "quick",
+    },
+    "cloudfront-min-tls": {
+        "explanation": "CloudFront's MinimumProtocolVersion pins the TLS version + cipher suite. Anything below TLSv1.2_2021 allows legacy ciphers vulnerable to BEAST/POODLE-class attacks. The default *.cloudfront.net certificate uses TLSv1, which is below the modern bar — production workloads should attach a custom ACM cert.",
+        "steps": [
+            "Attach a custom ACM certificate (must be in us-east-1 for CloudFront)",
+            "Update the distribution viewer-certificate to MinimumProtocolVersion=TLSv1.2_2021",
+        ],
+        "effort": "moderate",
+    },
+    "cloudfront-waf": {
+        "explanation": "Public-facing CloudFront edges without WAF are exposed to OWASP Top 10, bot scraping, and credential stuffing. Even with origin authentication, you need WAF for edge-level rate limiting and known-bad-input filtering.",
+        "steps": [
+            "Create a WAFv2 Web ACL with scope=CLOUDFRONT (must be in us-east-1)",
+            "Attach AWS Managed Rules Common Rule Set + Bot Control",
+            "Associate the Web ACL with the distribution",
+        ],
+        "effort": "moderate",
+    },
+    "cloudfront-geo-restrictions": {
+        "explanation": "CloudFront geo restrictions allow or deny by country at the edge. They are appropriate for sanctions enforcement, data residency compliance, and content licensing. They do not replace authorization but add a defense-in-depth layer.",
+        "steps": [
+            "Identify whether your service has geo-restriction requirements (sanctions, data residency)",
+            "If yes, configure restriction_type = whitelist/blacklist with the appropriate locations",
+        ],
+        "effort": "quick",
+    },
+    "cloudfront-oac": {
+        "explanation": "Without Origin Access Control (or the legacy OAI), the S3 bucket backing a CloudFront distribution must be publicly readable so CloudFront can fetch objects. This means anyone can bypass CloudFront entirely and hit the bucket directly, defeating WAF, signed URLs, and any other edge controls.",
+        "steps": [
+            "Create an OAC with signing_behavior=always, signing_protocol=sigv4",
+            "Attach to the distribution origin",
+            "Update the S3 bucket policy to allow only the cloudfront.amazonaws.com service principal with aws:SourceArn condition",
+        ],
+        "effort": "moderate",
+    },
+    "redshift-encryption": {
+        "explanation": "Redshift cluster storage is unencrypted by default. Cluster encryption can be enabled after creation but the migration is non-trivial — AWS performs a background snapshot + restore which can take hours for large clusters.",
+        "steps": [
+            "Schedule a maintenance window",
+            "aws redshift modify-cluster --cluster-identifier <id> --encrypted --kms-key-id <key-arn>",
+            "Cluster will be unavailable during the encryption operation",
+        ],
+        "effort": "significant",
+    },
+    "redshift-public-access": {
+        "explanation": "A publicly accessible Redshift cluster has an internet-routable endpoint. Even with strong authentication, this is a credential-spray surface and a common audit finding.",
+        "steps": [
+            "aws redshift modify-cluster --cluster-identifier <id> --no-publicly-accessible",
+            "Provide alternative access via VPN, AWS Client VPN, or a bastion host in the same VPC",
+        ],
+        "effort": "moderate",
+    },
+    "redshift-audit-logging": {
+        "explanation": "Without Redshift audit logging (connection log, user activity log, user log), you cannot reconstruct who ran which queries during an incident. SOC 2 expects this audit trail for any database holding regulated data.",
+        "steps": [
+            "Create an S3 bucket for audit logs",
+            "aws redshift enable-logging --cluster-identifier <id> --bucket-name <bucket> --s3-key-prefix redshift-audit/",
+        ],
+        "effort": "quick",
+    },
+    "redshift-require-ssl": {
+        "explanation": "Without require_ssl=true in the Redshift parameter group, clients can connect over plaintext, exposing credentials and queries on the wire.",
+        "steps": [
+            "aws redshift modify-cluster-parameter-group --parameter-group-name <pg> --parameters ParameterName=require_ssl,ParameterValue=true,ApplyType=dynamic",
+            "Reboot the cluster if required",
+        ],
+        "effort": "quick",
+    },
+    "elasticache-transit-encryption": {
+        "explanation": "ElastiCache Redis traffic between clients and the cluster is in plaintext by default. Cached session data, API tokens, and PII traversing the cache are exposed to anyone on the network path.",
+        "steps": [
+            "Transit encryption can only be enabled at replication group creation",
+            "Create a new replication group with transit_encryption_enabled=true",
+            "Migrate data via online migration or application-level dual-write, then cut over",
+        ],
+        "effort": "significant",
+    },
+    "elasticache-at-rest-encryption": {
+        "explanation": "ElastiCache snapshots and node-level disk storage are unencrypted by default. At-rest encryption can only be enabled at replication group creation.",
+        "steps": [
+            "Recreate the replication group with at_rest_encryption_enabled=true and a customer-managed KMS key",
+            "Migrate data and cut over",
+        ],
+        "effort": "significant",
+    },
+    "elasticache-auth-token": {
+        "explanation": "Without an AUTH token, anyone in the same VPC subnet can connect to Redis without credentials. The AUTH token adds a password layer on top of TLS — Redis's equivalent of a database password.",
+        "steps": [
+            "Generate a strong random token and store in Secrets Manager",
+            "aws elasticache modify-replication-group --auth-token <token> --auth-token-update-strategy ROTATE",
+            "Update applications to read the token from Secrets Manager",
+        ],
+        "effort": "moderate",
+    },
+    "neptune-encryption": {
+        "explanation": "Neptune cluster storage is unencrypted by default. Encryption can only be enabled at cluster creation; existing unencrypted clusters require a snapshot, encrypted-restore, and cutover.",
+        "steps": [
+            "Snapshot the cluster",
+            "Restore the snapshot with --storage-encrypted --kms-key-id <key>",
+            "Cut over and delete the old cluster",
+        ],
+        "effort": "significant",
+    },
+    "rds-force-ssl": {
+        "explanation": "Without rds.force_ssl=1 (PostgreSQL/SQL Server) or require_secure_transport=ON (MySQL/MariaDB), SSL is offered but clients can downgrade to plaintext. This is the parameter-group equivalent of Azure's secure_transport setting on PostgreSQL/MySQL Flexible Server.",
+        "steps": [
+            "Modify the DB parameter group to set the SSL parameter",
+            "Reboot the instance for the parameter to take effect",
+            "Verify clients use ssl=require / sslmode=require in connection strings",
+        ],
+        "effort": "moderate",
+    },
+    "rds-postgres-log-settings": {
+        "explanation": "Without log_connections, log_disconnections, and log_checkpoints turned on in the PostgreSQL parameter group, brute-force authentication attempts and anomalous session patterns leave no trace in RDS logs. Mirrors Azure's check_postgresql_log_settings for PostgreSQL Flexible Server.",
+        "steps": [
+            "Modify the parameter group to enable each missing parameter",
+            "Apply with ApplyMethod=immediate (no reboot needed for these params)",
+            "Verify logs flow to CloudWatch Logs via enabled_cloudwatch_logs_exports",
+        ],
+        "effort": "quick",
+    },
+    "rds-min-tls": {
+        "explanation": "SQL Server RDS allows TLS 1.0/1.1 unless rds.tls_version is restricted. TLS 1.0/1.1 have known cryptographic weaknesses (BEAST, POODLE) and are deprecated by every major security framework.",
+        "steps": [
+            "Modify the parameter group to set rds.tls_version=1.2",
+            "ApplyMethod=pending-reboot (the parameter requires a restart)",
+            "Schedule a maintenance window to apply",
+        ],
+        "effort": "moderate",
+    },
+    "lambda-function-url-auth": {
+        "explanation": "Lambda Function URLs are a relatively new feature where Lambda gets a public HTTPS endpoint without API Gateway. They default to AuthType=NONE — meaning anyone on the internet can invoke the function and incur unbounded costs. Bot scanners find these endpoints within hours of creation. This is one of the most common new misconfigurations in AWS as of 2026.",
+        "steps": [
+            "aws lambda update-function-url-config --function-name <name> --auth-type AWS_IAM",
+            "Update callers to sign requests with SigV4",
+            "If you genuinely need an unauthenticated public endpoint, put it behind API Gateway + WAF with rate limiting, not a raw Function URL",
+        ],
+        "effort": "quick",
+    },
+    "lambda-layer-origin": {
+        "explanation": "Lambda layers can be sourced from any AWS account that grants you GetLayerVersion permission. Layers from foreign accounts are a supply-chain risk: the layer publisher can ship arbitrary code that runs in your function's execution context with your function's IAM role.",
+        "steps": [
+            "Download each foreign layer via aws lambda get-layer-version-by-arn",
+            "Re-publish in your own account via aws lambda publish-layer-version",
+            "Update each function to use the in-account layer ARN",
+        ],
+        "effort": "moderate",
+    },
+    "apigw-client-cert": {
+        "explanation": "Without a client certificate, the backend integration cannot verify that incoming requests originated from API Gateway. If the backend URL leaks, an attacker can call it directly and bypass any throttling, WAF, or authorizer wired into API Gateway.",
+        "steps": [
+            "aws apigateway generate-client-certificate",
+            "Attach to each stage via aws apigateway update-stage",
+            "Update the backend to verify the cert against the API Gateway public key",
+        ],
+        "effort": "moderate",
+    },
+    "apigw-authorizer": {
+        "explanation": "API Gateway methods with AuthorizationType=NONE are publicly callable. This is the AWS equivalent of Azure App Service Easy Auth being disabled. If unintentional, an attacker can invoke the backend Lambda or HTTP integration without credentials.",
+        "steps": [
+            "Identify intentional public methods (document each in code review)",
+            "For all others: aws apigateway update-method with --patch-operations to set authorizationType=AWS_IAM (or COGNITO_USER_POOLS / CUSTOM)",
+        ],
+        "effort": "moderate",
+    },
+    "apigw-throttling": {
+        "explanation": "Without stage-level throttling, a single misbehaving client (or attacker) can trigger unbounded Lambda invocations, downstream DB load, and cost overruns. Account-level throttling exists as a backstop but stage-level limits are the right granularity.",
+        "steps": [
+            "aws apigateway update-stage with patch-operations setting throttling/burstLimit and throttling/rateLimit on the */* method path",
+            "Tune the limits based on expected legitimate traffic + headroom",
+        ],
+        "effort": "quick",
+    },
+    "apigw-request-validation": {
+        "explanation": "Without request validators, malformed requests are passed through to the backend Lambda — wasting compute and exposing the backend to fuzz inputs. Validators reject bad requests at the edge before they reach backend code.",
+        "steps": [
+            "Define request validators in the API spec (OpenAPI body schemas)",
+            "Attach them to each method via patch-operations setting requestValidatorId",
+        ],
+        "effort": "moderate",
+    },
+    "s3-object-ownership": {
+        "explanation": "S3 Object Ownership = BucketOwnerEnforced disables ACLs entirely. Without it, objects uploaded by other accounts can have ACLs that exclude the bucket owner — making auditing and lifecycle management harder. This is the modern AWS recommendation for new buckets.",
+        "steps": [
+            "aws s3api put-bucket-ownership-controls --bucket <name> --ownership-controls Rules=[{ObjectOwnership=BucketOwnerEnforced}]",
+            "Migrate any existing ACL-based access patterns to bucket-policy or IAM grants",
+        ],
+        "effort": "quick",
+    },
+    "s3-access-logging": {
+        "explanation": "Without S3 access logs, you cannot reconstruct who accessed which objects during an incident — no source IPs, no requester ARNs, no operation history beyond CloudTrail data events (which most accounts don't enable for cost reasons).",
+        "steps": [
+            "Create a dedicated log destination bucket with Object Lock + lifecycle rules",
+            "aws s3api put-bucket-logging on the source bucket pointing at the log bucket",
+            "Use CloudTrail data events for buckets requiring object-level audit",
+        ],
+        "effort": "quick",
+    },
+    "s3-kms-cmk": {
+        "explanation": "The default S3 server-side encryption (SSE-S3) uses an AWS-owned key. Customer-managed KMS encryption (SSE-KMS) gives you key-level audit, the ability to revoke decrypt access independently of the bucket policy, and meets stricter compliance requirements (PCI, HIPAA, FedRAMP High).",
+        "steps": [
+            "Create a customer-managed KMS key with rotation enabled",
+            "aws s3api put-bucket-encryption with SSEAlgorithm=aws:kms and KMSMasterKeyID=<arn>",
+            "Enable bucket_key_enabled to reduce KMS API costs by ~99%",
+        ],
+        "effort": "quick",
+    },
+    "aws-backup-cross-region-copy": {
+        "explanation": "Without cross-region backup copy actions, a single-region disaster (control plane outage, account compromise, ransomware) destroys both your primary data and your backups simultaneously. Mirrors Azure RSV cross-region restore.",
+        "steps": [
+            "Create a destination Backup vault in a different region",
+            "Edit each backup plan rule to add a copy_action targeting the destination vault",
+            "Set the destination vault's lifecycle delete_after to match or exceed the source",
+        ],
+        "effort": "moderate",
+    },
+    "aws-backup-vault-access-policy": {
+        "explanation": "Without a resource-based access policy denying destructive operations to non-break-glass principals, a compromised admin can wipe backups even with Vault Lock in GOVERNANCE mode. This is the AWS analog of Azure RSV's Multi-User Authorization.",
+        "steps": [
+            "Define an IAM role for break-glass backup operations (separate from day-to-day admins)",
+            "Write a vault access policy with Effect=Deny, NotPrincipal=<break-glass role>, and Action including DeleteBackupVault, DeleteRecoveryPoint, StartCopyJob",
+            "aws backup put-backup-vault-access-policy with the policy file",
+        ],
+        "effort": "moderate",
     },
     # ----- Azure CIS v3.0 explanations -----
     "azure-storage-shared-key-access": {

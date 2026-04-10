@@ -39,6 +39,9 @@ def run_all_aws_database_checks(client: AWSClient) -> list[Finding]:
             findings.extend(check_rds_deletion_protection(rc, account_id, r))
             findings.extend(check_rds_performance_insights_kms(rc, account_id, r))
             findings.extend(check_rds_minor_version_upgrade(rc, account_id, r))
+            findings.extend(check_rds_force_ssl_parameter(rc, account_id, r))
+            findings.extend(check_rds_postgres_log_settings(rc, account_id, r))
+            findings.extend(check_rds_min_tls_version(rc, account_id, r))
             findings.extend(check_documentdb_encryption(rc, account_id, r))
             findings.extend(check_documentdb_audit_logs(rc, account_id, r))
             findings.extend(check_dynamodb_pitr(rc, account_id, r))
@@ -46,6 +49,252 @@ def run_all_aws_database_checks(client: AWSClient) -> list[Finding]:
         except ClientError:
             continue
 
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# RDS parameter-group enforcement (mirrors Azure PostgreSQL/MySQL checks)
+# ---------------------------------------------------------------------------
+
+
+def _get_parameter_value(client: AWSClient, param_group_name: str, param_name: str) -> str | None:
+    """Read one parameter value from an RDS parameter group."""
+    try:
+        rds = client.client("rds")
+        paginator = rds.get_paginator("describe_db_parameters")
+        for page in paginator.paginate(DBParameterGroupName=param_group_name):
+            for p in page.get("Parameters", []):
+                if p.get("ParameterName") == param_name:
+                    return p.get("ParameterValue")
+    except ClientError:
+        return None
+    return None
+
+
+def check_rds_force_ssl_parameter(
+    client: AWSClient, account_id: str, region: str
+) -> list[Finding]:
+    """PostgreSQL/SQL Server RDS parameter group should force SSL.
+
+    Mirrors Azure's check_postgresql_secure_transport. Without this parameter,
+    SSL is offered but clients can downgrade to plaintext. The parameter is
+    ``rds.force_ssl`` for PostgreSQL/SQL Server (value must be 1), and
+    ``require_secure_transport=ON`` for MySQL/MariaDB.
+    """
+    findings: list[Finding] = []
+    for db in _rds_instances(client):
+        engine = db.get("Engine", "")
+        db_id = db.get("DBInstanceIdentifier", "unknown")
+        arn = db.get("DBInstanceArn", "")
+        pg_groups = db.get("DBParameterGroups", []) or []
+        if not pg_groups:
+            continue
+        pg_name = pg_groups[0].get("DBParameterGroupName")
+        if not pg_name:
+            continue
+
+        if engine in ("postgres", "aurora-postgresql", "sqlserver-ex", "sqlserver-se", "sqlserver-ee", "sqlserver-web"):
+            param_name = "rds.force_ssl"
+            expected_value = "1"
+        elif engine in ("mysql", "mariadb", "aurora-mysql"):
+            param_name = "require_secure_transport"
+            expected_value = "ON"
+        else:
+            continue
+
+        actual = _get_parameter_value(client, pg_name, param_name)
+        ok = (actual or "").upper() == expected_value.upper()
+        if ok:
+            findings.append(
+                Finding(
+                    check_id="rds-force-ssl",
+                    title=f"RDS '{db_id}' ({engine}) enforces SSL via parameter group",
+                    description=f"{param_name}={actual} on parameter group {pg_name}.",
+                    severity=Severity.INFO,
+                    status=ComplianceStatus.PASS,
+                    domain=CheckDomain.ENCRYPTION,
+                    resource_type="AWS::RDS::DBInstance",
+                    resource_id=arn,
+                    region=region,
+                    account_id=account_id,
+                    soc2_controls=["CC6.1", "CC6.7"],
+                    cis_aws_controls=["2.3.x"],
+                    details={"db": db_id, "engine": engine, "parameter": param_name},
+                )
+            )
+        else:
+            findings.append(
+                Finding(
+                    check_id="rds-force-ssl",
+                    title=f"RDS '{db_id}' ({engine}) does not enforce SSL",
+                    description=(
+                        f"Parameter {param_name} is {actual or 'unset'} on parameter group {pg_name}. "
+                        "Clients can connect over plaintext, exposing credentials and queries on "
+                        "the wire. This is the parameter-group equivalent of Azure's "
+                        "require_secure_transport=ON for PostgreSQL/MySQL Flexible Server."
+                    ),
+                    severity=Severity.HIGH,
+                    status=ComplianceStatus.FAIL,
+                    domain=CheckDomain.ENCRYPTION,
+                    resource_type="AWS::RDS::DBInstance",
+                    resource_id=arn,
+                    region=region,
+                    account_id=account_id,
+                    remediation=(
+                        f"aws rds modify-db-parameter-group --db-parameter-group-name {pg_name} "
+                        f"--parameters 'ParameterName={param_name},ParameterValue={expected_value},"
+                        "ApplyMethod=pending-reboot'. The instance must reboot for the parameter "
+                        "to take effect."
+                    ),
+                    soc2_controls=["CC6.1", "CC6.7"],
+                    cis_aws_controls=["2.3.x"],
+                    details={"db": db_id, "engine": engine, "parameter": param_name, "value": actual},
+                )
+            )
+    return findings
+
+
+def check_rds_postgres_log_settings(
+    client: AWSClient, account_id: str, region: str
+) -> list[Finding]:
+    """PostgreSQL RDS should log connections, disconnections, and checkpoints.
+
+    Mirrors Azure's check_postgresql_log_settings. Without these parameters,
+    brute-force authentication attempts and anomalous session patterns leave
+    no trace in RDS logs.
+    """
+    findings: list[Finding] = []
+    wanted = ["log_connections", "log_disconnections", "log_checkpoints"]
+    for db in _rds_instances(client):
+        engine = db.get("Engine", "")
+        if engine not in ("postgres", "aurora-postgresql"):
+            continue
+        db_id = db.get("DBInstanceIdentifier", "unknown")
+        arn = db.get("DBInstanceArn", "")
+        pg_groups = db.get("DBParameterGroups", []) or []
+        if not pg_groups:
+            continue
+        pg_name = pg_groups[0].get("DBParameterGroupName")
+        if not pg_name:
+            continue
+
+        actual = {p: (_get_parameter_value(client, pg_name, p) or "").lower() for p in wanted}
+        missing = [k for k, v in actual.items() if v not in ("1", "on")]
+        if not missing:
+            findings.append(
+                Finding(
+                    check_id="rds-postgres-log-settings",
+                    title=f"RDS PostgreSQL '{db_id}' logs connections + checkpoints",
+                    description="All 3 session-logging parameters are on.",
+                    severity=Severity.INFO,
+                    status=ComplianceStatus.PASS,
+                    domain=CheckDomain.LOGGING,
+                    resource_type="AWS::RDS::DBInstance",
+                    resource_id=arn,
+                    region=region,
+                    account_id=account_id,
+                    soc2_controls=["CC7.1", "CC7.2"],
+                    cis_aws_controls=["2.3.x"],
+                    details={"db": db_id, "settings": actual},
+                )
+            )
+        else:
+            findings.append(
+                Finding(
+                    check_id="rds-postgres-log-settings",
+                    title=f"RDS PostgreSQL '{db_id}' missing log settings: {', '.join(missing)}",
+                    description=(
+                        "One or more connection-logging parameters are off in the parameter "
+                        "group. Without these, anomalous session patterns and brute-force "
+                        "attempts leave no trace. Mirrors Azure's "
+                        "check_postgresql_log_settings for PostgreSQL Flexible Server."
+                    ),
+                    severity=Severity.MEDIUM,
+                    status=ComplianceStatus.FAIL,
+                    domain=CheckDomain.LOGGING,
+                    resource_type="AWS::RDS::DBInstance",
+                    resource_id=arn,
+                    region=region,
+                    account_id=account_id,
+                    remediation=(
+                        f"For each missing parameter: aws rds modify-db-parameter-group "
+                        f"--db-parameter-group-name {pg_name} "
+                        f"--parameters 'ParameterName=<name>,ParameterValue=1,ApplyMethod=immediate'"
+                    ),
+                    soc2_controls=["CC7.1", "CC7.2"],
+                    cis_aws_controls=["2.3.x"],
+                    details={"db": db_id, "settings": actual, "missing": missing},
+                )
+            )
+    return findings
+
+
+def check_rds_min_tls_version(
+    client: AWSClient, account_id: str, region: str
+) -> list[Finding]:
+    """SQL Server RDS should have rds.tls_version set to TLS 1.2 or higher.
+
+    Mirrors Azure's check_sql_min_tls. Only applies to SQL Server engines.
+    """
+    findings: list[Finding] = []
+    sql_engines = ("sqlserver-ex", "sqlserver-se", "sqlserver-ee", "sqlserver-web")
+    for db in _rds_instances(client):
+        engine = db.get("Engine", "")
+        if engine not in sql_engines:
+            continue
+        db_id = db.get("DBInstanceIdentifier", "unknown")
+        arn = db.get("DBInstanceArn", "")
+        pg_groups = db.get("DBParameterGroups", []) or []
+        if not pg_groups:
+            continue
+        pg_name = pg_groups[0].get("DBParameterGroupName")
+        if not pg_name:
+            continue
+
+        tls_version = _get_parameter_value(client, pg_name, "rds.tls_version")
+        ok = tls_version in ("1.2", "1.3")
+        if ok:
+            findings.append(
+                Finding(
+                    check_id="rds-min-tls",
+                    title=f"SQL Server '{db_id}' enforces TLS {tls_version}",
+                    description=f"rds.tls_version={tls_version} on parameter group {pg_name}.",
+                    severity=Severity.INFO,
+                    status=ComplianceStatus.PASS,
+                    domain=CheckDomain.ENCRYPTION,
+                    resource_type="AWS::RDS::DBInstance",
+                    resource_id=arn,
+                    region=region,
+                    account_id=account_id,
+                    soc2_controls=["CC6.1", "CC6.7"],
+                    cis_aws_controls=["2.3.x"],
+                )
+            )
+        else:
+            findings.append(
+                Finding(
+                    check_id="rds-min-tls",
+                    title=f"SQL Server '{db_id}' allows legacy TLS (value={tls_version})",
+                    description=(
+                        "rds.tls_version is not restricted to 1.2 or higher. TLS 1.0/1.1 have "
+                        "known cryptographic weaknesses and should be disabled."
+                    ),
+                    severity=Severity.MEDIUM,
+                    status=ComplianceStatus.FAIL,
+                    domain=CheckDomain.ENCRYPTION,
+                    resource_type="AWS::RDS::DBInstance",
+                    resource_id=arn,
+                    region=region,
+                    account_id=account_id,
+                    remediation=(
+                        f"aws rds modify-db-parameter-group --db-parameter-group-name {pg_name} "
+                        "--parameters 'ParameterName=rds.tls_version,ParameterValue=1.2,"
+                        "ApplyMethod=pending-reboot'"
+                    ),
+                    soc2_controls=["CC6.1", "CC6.7"],
+                    cis_aws_controls=["2.3.x"],
+                )
+            )
     return findings
 
 

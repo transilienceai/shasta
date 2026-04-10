@@ -190,6 +190,24 @@ def _run_aws_extras(client: Any, domains: list[CheckDomain]) -> list[Finding]:
         except Exception:
             pass
 
+    # Stage 2 of the AWS-to-Azure parity sweep: CloudFront (global) and
+    # data warehouse / cache / graph DB modules
+    if CheckDomain.NETWORKING in domains:
+        try:
+            from shasta.aws.cloudfront import run_all_aws_cloudfront_checks
+
+            extras.extend(run_all_aws_cloudfront_checks(client))
+        except Exception:
+            pass
+
+    if CheckDomain.STORAGE in domains or CheckDomain.ENCRYPTION in domains:
+        try:
+            from shasta.aws.data_warehouse import run_all_aws_data_warehouse_checks
+
+            extras.extend(run_all_aws_data_warehouse_checks(client))
+        except Exception:
+            pass
+
     if CheckDomain.MONITORING in domains:
         try:
             from shasta.aws.backup import run_all_aws_backup_checks
