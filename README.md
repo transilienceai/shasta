@@ -4,6 +4,12 @@
 
 Shasta scans your cloud infrastructure. Whitney scans your AI systems and code. Together, they cover 5 compliance frameworks, 117 automated checks, and 199 security questionnaire answers — with a web dashboard, Terraform remediation, and auditor-grade evidence. Built for founders running <50 employee companies who need compliance without the $30K/year Vanta bill.
 
+> **Three load-bearing artifacts at the repo root, in order of what to read:**
+> [`README.md`](./README.md) (this file — what it does) →
+> [`TRUST.md`](./TRUST.md) (how to verify the claims yourself) →
+> [`ENGINEERING_PRINCIPLES.md`](./ENGINEERING_PRINCIPLES.md) (how the codebase is built and held together).
+> Each is self-tested by the integrity suite in `tests/test_integrity/`.
+
 ---
 
 ## Table of Contents

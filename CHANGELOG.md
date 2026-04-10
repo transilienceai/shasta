@@ -141,6 +141,29 @@ modules respect the global / regional distinction.
 - Total tests: **624 → 745** (new sweep tests + structural multi-region
   enforcement)
 
+### Documentation — unified trust story
+
+A new top-level [`TRUST.md`](./TRUST.md) consolidates the project-wide
+trust story that had grown well beyond Whitney's original scope. Three
+load-bearing artifacts now sit side-by-side at the repo root:
+
+- `README.md` — what Shasta and Whitney do
+- `TRUST.md` — how to verify the claims yourself (the seven enforcement
+  layers, framework coverage matrix, exact verification commands)
+- `ENGINEERING_PRINCIPLES.md` — how the codebase is held together
+
+`src/whitney/TRUST.md` is preserved but trimmed to Whitney-specific
+content (vulnerability fixtures, live AWS + Azure resource validation,
+Semgrep dual-engine architecture). It cross-links to the root
+`TRUST.md` for the project-wide story.
+
+`tests/test_integrity/test_doc_claims.py` gained 5 new assertions that
+verify the root `TRUST.md` numeric claims (total check functions, AI vs
+cloud breakdown, Terraform template count, total test count, Layer 1
+sub-suite breakdown, integrity test self-count) match reality. The test
+file is now at **16 parametrized assertions** (was 11). The README
+gained a one-line "three load-bearing artifacts" pointer at the top.
+
 ### Engineering Principles honored
 
 This release was developed against the discipline encoded in

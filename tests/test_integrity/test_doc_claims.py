@@ -320,6 +320,7 @@ def test_readme_policy_template_count() -> None:
 
 WHITNEY_README = REPO_ROOT / "src" / "whitney" / "README.md"
 WHITNEY_TRUST = REPO_ROOT / "src" / "whitney" / "TRUST.md"
+ROOT_TRUST = REPO_ROOT / "TRUST.md"
 
 
 def test_whitney_readme_test_count() -> None:
@@ -334,13 +335,98 @@ def test_whitney_readme_test_count() -> None:
 
 
 def test_whitney_trust_unit_test_count() -> None:
-    """TRUST.md 'Layer 1: Unit Tests (X tests)' header must match reality."""
+    """Whitney TRUST.md 'Whitney unit tests: X' summary must match reality."""
     assert_claim(
         WHITNEY_TRUST,
-        r"Unit Tests \((\d+) tests?\)",
+        r"Whitney unit tests:\s+(\d+)",
         actual=whitney_collected_count(),
         description="Whitney unit-test collected count",
         tolerance=10,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tests — root TRUST.md (project-wide trust story)
+# ---------------------------------------------------------------------------
+
+
+def test_root_trust_total_check_count() -> None:
+    """Root TRUST.md TL;DR claim of '220 check functions (174 cloud + 46 AI)'."""
+    text = ROOT_TRUST.read_text(encoding="utf-8")
+    pattern = re.compile(
+        r"\*\*(\d+)\s+check functions\*\*\s*\((\d+)\s+cloud compliance\s*\+\s*(\d+)\s+AI"
+    )
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        if "~~" in line:
+            continue
+        m = pattern.search(line)
+        if m:
+            total, shasta, whit = (int(m.group(i)) for i in (1, 2, 3))
+            actual_shasta = shasta_check_count()
+            actual_whit = whitney_check_count()
+            actual_total = total_check_count()
+            assert (total, shasta, whit) == (actual_total, actual_shasta, actual_whit), (
+                f"TRUST.md:{lineno} claims {total} ({shasta} cloud + {whit} AI) "
+                f"but registry has {actual_total} ({actual_shasta} + {actual_whit})."
+            )
+            return
+    raise AssertionError("TRUST.md TL;DR check-function pattern not found")
+
+
+def test_root_trust_terraform_template_count() -> None:
+    """Root TRUST.md TL;DR claim of 'X Terraform remediation templates'."""
+    assert_claim(
+        ROOT_TRUST,
+        r"\*\*(\d+)\s+Terraform remediation templates\*\*",
+        actual=total_terraform_template_count(),
+        description="root TRUST.md Terraform template count",
+        tolerance=0,
+    )
+
+
+def test_root_trust_test_count() -> None:
+    """Root TRUST.md TL;DR bullet of '- **N tests** that all pass'."""
+    assert_claim(
+        ROOT_TRUST,
+        r"\*\*(\d+)\s+tests\*\*\s+that all pass",
+        actual=pytest_collected_count(),
+        description="root TRUST.md total test count",
+        tolerance=50,
+    )
+
+
+def test_root_trust_layer1_test_breakdown() -> None:
+    """Root TRUST.md Layer 1 table rows must match collected sub-suite counts."""
+    text = ROOT_TRUST.read_text(encoding="utf-8")
+    # Whitney row
+    m = re.search(r"`tests/test_whitney/`\s*\|\s*(\d+)", text)
+    assert m, "Whitney row not found in Layer 1 table"
+    claimed = int(m.group(1))
+    actual = whitney_collected_count()
+    assert abs(claimed - actual) <= 10, (
+        f"TRUST.md Layer 1 claims {claimed} Whitney tests but actual is {actual}. "
+        f"Update the table cell to {actual}."
+    )
+
+
+def test_root_trust_integrity_test_count() -> None:
+    """Root TRUST.md claim of '11 parametrized assertions' in integrity tests."""
+    # Count tests/test_integrity collected
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests/test_integrity/", "--collect-only", "-q"],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        timeout=60,
+    )
+    m = re.search(r"(\d+)\s+tests?\s+collected", result.stdout)
+    actual = int(m.group(1)) if m else 0
+    assert_claim(
+        ROOT_TRUST,
+        r"\*\*(\d+)\s+parametrized\s+assertions\*\*",
+        actual=actual,
+        description="root TRUST.md integrity test count",
+        tolerance=2,
     )
 
 

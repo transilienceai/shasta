@@ -1,6 +1,17 @@
 # How We Know Whitney Works
 
-Whitney is an AI security and governance scanner. This document explains exactly how we validated that it delivers trustworthy results — not through marketing claims, but through layered testing against real systems.
+Whitney is an AI security and governance scanner. This document explains
+how we validated that it delivers trustworthy results — not through
+marketing claims, but through layered testing against real AI
+infrastructure.
+
+> **For the project-wide trust story** (test counts, doc-vs-code drift
+> integrity tests, multi-region structural enforcement, CI workflow,
+> framework coverage matrix across Shasta and Whitney, the seven
+> enforcement layers), see the **[root `TRUST.md`](../../TRUST.md)** at the
+> repository root. This file is the Whitney-specific deep dive: AI
+> validation fixtures, live AWS + Azure resource testing, and the
+> Semgrep dual-engine deterministic architecture.
 
 ---
 
@@ -111,14 +122,16 @@ Every finding matched the expected result for the resource configuration. No fal
 ## Test Coverage Summary
 
 ```
-Unit tests:            319
-Integration tests:      21
-Total:                 340
+Whitney unit tests:    419  (run: pytest tests/test_whitney/)
+Integration tests:      21  (run: pytest tests/integration/validate_whitney.py)
 
-AWS checks validated:   14/15 (93%)
-Azure checks validated: 13/15 (87%)
-Code checks validated:  15/15 (100%)
+AWS checks validated:   14/15 (93%)  — see Layer 3 above
+Azure checks validated: 13/15 (87%)  — see Layer 3 above
+Code checks validated:  15/15 (100%) — see Layer 1 / Layer 2 above
 ```
+
+For the project-wide test count across Shasta + Whitney + integrity +
+smoke suites, see the [root `TRUST.md`](../../TRUST.md#layer-1--test-suite).
 
 ---
 
