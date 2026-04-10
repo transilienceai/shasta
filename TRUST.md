@@ -19,7 +19,7 @@ Semgrep architecture), see [`src/whitney/TRUST.md`](./src/whitney/TRUST.md).
 
 Shasta and Whitney together ship the following, all integrity-tested:
 
-- **220 check functions** (174 cloud compliance + 46 AI governance)
+- **236 check functions** (190 cloud compliance + 46 AI governance)
 - **112 Terraform remediation templates** (81 AWS + 31 Azure)
 - **684 tests** that all pass on every commit
 

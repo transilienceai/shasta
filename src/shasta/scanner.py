@@ -383,6 +383,15 @@ def _run_azure_extras(azure_client: Any, domains: list[CheckDomain]) -> list[Fin
         except Exception:
             pass
 
+    # Entra ID hardening checks (CIS/MCSB gaps beyond iam.py)
+    if CheckDomain.IAM in domains:
+        try:
+            from shasta.azure.entra import run_all_azure_entra_checks
+
+            extras.extend(run_all_azure_entra_checks(azure_client))
+        except Exception:
+            pass
+
     return extras
 
 

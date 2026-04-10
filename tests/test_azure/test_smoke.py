@@ -34,6 +34,7 @@ AZURE_MODULES = [
     "shasta.azure.private_endpoints",
     "shasta.azure.diagnostic_settings",
     "shasta.azure.governance",
+    "shasta.azure.entra",
 ]
 
 EXPECTED_RUNNERS = {
@@ -49,6 +50,7 @@ EXPECTED_RUNNERS = {
     "shasta.azure.private_endpoints": "run_all_azure_private_endpoint_checks",
     "shasta.azure.diagnostic_settings": "run_all_azure_diagnostic_settings_checks",
     "shasta.azure.governance": "run_all_azure_governance_checks",
+    "shasta.azure.entra": "run_all_azure_entra_checks",
 }
 
 
@@ -178,6 +180,31 @@ def test_networking_modern_flow_logs_check_callable() -> None:
 
     assert callable(getattr(networking, "check_vnet_flow_logs_modern"))
     assert callable(getattr(networking, "check_network_watcher_per_region"))
+
+
+def test_entra_check_functions_are_callable() -> None:
+    from shasta.azure import entra
+
+    expected = [
+        "check_sign_in_risk_policy",
+        "check_user_risk_policy",
+        "check_banned_password_protection",
+        "check_sspr_notifications",
+        "check_authentication_methods",
+        "check_security_defaults",
+        "check_user_consent_restricted",
+        "check_app_registration_restricted",
+        "check_admin_consent_workflow",
+        "check_admin_portal_restricted",
+        "check_security_group_creation_restricted",
+        "check_m365_group_creation_restricted",
+        "check_guest_user_access_restricted",
+        "check_break_glass_accounts",
+        "check_named_locations",
+        "check_cross_tenant_access_default",
+    ]
+    for name in expected:
+        assert callable(getattr(entra, name)), f"entra.{name} missing or not callable"
 
 
 def test_azure_terraform_templates_registered() -> None:
