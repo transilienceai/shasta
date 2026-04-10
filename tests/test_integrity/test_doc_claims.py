@@ -236,6 +236,57 @@ def test_readme_technical_controls_check_count() -> None:
     )
 
 
+def test_readme_intro_total_check_count() -> None:
+    """The intro paragraph 'N automated checks' free-text claim must match grand total.
+
+    This catches the failure mode where the headline at line 25 is integrity-tested
+    but the prose intro at line 5 drifts independently. The intro claim references
+    Shasta + Whitney combined ('Together, they cover ...'), so it should match the
+    grand total, not just the Shasta-only count.
+    """
+    text = README.read_text(encoding="utf-8")
+    pattern = re.compile(r"(\d+)\s+automated checks(?!\s+across AWS and Azure)")
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        if "~~" in line:
+            continue
+        if "Together, they cover" not in line:
+            continue
+        m = pattern.search(line)
+        if m:
+            claimed = int(m.group(1))
+            actual = total_check_count()
+            assert claimed == actual, (
+                f"README.md:{lineno} 'Together, they cover ... {claimed} automated checks' "
+                f"is stale. Actual grand total = {actual} ({shasta_check_count()} cloud "
+                f"+ {whitney_check_count()} AI). Update the line to {actual}."
+            )
+            return
+    raise AssertionError(
+        "README intro 'Together, they cover ... N automated checks' line not found. "
+        "Either the README was rewritten or this test needs updating."
+    )
+
+
+def test_readme_intro_terraform_template_count() -> None:
+    """Same intro paragraph must also match the live Terraform template count."""
+    text = README.read_text(encoding="utf-8")
+    pattern = re.compile(r"(\d+)\s+Terraform remediation templates")
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        if "~~" in line or "Together, they cover" not in line:
+            continue
+        m = pattern.search(line)
+        if m:
+            claimed = int(m.group(1))
+            actual = total_terraform_template_count()
+            assert claimed == actual, (
+                f"README.md:{lineno} intro claims {claimed} Terraform templates, "
+                f"actual is {actual}. Update the line to {actual}."
+            )
+            return
+    # Optional — only fail if the line was supposed to mention TF templates
+    # and doesn't anymore. Not an assertion for this iteration.
+
+
 def test_readme_check_to_risk_mapping_count() -> None:
     """`FINDING_TO_RISK` table size must match the README claim."""
     assert_claim(

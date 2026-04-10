@@ -2,7 +2,7 @@
 
 **An AI-native compliance toolkit that enables startup founders to achieve and maintain SOC 2, ISO 27001, HIPAA, ISO 42001, and EU AI Act compliance across AWS and Azure — through conversation, not dashboards.**
 
-Shasta scans your cloud infrastructure. Whitney scans your AI systems and code. Together, they cover 5 compliance frameworks, 117 automated checks, and 199 security questionnaire answers — with a web dashboard, Terraform remediation, and auditor-grade evidence. Built for founders running <50 employee companies who need compliance without the $30K/year Vanta bill.
+Shasta scans your cloud infrastructure. Whitney scans your AI systems and code. Together, they cover 12 compliance frameworks, 220 automated checks, and 199 security questionnaire answers — with a web dashboard, 112 Terraform remediation templates, and auditor-grade evidence. Built for founders running <50 employee companies who need compliance without the $30K/year Vanta bill.
 
 > **Three load-bearing artifacts at the repo root, in order of what to read:**
 > [`README.md`](./README.md) (this file — what it does) →
