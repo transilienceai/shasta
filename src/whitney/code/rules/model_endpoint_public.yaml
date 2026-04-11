@@ -34,16 +34,36 @@ rules:
                   $CLIENT.chat.completions.create(...)
       - pattern-not-inside: |
           @login_required
-          ...
+          def $F(...):
+              ...
       - pattern-not-inside: |
           @require_auth
-          ...
+          def $F(...):
+              ...
       - pattern-not-inside: |
           @jwt_required(...)
-          ...
+          def $F(...):
+              ...
       - pattern-not-inside: |
           @auth_required
-          ...
+          def $F(...):
+              ...
+      - pattern-not-inside: |
+          @login_required
+          async def $F(...):
+              ...
+      - pattern-not-inside: |
+          @require_auth
+          async def $F(...):
+              ...
+      - pattern-not-inside: |
+          @jwt_required(...)
+          async def $F(...):
+              ...
+      - pattern-not-inside: |
+          @auth_required
+          async def $F(...):
+              ...
       - pattern-not: |
           @app.post(...)
           async def $FUNC(..., $AUTH = Depends(...), ...):

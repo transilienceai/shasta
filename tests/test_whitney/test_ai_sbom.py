@@ -328,12 +328,12 @@ class TestScanAWSComponents:
     def test_bedrock_models(self, mock_discover):
         mock_discover.return_value = {
             "bedrock": {
-                "models": [
+                "foundation_models": [
                     {"model_id": "anthropic.claude-3-sonnet-20240229-v1:0", "provider": "Anthropic"}
                 ]
             },
             "sagemaker": {"endpoints": [], "models": []},
-            "lambda_ai": {"functions_with_ai_keys": []},
+            "lambda_ai": {"functions_with_ai_vars": []},
         }
         components = scan_aws_for_ai_components(None)
         assert len(components) == 1
@@ -344,12 +344,12 @@ class TestScanAWSComponents:
     @patch("whitney.discovery.aws_ai.discover_aws_ai_services")
     def test_sagemaker_endpoints(self, mock_discover):
         mock_discover.return_value = {
-            "bedrock": {"models": []},
+            "bedrock": {"foundation_models": []},
             "sagemaker": {
                 "endpoints": [{"name": "my-ml-endpoint"}],
                 "models": [],
             },
-            "lambda_ai": {"functions_with_ai_keys": []},
+            "lambda_ai": {"functions_with_ai_vars": []},
         }
         components = scan_aws_for_ai_components(None)
         assert len(components) == 1

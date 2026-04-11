@@ -241,7 +241,7 @@ def scan_aws_for_ai_components(client: object) -> list[AIComponent]:
     components: list[AIComponent] = []
 
     # Bedrock foundation models
-    for model in inventory.get("bedrock", {}).get("models", []):
+    for model in inventory.get("bedrock", {}).get("foundation_models", []):
         model_id = model.get("model_id", model.get("modelId", ""))
         provider = model.get("provider", model.get("providerName", "unknown"))
         if model_id:
@@ -290,7 +290,7 @@ def scan_aws_for_ai_components(client: object) -> list[AIComponent]:
             )
 
     # Lambda functions with AI keys
-    for fn in inventory.get("lambda_ai", {}).get("functions_with_ai_keys", []):
+    for fn in inventory.get("lambda_ai", {}).get("functions_with_ai_vars", []):
         name = fn.get("name", fn.get("FunctionName", ""))
         if name:
             components.append(

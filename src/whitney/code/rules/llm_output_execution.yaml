@@ -98,7 +98,7 @@ rules:
 
   # --- Generic: exec/eval on variable named like LLM output ---
   - id: code-llm-output-exec-generic
-    pattern-regex: "(?:exec|eval)\\s*\\(\\s*(?:response|completion|output|result|answer|generated|llm_output|ai_response|chat_response|model_output)"
+    pattern-regex: "(?:^|\\s|;)(?:exec|eval)\\s*\\(\\s*(?:response|completion|output|result|answer|generated|llm_output|ai_response|chat_response|model_output)"
     message: >
       Variable with LLM-output-like name passed to exec() or eval().
       Verify this is not LLM-generated content being executed as code.

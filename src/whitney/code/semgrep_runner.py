@@ -102,10 +102,19 @@ def run_semgrep(repo_path: str | Path) -> list[Finding]:
         logger.warning("Semgrep timed out after 300s")
         return []
 
-    # Semgrep exit codes: 0 = no findings, 1 = findings found, >1 = error
-    if result.returncode > 1:
+    # Semgrep exit codes: 0 = no findings, 1 = findings found,
+    # 2 = findings + rule errors (partial results), >2 = fatal error
+    if result.returncode > 2:
         logger.warning("Semgrep failed (exit %d): %s", result.returncode, result.stderr[:500])
         return []
+
+    if result.returncode == 2:
+        # Partial results — some rules had parse errors but others ran fine.
+        # Log the errors but still parse whatever findings were produced.
+        logger.warning(
+            "Semgrep had rule errors (exit 2), parsing partial results: %s",
+            result.stderr[:500],
+        )
 
     return _parse_semgrep_json(result.stdout, repo_path)
 
