@@ -69,8 +69,15 @@ USER_INPUT_PATTERNS: list[re.Pattern[str]] = [
 FSTRING_OR_FORMAT_PATTERN: re.Pattern[str] = re.compile(r'(?:f["\']|\.format\s*\(|%\s*\()')
 
 META_PROMPT_PATTERNS: list[re.Pattern[str]] = [
+    # Require system-prompt-like phrasing — "You are a/an ..." or "Your role is ..."
     re.compile(
-        r"""["'](?:you are|your role is|instructions:|your task is|you must|as an ai)""",
+        r"""["'](?:you are (?:a |an |the )|your role is|"""
+        r"""your task is to|you must (?:always |never ))""",
+        re.IGNORECASE,
+    ),
+    # "As an AI" with continuation — not just the phrase in isolation
+    re.compile(
+        r"""["']as an ai (?:assistant|agent|model|system)""",
         re.IGNORECASE,
     ),
 ]
@@ -115,7 +122,8 @@ AI_API_CALL_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"chain\.run"),
     re.compile(r"llm\.\("),
     re.compile(r"model\.generate"),
-    re.compile(r"pipeline\s*\("),
+    # Require pipeline with a task string to avoid CI/data pipeline matches
+    re.compile(r"""pipeline\s*\(\s*["']"""),
 ]
 
 AI_RESPONSE_DIRECT_USE: list[re.Pattern[str]] = [
@@ -157,12 +165,14 @@ AGENT_TOOL_DEFINITION_PATTERNS: list[re.Pattern[str]] = [
 
 VECTOR_DB_QUERY_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"pinecone\.(?:Index|query)"),
-    re.compile(r"\.query\s*\("),
     re.compile(r"chroma\.(?:query|get)"),
-    re.compile(r"collection\.(?:search|query)"),
     re.compile(r"vectorstore\.(?:similarity_search|as_retriever)"),
+    re.compile(r"(?:vector_store|vectordb|vector_db)\.(?:query|search)\s*\("),
     re.compile(r"Qdrant.*\.search"),
     re.compile(r"weaviate.*\.query"),
+    re.compile(r"(?:Chroma|FAISS|Milvus|Pinecone|Weaviate|Qdrant)\w*\.(?:query|search)\s*\("),
+    re.compile(r"similarity_search\s*\("),
+    re.compile(r"\.as_retriever\s*\("),
 ]
 
 ACCESS_CONTROL_PATTERNS: list[re.Pattern[str]] = [
@@ -221,7 +231,8 @@ MODEL_INFERENCE_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"model\.generate\s*\("),
     re.compile(r"\.completions\.create\s*\("),
     re.compile(r"\.messages\.create\s*\("),
-    re.compile(r"pipeline\s*\("),
+    # Require pipeline with a task string to avoid matching CI/data pipelines
+    re.compile(r"""pipeline\s*\(\s*["']"""),
 ]
 
 # ---------------------------------------------------------------------------
@@ -413,7 +424,7 @@ MCP_DANGEROUS_TOOL_PATTERNS: list[re.Pattern[str]] = [
         r"""(?:subprocess|os\.system|os\.popen|exec\s*\(|eval\s*\(|"""
         r"""shutil\.rmtree|shutil\.move|open\s*\(.+['\"]w)"""
     ),
-    re.compile(r"(?:DROP\s+TABLE|DELETE\s+FROM|TRUNCATE)", re.IGNORECASE),
+    re.compile(r"(?:DROP\s+TABLE|DELETE\s+FROM|TRUNCATE\s+TABLE)", re.IGNORECASE),
 ]
 
 # MCP tool definitions without input schema validation
@@ -428,9 +439,16 @@ MCP_NO_SCHEMA_PATTERNS: list[re.Pattern[str]] = [
 # ---------------------------------------------------------------------------
 
 A2A_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r"(?:from\s+a2a|import\s+a2a|AgentCard|A2AServer)", re.IGNORECASE),
-    re.compile(r"agent[_-]?card|\.well-known/agent\.json", re.IGNORECASE),
-    re.compile(r"TaskSendParams|MessageSendParams|A2AClient", re.IGNORECASE),
+    # a2a-sdk Python package: from a2a.server import ..., from a2a.types import ...
+    re.compile(r"(?:from\s+a2a\b|import\s+a2a\b)", re.IGNORECASE),
+    # Core A2A types (PascalCase class names from the SDK)
+    re.compile(r"AgentCard|A2AServer|A2AClient|A2AStarletteApplication"),
+    # Well-known agent card path (spec: /.well-known/agent-card.json)
+    re.compile(r"agent[_-]?card\.json|\.well-known/agent", re.IGNORECASE),
+    # A2A message types
+    re.compile(r"TaskSendParams|MessageSendParams|SendTaskRequest"),
+    # Agent skill/capability declarations
+    re.compile(r"AgentSkill|AgentCapabilities|AgentProvider"),
 ]
 
 # A2A agent cards without authentication requirements

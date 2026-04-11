@@ -193,8 +193,8 @@ class TestMetaPromptPatterns:
         [
             ('"You are a helpful assistant"', True),
             ('"Your role is to assist users"', True),
-            ('"Instructions: Follow these steps"', True),
-            ('"Your task is to classify"', True),
+            ('"Instructions: Follow these steps"', False),  # tightened — too generic
+            ('"Your task is to classify text"', True),
             ('"Hello world"', False),
         ],
     )
