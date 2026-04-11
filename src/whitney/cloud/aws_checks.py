@@ -742,10 +742,21 @@ def check_sagemaker_endpoint_encryption(
         ep_name = ep["EndpointName"]
         try:
             detail = sm.describe_endpoint(EndpointName=ep_name)
-            kms_key = detail.get("KmsKeyId")
             ep_arn = detail.get(
                 "EndpointArn", f"arn:aws:sagemaker:{region}:{account_id}:endpoint/{ep_name}"
             )
+
+            # KmsKeyId lives on the endpoint config, not the endpoint itself
+            kms_key = None
+            ep_config_name = detail.get("EndpointConfigName")
+            if ep_config_name:
+                try:
+                    config_detail = sm.describe_endpoint_config(
+                        EndpointConfigName=ep_config_name
+                    )
+                    kms_key = config_detail.get("KmsKeyId")
+                except ClientError:
+                    pass
 
             if kms_key:
                 findings.append(
