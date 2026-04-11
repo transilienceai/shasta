@@ -10,7 +10,7 @@ Part of the Sierra Nevada mountain range: **Shasta** (14,179 ft) secures your cl
 
 Whitney uses **zero LLM calls**. Every finding is produced by Semgrep AST-based pattern matching (with regex fallback), AWS/Azure SDK API calls, dictionary lookups, and arithmetic. There is no probabilistic model, no prompt, no token consumption in the scanning pipeline.
 
-The code scanner uses a **dual-engine architecture**: when [Semgrep](https://semgrep.dev) is installed, 13 of the 15 code checks run as AST-aware Semgrep rules (more precise than regex, immune to formatting issues, won't match in comments). The 2 checks that need file-level memoization or version constraint comparison stay as Python. If Semgrep is not installed, all 15 checks fall back to the original regex engine.
+The code scanner uses a **dual-engine architecture**: when [Semgrep](https://semgrep.dev) is installed, 13 of the 20 code checks run as AST-aware Semgrep rules (more precise than regex, immune to formatting issues, won't match in comments). The 7 checks that need file-level context analysis (rate limiting, outdated SDK, MCP server security, A2A protocol security) stay as Python. If Semgrep is not installed, all 20 checks fall back to the original regex engine.
 
 This is a deliberate architectural choice and a differentiator. Most AI security vendors (Straiker, Lakera, CalypsoAI) use LLMs in their detection pipeline, which means their results vary between runs. Whitney's results are **100% reproducible**: same code + same infrastructure = same findings, every time.
 
@@ -376,15 +376,16 @@ Whitney shares Shasta's core infrastructure:
 
 ## What's Included
 
-- [x] 15 code security checks for AI repositories
+- [x] 20 code security checks for AI repositories (including MCP + A2A protocol security)
 - [x] 15 AWS cloud checks (Bedrock, SageMaker, Lambda, S3, CloudTrail)
 - [x] 15 Azure cloud checks (OpenAI, ML, Cognitive Services, AI Search)
+- [x] 7 compliance frameworks (ISO 42001, EU AI Act, NIST AI RMF, NIST AI 600-1, OWASP LLM Top 10, OWASP Agentic Top 10, MITRE ATLAS)
 - [x] AI service discovery (AWS + Azure)
 - [x] ISO 42001 framework (11 controls, scoring, mapping)
 - [x] EU AI Act framework (8 obligations, scoring, mapping)
 - [x] AI governance policy generator (7 templates covering all policy-required controls)
 - [x] AI SBOM scanner (CycloneDX 1.5 output for SDKs, models, cloud services)
-- [x] 419 tests, validated against live AWS and Azure
+- [x] 446 tests, validated against live AWS and Azure
 
 ## What's Next
 

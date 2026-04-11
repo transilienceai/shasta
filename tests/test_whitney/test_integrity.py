@@ -92,13 +92,13 @@ class TestNoEmptyStubDirectories:
 
 
 class TestCodeCheckCounts:
-    """README claims 15 code checks — verify."""
+    """README claims 20 code checks — verify."""
 
-    def test_all_checks_list_has_15(self):
+    def test_all_checks_list_has_20(self):
         from whitney.code.checks import ALL_CHECKS
 
-        assert len(ALL_CHECKS) == 15, (
-            f"README claims 15 code checks but ALL_CHECKS has {len(ALL_CHECKS)}"
+        assert len(ALL_CHECKS) == 20, (
+            f"README claims 20 code checks but ALL_CHECKS has {len(ALL_CHECKS)}"
         )
 
     def test_each_check_is_callable(self):

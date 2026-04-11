@@ -391,4 +391,52 @@ KEY_SCAN_EXCLUDED_FILES: frozenset[str] = frozenset(
     }
 )
 
+# ---------------------------------------------------------------------------
+# MCP (Model Context Protocol) patterns
+# ---------------------------------------------------------------------------
+
+MCP_SERVER_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r"(?:from\s+mcp|import\s+mcp|require\s*\(\s*['\"].*mcp)", re.IGNORECASE),
+    re.compile(r"McpServer|MCPServer|mcp\.server|StdioServerTransport", re.IGNORECASE),
+    re.compile(r"@mcp\.tool|@server\.tool|\.add_tool\(", re.IGNORECASE),
+]
+
+# Indicators that an MCP server lacks authentication
+MCP_NO_AUTH_PATTERNS: list[re.Pattern[str]] = [
+    # stdio transport — inherently local, no auth needed
+    re.compile(r"StdioServerTransport|stdio_server", re.IGNORECASE),
+]
+
+# MCP tool definitions that grant dangerous capabilities
+MCP_DANGEROUS_TOOL_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(
+        r"""(?:subprocess|os\.system|os\.popen|exec\s*\(|eval\s*\(|"""
+        r"""shutil\.rmtree|shutil\.move|open\s*\(.+['\"]w)"""
+    ),
+    re.compile(r"(?:DROP\s+TABLE|DELETE\s+FROM|TRUNCATE)", re.IGNORECASE),
+]
+
+# MCP tool definitions without input schema validation
+MCP_NO_SCHEMA_PATTERNS: list[re.Pattern[str]] = [
+    # Tool definition with **kwargs or *args (no typed schema)
+    re.compile(r"def\s+\w+\s*\(\s*\*\*kwargs\s*\)"),
+    re.compile(r"def\s+\w+\s*\(\s*\*args\s*\)"),
+]
+
+# ---------------------------------------------------------------------------
+# A2A (Agent-to-Agent) protocol patterns
+# ---------------------------------------------------------------------------
+
+A2A_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r"(?:from\s+a2a|import\s+a2a|AgentCard|A2AServer)", re.IGNORECASE),
+    re.compile(r"agent[_-]?card|\.well-known/agent\.json", re.IGNORECASE),
+    re.compile(r"TaskSendParams|MessageSendParams|A2AClient", re.IGNORECASE),
+]
+
+# A2A agent cards without authentication requirements
+A2A_NO_AUTH_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r"""['\"]authentication['\"]?\s*:\s*(?:None|null|['\"]['\"]|\[\s*\])"""),
+    re.compile(r"""['\"]auth['\"]?\s*:\s*(?:None|null|['\"]['\"]|\{\s*\})"""),
+]
+
 MAX_FILE_SIZE_BYTES: int = 1_048_576  # 1 MB

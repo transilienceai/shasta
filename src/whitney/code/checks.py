@@ -17,6 +17,8 @@ from shasta.evidence.models import (
     Severity,
 )
 from whitney.code.patterns import (
+    A2A_NO_AUTH_PATTERNS,
+    A2A_PATTERNS,
     ACCESS_CONTROL_PATTERNS,
     AGENT_TOOL_DEFINITION_PATTERNS,
     AI_API_CALL_PATTERNS,
@@ -34,6 +36,10 @@ from whitney.code.patterns import (
     KEY_SCAN_EXCLUDED_FILES,
     LOGGING_PATTERNS,
     MAX_FILE_SIZE_BYTES,
+    MCP_DANGEROUS_TOOL_PATTERNS,
+    MCP_NO_AUTH_PATTERNS,
+    MCP_NO_SCHEMA_PATTERNS,
+    MCP_SERVER_PATTERNS,
     META_PROMPT_PATTERNS,
     MODEL_INFERENCE_PATTERNS,
     PII_PATTERNS,
@@ -1093,6 +1099,318 @@ def check_no_fallback_handler(repo_path: Path) -> list[Finding]:
 
 
 # ---------------------------------------------------------------------------
+# MCP (Model Context Protocol) security checks
+# ---------------------------------------------------------------------------
+
+
+def check_mcp_server_auth(repo_path: Path) -> list[Finding]:
+    """Detect MCP servers deployed without authentication."""
+    repo_path = Path(repo_path)
+    findings: list[Finding] = []
+
+    for fpath in _iter_files(repo_path, SOURCE_CODE_EXTENSIONS):
+        content = _read_file(fpath)
+        if content is None:
+            continue
+
+        # Only scan files that contain MCP server code
+        has_mcp = any(p.search(content) for p in MCP_SERVER_PATTERNS)
+        if not has_mcp:
+            continue
+
+        lines = _get_lines(content)
+
+        # Check if stdio transport is used (no network auth possible)
+        uses_stdio = any(p.search(content) for p in MCP_NO_AUTH_PATTERNS)
+
+        # Look for auth configuration indicators
+        has_auth = bool(
+            re.search(
+                r"(?:auth|authenticate|bearer|api[_-]?key|token|oauth)",
+                content,
+                re.IGNORECASE,
+            )
+        )
+
+        if uses_stdio:
+            # stdio is local-only — INFO, not a failure, but flag for
+            # production awareness
+            for idx, line in enumerate(lines):
+                if any(p.search(line) for p in MCP_NO_AUTH_PATTERNS):
+                    findings.append(
+                        _make_finding(
+                            check_id="code-mcp-server-auth",
+                            title=(f"MCP server uses stdio transport in {fpath.name}"),
+                            description=(
+                                f"MCP server at line {idx + 1} uses "
+                                f"stdio transport which cannot enforce "
+                                f"network-level authentication. "
+                                f"Ensure this is not exposed remotely "
+                                f"in production."
+                            ),
+                            severity=Severity.MEDIUM,
+                            repo_path=repo_path,
+                            file_path=fpath,
+                            line_number=idx + 1,
+                            matched_pattern="StdioServerTransport",
+                            code_snippet=_snippet(lines, idx),
+                            remediation=(
+                                "For production deployments, use SSE or "
+                                "HTTP transport with OAuth 2.1 or API "
+                                "key authentication instead of stdio."
+                            ),
+                            soc2_controls=["CC6.1", "CC6.6"],
+                        )
+                    )
+                    break
+        elif not has_auth:
+            # Network MCP server with no auth — HIGH
+            for idx, line in enumerate(lines):
+                if any(p.search(line) for p in MCP_SERVER_PATTERNS):
+                    findings.append(
+                        _make_finding(
+                            check_id="code-mcp-server-auth",
+                            title=(f"MCP server without authentication in {fpath.name}"),
+                            description=(
+                                f"MCP server defined at line {idx + 1} "
+                                f"has no apparent authentication. "
+                                f"Unauthenticated MCP servers allow "
+                                f"any client to invoke tools."
+                            ),
+                            severity=Severity.HIGH,
+                            repo_path=repo_path,
+                            file_path=fpath,
+                            line_number=idx + 1,
+                            matched_pattern="MCP server without auth",
+                            code_snippet=_snippet(lines, idx),
+                            remediation=(
+                                "Add authentication to the MCP server: "
+                                "OAuth 2.1, API key validation, or mTLS. "
+                                "Reject unauthenticated tool calls."
+                            ),
+                            soc2_controls=["CC6.1", "CC6.6"],
+                        )
+                    )
+                    break
+    return findings
+
+
+def check_mcp_tool_scope(repo_path: Path) -> list[Finding]:
+    """Detect MCP tool definitions with dangerous or overprivileged capabilities."""
+    repo_path = Path(repo_path)
+    findings: list[Finding] = []
+
+    for fpath in _iter_files(repo_path, SOURCE_CODE_EXTENSIONS):
+        content = _read_file(fpath)
+        if content is None:
+            continue
+
+        has_mcp = any(p.search(content) for p in MCP_SERVER_PATTERNS)
+        if not has_mcp:
+            continue
+
+        lines = _get_lines(content)
+        for idx, line in enumerate(lines):
+            for pat in MCP_DANGEROUS_TOOL_PATTERNS:
+                m = pat.search(line)
+                if m:
+                    findings.append(
+                        _make_finding(
+                            check_id="code-mcp-tool-scope",
+                            title=(f"MCP tool with dangerous capability in {fpath.name}"),
+                            description=(
+                                f"MCP tool at line {idx + 1} grants "
+                                f"access to dangerous operations "
+                                f"({m.group(0).strip()}). "
+                                f"Overprivileged tools can be exploited "
+                                f"via prompt injection."
+                            ),
+                            severity=Severity.HIGH,
+                            repo_path=repo_path,
+                            file_path=fpath,
+                            line_number=idx + 1,
+                            matched_pattern=pat.pattern,
+                            code_snippet=_snippet(lines, idx),
+                            remediation=(
+                                "Restrict MCP tool capabilities to the "
+                                "minimum necessary. Sandbox shell/file "
+                                "operations. Use allowlists for permitted "
+                                "actions."
+                            ),
+                            soc2_controls=["CC6.1", "CC7.2"],
+                        )
+                    )
+                    break
+    return findings
+
+
+def check_mcp_input_validation(repo_path: Path) -> list[Finding]:
+    """Detect MCP tool functions that accept unvalidated input."""
+    repo_path = Path(repo_path)
+    findings: list[Finding] = []
+
+    for fpath in _iter_files(repo_path, SOURCE_CODE_EXTENSIONS):
+        content = _read_file(fpath)
+        if content is None:
+            continue
+
+        has_mcp = any(p.search(content) for p in MCP_SERVER_PATTERNS)
+        if not has_mcp:
+            continue
+
+        lines = _get_lines(content)
+        for idx, line in enumerate(lines):
+            for pat in MCP_NO_SCHEMA_PATTERNS:
+                m = pat.search(line)
+                if m:
+                    findings.append(
+                        _make_finding(
+                            check_id="code-mcp-input-validation",
+                            title=(f"MCP tool accepts unvalidated input in {fpath.name}"),
+                            description=(
+                                f"Tool function at line {idx + 1} "
+                                f"uses **kwargs or *args without a "
+                                f"typed schema. Unvalidated inputs "
+                                f"can be exploited for injection."
+                            ),
+                            severity=Severity.MEDIUM,
+                            repo_path=repo_path,
+                            file_path=fpath,
+                            line_number=idx + 1,
+                            matched_pattern=pat.pattern,
+                            code_snippet=_snippet(lines, idx),
+                            remediation=(
+                                "Define typed input schemas for all MCP "
+                                "tools using Pydantic models or JSON "
+                                "Schema. Validate inputs before processing."
+                            ),
+                            soc2_controls=["CC6.1"],
+                        )
+                    )
+                    break
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# A2A (Agent-to-Agent) protocol security checks
+# ---------------------------------------------------------------------------
+
+
+def check_a2a_agent_auth(repo_path: Path) -> list[Finding]:
+    """Detect A2A Agent Cards or servers without authentication requirements."""
+    repo_path = Path(repo_path)
+    findings: list[Finding] = []
+
+    for fpath in _iter_files(repo_path, ALL_SCANNABLE_EXTENSIONS):
+        content = _read_file(fpath)
+        if content is None:
+            continue
+
+        has_a2a = any(p.search(content) for p in A2A_PATTERNS)
+        if not has_a2a:
+            continue
+
+        lines = _get_lines(content)
+
+        # Check for Agent Cards with empty or null authentication
+        for idx, line in enumerate(lines):
+            for pat in A2A_NO_AUTH_PATTERNS:
+                m = pat.search(line)
+                if m:
+                    findings.append(
+                        _make_finding(
+                            check_id="code-a2a-agent-auth",
+                            title=(f"A2A agent without authentication in {fpath.name}"),
+                            description=(
+                                f"Agent Card or A2A configuration at "
+                                f"line {idx + 1} declares empty or "
+                                f"null authentication. Agents accepting "
+                                f"unauthenticated requests are "
+                                f"vulnerable to impersonation."
+                            ),
+                            severity=Severity.HIGH,
+                            repo_path=repo_path,
+                            file_path=fpath,
+                            line_number=idx + 1,
+                            matched_pattern=pat.pattern,
+                            code_snippet=_snippet(lines, idx),
+                            remediation=(
+                                "Require authentication in the Agent "
+                                "Card. Use OAuth 2.0, API keys, or "
+                                "mTLS for agent-to-agent communication."
+                            ),
+                            soc2_controls=["CC6.1", "CC6.6"],
+                        )
+                    )
+                    break
+    return findings
+
+
+def check_a2a_delegation_scope(repo_path: Path) -> list[Finding]:
+    """Detect A2A task delegation without scope restriction."""
+    repo_path = Path(repo_path)
+    findings: list[Finding] = []
+
+    # Pattern: sending tasks to other agents without permission checks
+    delegation_pattern = re.compile(
+        r"(?:send_task|delegate|forward_task|TaskSendParams)\s*\(",
+        re.IGNORECASE,
+    )
+    scope_pattern = re.compile(
+        r"(?:scope|permission|allowed|restrict|authoriz|capabilities)",
+        re.IGNORECASE,
+    )
+
+    for fpath in _iter_files(repo_path, SOURCE_CODE_EXTENSIONS):
+        content = _read_file(fpath)
+        if content is None:
+            continue
+
+        has_a2a = any(p.search(content) for p in A2A_PATTERNS)
+        if not has_a2a:
+            continue
+
+        lines = _get_lines(content)
+        for idx, line in enumerate(lines):
+            if not delegation_pattern.search(line):
+                continue
+
+            # Check surrounding context for scope/permission checks
+            window_start = max(0, idx - 5)
+            window_end = min(len(lines), idx + 6)
+            window = "\n".join(lines[window_start:window_end])
+
+            if not scope_pattern.search(window):
+                findings.append(
+                    _make_finding(
+                        check_id="code-a2a-delegation-scope",
+                        title=(f"A2A task delegation without scope check in {fpath.name}"),
+                        description=(
+                            f"Task delegation at line {idx + 1} "
+                            f"has no apparent scope or permission "
+                            f"check. Unrestricted delegation can "
+                            f"lead to privilege escalation across "
+                            f"agent chains."
+                        ),
+                        severity=Severity.MEDIUM,
+                        repo_path=repo_path,
+                        file_path=fpath,
+                        line_number=idx + 1,
+                        matched_pattern=delegation_pattern.pattern,
+                        code_snippet=_snippet(lines, idx),
+                        remediation=(
+                            "Validate that the delegating agent has "
+                            "permission to invoke the target agent. "
+                            "Restrict delegation scope to declared "
+                            "capabilities. Log all cross-agent calls."
+                        ),
+                        soc2_controls=["CC6.1", "CC6.2"],
+                    )
+                )
+    return findings
+
+
+# ---------------------------------------------------------------------------
 # Aggregated list of all checks
 # ---------------------------------------------------------------------------
 
@@ -1112,12 +1430,26 @@ ALL_CHECKS = [
     check_training_data_unencrypted,
     check_no_model_versioning,
     check_no_fallback_handler,
+    # MCP protocol security
+    check_mcp_server_auth,
+    check_mcp_tool_scope,
+    check_mcp_input_validation,
+    # A2A protocol security
+    check_a2a_agent_auth,
+    check_a2a_delegation_scope,
 ]
 
 # Checks that cannot be expressed as Semgrep rules and must always run as Python.
 # - check_no_rate_limiting: file-level memoization (skip file if rate limiting exists anywhere)
 # - check_outdated_ai_sdk: dependency file parsing + version constraint comparison
+# - check_mcp_*: multi-pattern context checks requiring file-level MCP detection
+# - check_a2a_*: multi-pattern context checks requiring file-level A2A detection
 PYTHON_ONLY_CHECKS = [
     check_no_rate_limiting,
     check_outdated_ai_sdk,
+    check_mcp_server_auth,
+    check_mcp_tool_scope,
+    check_mcp_input_validation,
+    check_a2a_agent_auth,
+    check_a2a_delegation_scope,
 ]

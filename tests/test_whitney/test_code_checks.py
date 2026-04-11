@@ -12,21 +12,26 @@ import pytest
 
 from whitney.code.checks import (
     ALL_CHECKS,
+    check_a2a_agent_auth,
+    check_a2a_delegation_scope,
     check_ai_api_key_exposed,
     check_ai_key_in_env_file,
-    check_prompt_injection_risk,
-    check_no_output_validation,
-    check_pii_in_prompts,
-    check_model_endpoint_public,
-    check_agent_unrestricted_tools,
-    check_rag_no_access_control,
-    check_no_rate_limiting,
-    check_meta_prompt_exposed,
     check_ai_logging_insufficient,
-    check_outdated_ai_sdk,
-    check_training_data_unencrypted,
-    check_no_model_versioning,
+    check_agent_unrestricted_tools,
+    check_mcp_input_validation,
+    check_mcp_server_auth,
+    check_mcp_tool_scope,
+    check_meta_prompt_exposed,
+    check_model_endpoint_public,
     check_no_fallback_handler,
+    check_no_model_versioning,
+    check_no_output_validation,
+    check_no_rate_limiting,
+    check_outdated_ai_sdk,
+    check_pii_in_prompts,
+    check_prompt_injection_risk,
+    check_rag_no_access_control,
+    check_training_data_unencrypted,
 )
 from shasta.evidence.models import Severity, ComplianceStatus
 
@@ -681,7 +686,7 @@ class TestAllChecks:
     """Verify the ALL_CHECKS aggregation."""
 
     def test_all_checks_count(self):
-        assert len(ALL_CHECKS) == 15
+        assert len(ALL_CHECKS) == 20
 
     def test_all_checks_are_callable(self):
         for check_fn in ALL_CHECKS:
@@ -699,3 +704,277 @@ class TestAllChecks:
         findings = check_ai_api_key_exposed(tmp_path)
         for f in findings:
             assert f.status == ComplianceStatus.FAIL
+
+
+# ---------------------------------------------------------------------------
+# MCP: check_mcp_server_auth
+# ---------------------------------------------------------------------------
+
+
+class TestCheckMCPServerAuth:
+    """Test detection of MCP servers without authentication."""
+
+    def test_detects_mcp_server_no_auth(self, tmp_path):
+        write_file(
+            tmp_path,
+            "server.py",
+            (
+                "from mcp.server import McpServer\n"
+                "from mcp.server.sse import SseServerTransport\n"
+                "server = McpServer('my-server')\n"
+                "@server.tool()\n"
+                "def fetch_data(url: str):\n"
+                "    return requests.get(url).text\n"
+            ),
+        )
+        findings = check_mcp_server_auth(tmp_path)
+        _assert_finding(findings, check_id="code-mcp-server-auth")
+
+    def test_detects_stdio_transport(self, tmp_path):
+        write_file(
+            tmp_path,
+            "server.py",
+            (
+                "from mcp.server import McpServer\n"
+                "from mcp.server.stdio import StdioServerTransport\n"
+                "server = McpServer('local-server')\n"
+                "@server.tool()\n"
+                "def read_file(path: str):\n"
+                "    return open(path).read()\n"
+            ),
+        )
+        findings = check_mcp_server_auth(tmp_path)
+        _assert_finding(
+            findings, check_id="code-mcp-server-auth", severity=Severity.MEDIUM
+        )
+
+    def test_clean_mcp_server_with_auth(self, tmp_path):
+        write_file(
+            tmp_path,
+            "server.py",
+            (
+                "from mcp.server import McpServer\n"
+                "from mcp.server.sse import SseServerTransport\n"
+                "server = McpServer('secure-server')\n"
+                "auth = BearerTokenAuth(token=os.environ['MCP_TOKEN'])\n"
+                "@server.tool()\n"
+                "def safe_tool(query: str):\n"
+                "    return db.query(query)\n"
+            ),
+        )
+        findings = check_mcp_server_auth(tmp_path)
+        assert len(findings) == 0
+
+    def test_no_mcp_code_no_findings(self, tmp_path):
+        write_file(tmp_path, "app.py", "import flask\napp = flask.Flask(__name__)\n")
+        findings = check_mcp_server_auth(tmp_path)
+        assert len(findings) == 0
+
+
+# ---------------------------------------------------------------------------
+# MCP: check_mcp_tool_scope
+# ---------------------------------------------------------------------------
+
+
+class TestCheckMCPToolScope:
+    """Test detection of overprivileged MCP tools."""
+
+    def test_detects_subprocess_in_mcp_tool(self, tmp_path):
+        write_file(
+            tmp_path,
+            "server.py",
+            (
+                "from mcp.server import McpServer\n"
+                "server = McpServer('shell-server')\n"
+                "@server.tool()\n"
+                "def run_command(cmd: str):\n"
+                "    return subprocess.run(cmd, shell=True, capture_output=True)\n"
+            ),
+        )
+        findings = check_mcp_tool_scope(tmp_path)
+        _assert_finding(
+            findings, check_id="code-mcp-tool-scope", severity=Severity.HIGH
+        )
+
+    def test_detects_eval_in_mcp_tool(self, tmp_path):
+        write_file(
+            tmp_path,
+            "server.py",
+            (
+                "from mcp.server import McpServer\n"
+                "server = McpServer('eval-server')\n"
+                "@server.tool()\n"
+                "def evaluate(expression: str):\n"
+                "    return eval(expression)\n"
+            ),
+        )
+        findings = check_mcp_tool_scope(tmp_path)
+        _assert_finding(findings, check_id="code-mcp-tool-scope")
+
+    def test_clean_mcp_tool(self, tmp_path):
+        write_file(
+            tmp_path,
+            "server.py",
+            (
+                "from mcp.server import McpServer\n"
+                "server = McpServer('safe-server')\n"
+                "@server.tool()\n"
+                "def lookup(term: str):\n"
+                "    return dictionary.get(term, 'Not found')\n"
+            ),
+        )
+        findings = check_mcp_tool_scope(tmp_path)
+        assert len(findings) == 0
+
+
+# ---------------------------------------------------------------------------
+# MCP: check_mcp_input_validation
+# ---------------------------------------------------------------------------
+
+
+class TestCheckMCPInputValidation:
+    """Test detection of MCP tools without input validation."""
+
+    def test_detects_kwargs_tool(self, tmp_path):
+        write_file(
+            tmp_path,
+            "server.py",
+            (
+                "from mcp.server import McpServer\n"
+                "server = McpServer('untyped-server')\n"
+                "@server.tool()\n"
+                "def process(**kwargs):\n"
+                "    return str(kwargs)\n"
+            ),
+        )
+        findings = check_mcp_input_validation(tmp_path)
+        _assert_finding(findings, check_id="code-mcp-input-validation")
+
+    def test_clean_typed_tool(self, tmp_path):
+        write_file(
+            tmp_path,
+            "server.py",
+            (
+                "from mcp.server import McpServer\n"
+                "server = McpServer('typed-server')\n"
+                "@server.tool()\n"
+                "def search(query: str, limit: int = 10):\n"
+                "    return db.search(query, limit)\n"
+            ),
+        )
+        findings = check_mcp_input_validation(tmp_path)
+        assert len(findings) == 0
+
+
+# ---------------------------------------------------------------------------
+# A2A: check_a2a_agent_auth
+# ---------------------------------------------------------------------------
+
+
+class TestCheckA2AAgentAuth:
+    """Test detection of A2A agents without authentication."""
+
+    def test_detects_null_auth_in_agent_card(self, tmp_path):
+        write_file(
+            tmp_path,
+            "agent_config.py",
+            (
+                "from a2a.server import A2AServer\n"
+                "agent_card = {\n"
+                '    "name": "my-agent",\n'
+                '    "authentication": None,\n'
+                '    "skills": ["summarize", "translate"],\n'
+                "}\n"
+            ),
+        )
+        findings = check_a2a_agent_auth(tmp_path)
+        _assert_finding(
+            findings, check_id="code-a2a-agent-auth", severity=Severity.HIGH
+        )
+
+    def test_detects_empty_auth_list(self, tmp_path):
+        write_file(
+            tmp_path,
+            "agent_config.json",
+            (
+                '{\n'
+                '  "name": "my-agent",\n'
+                '  "authentication": [],\n'
+                '  "skills": ["search"]\n'
+                '}\n'
+            ),
+        )
+        # Need A2A pattern in the file
+        write_file(
+            tmp_path,
+            "agent.py",
+            (
+                "from a2a.server import A2AServer\n"
+                'card = {"authentication": []}\n'
+            ),
+        )
+        findings = check_a2a_agent_auth(tmp_path)
+        _assert_finding(findings, check_id="code-a2a-agent-auth")
+
+    def test_clean_a2a_with_auth(self, tmp_path):
+        write_file(
+            tmp_path,
+            "agent.py",
+            (
+                "from a2a.server import A2AServer\n"
+                "agent_card = {\n"
+                '    "name": "secure-agent",\n'
+                '    "authentication": {"type": "oauth2"},\n'
+                '    "skills": ["search"],\n'
+                "}\n"
+            ),
+        )
+        findings = check_a2a_agent_auth(tmp_path)
+        assert len(findings) == 0
+
+    def test_no_a2a_code_no_findings(self, tmp_path):
+        write_file(tmp_path, "app.py", "import flask\n")
+        findings = check_a2a_agent_auth(tmp_path)
+        assert len(findings) == 0
+
+
+# ---------------------------------------------------------------------------
+# A2A: check_a2a_delegation_scope
+# ---------------------------------------------------------------------------
+
+
+class TestCheckA2ADelegationScope:
+    """Test detection of unrestricted A2A task delegation."""
+
+    def test_detects_unscoped_delegation(self, tmp_path):
+        write_file(
+            tmp_path,
+            "orchestrator.py",
+            (
+                "from a2a.client import A2AClient\n"
+                "client = A2AClient('http://agent-b')\n"
+                "def process_request(user_input):\n"
+                "    result = client.send_task(user_input)\n"
+                "    return result\n"
+            ),
+        )
+        findings = check_a2a_delegation_scope(tmp_path)
+        _assert_finding(findings, check_id="code-a2a-delegation-scope")
+
+    def test_clean_delegation_with_scope(self, tmp_path):
+        write_file(
+            tmp_path,
+            "orchestrator.py",
+            (
+                "from a2a.client import A2AClient\n"
+                "client = A2AClient('http://agent-b')\n"
+                "ALLOWED_CAPABILITIES = {'search', 'summarize'}\n"
+                "def process_request(user_input):\n"
+                "    if not check_scope(user_input, ALLOWED_CAPABILITIES):\n"
+                "        raise PermissionError('Not allowed')\n"
+                "    result = client.send_task(user_input)\n"
+                "    return result\n"
+            ),
+        )
+        findings = check_a2a_delegation_scope(tmp_path)
+        assert len(findings) == 0

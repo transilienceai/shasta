@@ -2,7 +2,7 @@
 
 **An AI-native compliance toolkit that enables startup founders to achieve and maintain SOC 2, ISO 27001, HIPAA, ISO 42001, and EU AI Act compliance across AWS and Azure — through conversation, not dashboards.**
 
-Shasta scans your cloud infrastructure. Whitney scans your AI systems and code. Together, they cover 12 compliance frameworks, 236 automated checks, and 199 security questionnaire answers — with a web dashboard, 112 Terraform remediation templates, and auditor-grade evidence. Built for founders running <50 employee companies who need compliance without the $30K/year Vanta bill.
+Shasta scans your cloud infrastructure. Whitney scans your AI systems and code. Together, they cover 13 compliance frameworks, 241 automated checks, and 199 security questionnaire answers — with a web dashboard, 112 Terraform remediation templates, and auditor-grade evidence. Built for founders running <50 employee companies who need compliance without the $30K/year Vanta bill.
 
 > **Three load-bearing artifacts at the repo root, in order of what to read:**
 > [`README.md`](./README.md) (this file — what it does) →
@@ -297,7 +297,7 @@ For a **<50 employee startup** pursuing compliance:
 | Change management | ~80% | GitHub integration + CloudTrail + Config + Azure Activity Log |
 | Remediation guidance | ~90% | 112 Terraform templates (81 AWS + 31 Azure azurerm) covering CloudTrail/KMS/Object Lock, Security Hub, Access Analyzer, EC2 IMDSv2 + instance profiles, EKS private endpoint + audit logging + secrets KMS, ECS task hardening, KMS rotation + key policy + scheduled deletion, IAM policy wildcards + role trust + unused roles, CIS 4.x CloudWatch alarms, Config conformance packs, CloudFront HTTPS+TLS+WAF+OAC, Redshift encryption+public-access+audit+SSL, ElastiCache TLS+at-rest+AUTH, Neptune encryption, RDS force_ssl + log_settings + min TLS, Lambda Function URL auth + layer origin, API Gateway client cert + authorizer + throttling + request validation, S3 Object Ownership + access logging + KMS-CMK, AWS Backup cross-region copy + access policy, EFS/SNS/SQS/Secrets/ACM, ELB v2 TLS+logs+headers, RDS deep+IAM auth+PITR, Lambda runtime+CMK+DLQ, API Gateway WAF+logging, AWS Backup vault lock, VPC endpoints, CloudWatch Logs KMS+retention, AWS Org SCPs+tag policies — plus the full Azure set |
 | Security questionnaires | ~70% | 199 questions auto-filled from scan evidence (SIG Lite, CAIQ, Enterprise) |
-| AI governance | ~80% | 45 AI checks (code + cloud), ISO 42001, EU AI Act mapping |
+| AI governance | ~85% | 51 AI checks (20 code + 15 AWS + 15 Azure + SBOM), 7 frameworks (ISO 42001, EU AI Act, NIST AI RMF, NIST AI 600-1, OWASP LLM Top 10, OWASP Agentic Top 10, MITRE ATLAS), MCP + A2A protocol security |
 | Visual dashboard | Yes | FastAPI + Tailwind + Chart.js at localhost:8080 |
 
 **Frameworks supported:** SOC 2, ISO 27001, HIPAA, ISO 42001, EU AI Act

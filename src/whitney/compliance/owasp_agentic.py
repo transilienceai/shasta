@@ -39,6 +39,7 @@ OWASP_AGENTIC_TOP10: dict[str, OWASPAgenticRisk] = {
         check_ids=[
             "code-agent-unrestricted-tools",
             "bedrock-agent-guardrails",
+            "code-a2a-delegation-scope",
         ],
         soc2_equivalent=["CC6.1", "CC6.3"],
         guidance=(
@@ -57,12 +58,14 @@ OWASP_AGENTIC_TOP10: dict[str, OWASPAgenticRisk] = {
         ),
         check_ids=[
             "code-agent-unrestricted-tools",
+            "code-mcp-tool-scope",
+            "code-mcp-input-validation",
         ],
         soc2_equivalent=["CC6.1", "CC7.2"],
         guidance=(
             "Sandbox agent tools. Use allowlists for permitted operations. "
             "Validate tool inputs and outputs. Log all tool invocations "
-            "for audit."
+            "for audit. Define typed schemas for MCP tools."
         ),
     ),
     "AGENTIC03": OWASPAgenticRisk(
@@ -73,7 +76,11 @@ OWASP_AGENTIC_TOP10: dict[str, OWASPAgenticRisk] = {
             "authentication, TLS, or access controls, enabling unauthorised "
             "tool access and data exposure."
         ),
-        check_ids=[],  # Future: mcp-server-auth, mcp-server-tls
+        check_ids=[
+            "code-mcp-server-auth",
+            "code-mcp-tool-scope",
+            "code-mcp-input-validation",
+        ],
         soc2_equivalent=["CC6.1", "CC6.6"],
         guidance=(
             "Require authentication on all MCP servers. Use TLS for "
@@ -94,12 +101,14 @@ OWASP_AGENTIC_TOP10: dict[str, OWASPAgenticRisk] = {
             "code-ai-key-in-env-file",
             "lambda-ai-api-keys-not-hardcoded",
             "azure-openai-managed-identity",
+            "code-a2a-agent-auth",
         ],
         soc2_equivalent=["CC6.1", "CC6.2"],
         guidance=(
             "Use managed identities instead of API keys. Never hardcode "
             "credentials. Assign per-agent service accounts with "
-            "least-privilege IAM policies."
+            "least-privilege IAM policies. Require authentication in "
+            "A2A Agent Cards."
         ),
     ),
     "AGENTIC05": OWASPAgenticRisk(

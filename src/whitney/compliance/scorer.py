@@ -9,6 +9,7 @@ from whitney.compliance.mapper import (
     get_eu_ai_act_obligation_summary,
     get_iso42001_control_summary,
     get_mitre_atlas_summary,
+    get_nist_ai_600_1_summary,
     get_nist_ai_rmf_summary,
     get_owasp_agentic_summary,
     get_owasp_llm_summary,
@@ -60,6 +61,14 @@ class AIGovernanceScore:
     nist_requires_policy: int = 0
     nist_score: float = 0.0
     nist_grade: str = "A"
+
+    # NIST AI 600-1 (GenAI Profile)
+    nist_600_1_total: int = 0
+    nist_600_1_passing: int = 0
+    nist_600_1_failing: int = 0
+    nist_600_1_requires_policy: int = 0
+    nist_600_1_score: float = 0.0
+    nist_600_1_grade: str = "A"
 
     # MITRE ATLAS
     atlas_total: int = 0
@@ -125,7 +134,9 @@ def calculate_ai_governance_score(findings: list[Finding]) -> AIGovernanceScore:
     owasp_llm_total = len(owasp_llm_summary)
     owasp_llm_passing = sum(1 for r in owasp_llm_summary.values() if r["overall_status"] == "pass")
     owasp_llm_failing = sum(1 for r in owasp_llm_summary.values() if r["overall_status"] == "fail")
-    owasp_llm_partial = sum(1 for r in owasp_llm_summary.values() if r["overall_status"] == "partial")
+    owasp_llm_partial = sum(
+        1 for r in owasp_llm_summary.values() if r["overall_status"] == "partial"
+    )
     owasp_llm_assessed = owasp_llm_passing + owasp_llm_failing + owasp_llm_partial
     owasp_llm_score = (
         (owasp_llm_passing + owasp_llm_partial * 0.5) / owasp_llm_assessed * 100
@@ -164,6 +175,32 @@ def calculate_ai_governance_score(findings: list[Finding]) -> AIGovernanceScore:
         nist_score = 0.0
     nist_grade = _score_to_grade(nist_score)
 
+    # NIST AI 600-1 scoring
+    nist_600_1_summary = get_nist_ai_600_1_summary(findings)
+    nist_600_1_total = len(nist_600_1_summary)
+    nist_600_1_passing = sum(
+        1 for r in nist_600_1_summary.values() if r["overall_status"] == "pass"
+    )
+    nist_600_1_failing = sum(
+        1 for r in nist_600_1_summary.values() if r["overall_status"] == "fail"
+    )
+    nist_600_1_partial = sum(
+        1 for r in nist_600_1_summary.values() if r["overall_status"] == "partial"
+    )
+    nist_600_1_rp = sum(
+        1 for r in nist_600_1_summary.values() if r["overall_status"] == "requires_policy"
+    )
+    nist_600_1_assessed = nist_600_1_passing + nist_600_1_failing + nist_600_1_partial
+    if nist_600_1_assessed > 0:
+        nist_600_1_score = (
+            (nist_600_1_passing + nist_600_1_partial * 0.5) / nist_600_1_assessed * 100
+        )
+    elif nist_600_1_rp > 0:
+        nist_600_1_score = 100.0
+    else:
+        nist_600_1_score = 0.0
+    nist_600_1_grade = _score_to_grade(nist_600_1_score)
+
     # MITRE ATLAS scoring
     atlas_summary = get_mitre_atlas_summary(findings)
     atlas_total = len(atlas_summary)
@@ -179,12 +216,38 @@ def calculate_ai_governance_score(findings: list[Finding]) -> AIGovernanceScore:
     atlas_grade = _score_to_grade(atlas_score)
 
     # Combined score (weighted average of all frameworks with assessed controls)
-    total_assessed = iso_assessed + eu_assessed + owasp_llm_assessed + owasp_ag_assessed + nist_assessed + atlas_assessed
+    total_assessed = (
+        iso_assessed
+        + eu_assessed
+        + owasp_llm_assessed
+        + owasp_ag_assessed
+        + nist_assessed
+        + nist_600_1_assessed
+        + atlas_assessed
+    )
     if total_assessed > 0:
-        combined_passing = iso_passing + eu_passing + owasp_llm_passing + owasp_ag_passing + nist_passing + atlas_passing
-        combined_partial = iso_partial + eu_partial + owasp_llm_partial + owasp_ag_partial + nist_partial + atlas_partial
+        combined_passing = (
+            iso_passing
+            + eu_passing
+            + owasp_llm_passing
+            + owasp_ag_passing
+            + nist_passing
+            + nist_600_1_passing
+            + atlas_passing
+        )
+        combined_partial = (
+            iso_partial
+            + eu_partial
+            + owasp_llm_partial
+            + owasp_ag_partial
+            + nist_partial
+            + nist_600_1_partial
+            + atlas_partial
+        )
         combined_score = (combined_passing + combined_partial * 0.5) / total_assessed * 100
-    elif (iso_not_assessed + eu_not_assessed) > 0 or (iso_requires_policy + eu_requires_policy + nist_rp) > 0:
+    elif (iso_not_assessed + eu_not_assessed) > 0 or (
+        iso_requires_policy + eu_requires_policy + nist_rp + nist_600_1_rp
+    ) > 0:
         combined_score = 100.0
     else:
         combined_score = 0.0
@@ -223,6 +286,12 @@ def calculate_ai_governance_score(findings: list[Finding]) -> AIGovernanceScore:
         nist_requires_policy=nist_rp,
         nist_score=round(nist_score, 1),
         nist_grade=nist_grade,
+        nist_600_1_total=nist_600_1_total,
+        nist_600_1_passing=nist_600_1_passing,
+        nist_600_1_failing=nist_600_1_failing,
+        nist_600_1_requires_policy=nist_600_1_rp,
+        nist_600_1_score=round(nist_600_1_score, 1),
+        nist_600_1_grade=nist_600_1_grade,
         atlas_total=atlas_total,
         atlas_passing=atlas_passing,
         atlas_failing=atlas_failing,

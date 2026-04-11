@@ -315,10 +315,10 @@ def test_readme_test_count_in_tree_block() -> None:
 
 
 def test_readme_ai_check_count() -> None:
-    """The 'X AI checks (code + cloud)' row must match Whitney's check_* count."""
+    """The 'X AI checks (N code + ...)' row must match Whitney's check_* count."""
     assert_claim(
         README,
-        r"(\d+) AI checks \(code \+ cloud\)",
+        r"(\d+) AI checks \(",
         actual=whitney_check_count(),
         description="Whitney check_* function count",
         tolerance=2,

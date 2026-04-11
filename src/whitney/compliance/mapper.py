@@ -15,6 +15,10 @@ from whitney.compliance.mitre_atlas import (
     ATLAS_TECHNIQUES,
     get_atlas_techniques_for_check,
 )
+from whitney.compliance.nist_ai_600_1 import (
+    NIST_AI_600_1_RISKS,
+    get_nist_ai_600_1_risks_for_check,
+)
 from whitney.compliance.nist_ai_rmf import (
     NIST_AI_RMF_CATEGORIES,
     get_nist_ai_rmf_categories_for_check,
@@ -55,6 +59,10 @@ def enrich_findings_with_ai_controls(findings: list[Finding]) -> list[Finding]:
         # NIST AI RMF
         nist_categories = get_nist_ai_rmf_categories_for_check(finding.check_id)
         finding.details["nist_ai_rmf"] = [c.id for c in nist_categories]
+
+        # NIST AI 600-1 (GenAI Profile)
+        nist_600_1_risks = get_nist_ai_600_1_risks_for_check(finding.check_id)
+        finding.details["nist_ai_600_1"] = [r.id for r in nist_600_1_risks]
 
         # MITRE ATLAS
         atlas_techniques = get_atlas_techniques_for_check(finding.check_id)
@@ -245,6 +253,15 @@ def get_nist_ai_rmf_summary(findings: list[Finding]) -> dict[str, dict]:
         findings,
         get_nist_ai_rmf_categories_for_check,
         extra_fields={"function": "function"},
+    )
+
+
+def get_nist_ai_600_1_summary(findings: list[Finding]) -> dict[str, dict]:
+    """Aggregate findings by NIST AI 600-1 generative-AI risk."""
+    return _build_summary(
+        NIST_AI_600_1_RISKS,
+        findings,
+        get_nist_ai_600_1_risks_for_check,
     )
 
 

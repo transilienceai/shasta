@@ -1,6 +1,6 @@
 [project]
 name = "shasta"
-version = "1.7.0"
+version = "1.8.0"
 description = "Multi-cloud compliance and AI governance platform — SOC 2, ISO 27001, HIPAA, ISO 42001, and EU AI Act"
 requires-python = ">=3.11"
 dependencies = [

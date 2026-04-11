@@ -17,7 +17,7 @@ infrastructure.
 
 ## Three Layers of Validation
 
-### Layer 1: Unit Tests (419 tests)
+### Layer 1: Unit Tests (446 tests)
 
 Every Whitney module has comprehensive test coverage. Tests use realistic code samples, not toy examples.
 
@@ -122,7 +122,7 @@ Every finding matched the expected result for the resource configuration. No fal
 ## Test Coverage Summary
 
 ```
-Whitney unit tests:    419  (run: pytest tests/test_whitney/)
+Whitney unit tests:    446  (run: pytest tests/test_whitney/)
 Integration tests:      21  (run: pytest tests/integration/validate_whitney.py)
 
 AWS checks validated:   14/15 (93%)  — see Layer 3 above

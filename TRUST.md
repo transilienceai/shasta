@@ -19,9 +19,9 @@ Semgrep architecture), see [`src/whitney/TRUST.md`](./src/whitney/TRUST.md).
 
 Shasta and Whitney together ship the following, all integrity-tested:
 
-- **236 check functions** (190 cloud compliance + 46 AI governance)
+- **241 check functions** (190 cloud compliance + 51 AI governance)
 - **112 Terraform remediation templates** (81 AWS + 31 Azure)
-- **684 tests** that all pass on every commit
+- **739 tests** that all pass on every commit
 
 None of the claims in this README are written by hand and hoped-for —
 every numeric claim is AST-counted from source by an integrity test
@@ -100,9 +100,9 @@ py -3.12 -m pytest tests/test_whitney/test_integrity.py -v
 
 | Suite | Tests | What it covers |
 |---|---|---|
-| `tests/test_whitney/` | 419 | Whitney AI scanner: patterns, code checks, scorer, mapper, policies, SBOM, integrity, semgrep runner |
+| `tests/test_whitney/` | 446 | Whitney AI scanner: patterns, code checks, scorer, mapper, policies, SBOM, integrity, semgrep runner, NIST AI 600-1 |
 | `tests/test_aws/` | 108 | AWS smoke tests: imports, runner signatures, multi-region structural enforcement, Terraform template renders, deprecated runtime tables, VPC endpoint expectations |
-| `tests/test_azure/` | 55 | Azure smoke tests: imports, runner signatures, diagnostic settings matrix, Defender required plans, CIS 5.2.x activity log alert mappings, Terraform template renders |
+| `tests/test_azure/` | 58 | Azure smoke tests: imports, runner signatures, diagnostic settings matrix, Defender required plans, CIS 5.2.x activity log alert mappings, Terraform template renders, Entra ID checks |
 | `tests/test_compliance/` | 21 | SOC 2 + ISO 27001 scorer + mapper |
 | `tests/test_workflows/` | 26 | Risk register + drift detection workflows |
 | `tests/test_integrity/` | 11 | **Doc-vs-code drift** — see Layer 2 |
