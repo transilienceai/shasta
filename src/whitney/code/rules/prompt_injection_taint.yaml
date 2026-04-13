@@ -149,13 +149,13 @@ rules:
       - pattern: UnstructuredURLLoader(...).load()
 
       # -------- indirect_rag: vector store retrievals --------------------
+      # $RETRIEVER.invoke removed — see comment at end of sources block.
       - pattern: $STORE.similarity_search(...)
       - pattern: $STORE.similarity_search_with_score(...)
       - pattern: $STORE.similarity_search_with_relevance_scores(...)
       - pattern: $STORE.max_marginal_relevance_search(...)
       - pattern: $STORE.as_retriever(...)
       - pattern: $RETRIEVER.get_relevant_documents(...)
-      - pattern: $RETRIEVER.invoke(...)
 
       # -------- indirect_search: web search API results ------------------
       - pattern: $TAVILY.search(...)
@@ -350,13 +350,20 @@ rules:
               - pattern: AgentExecutor(...).run(...)
               - pattern: $EXECUTOR.invoke(...)
               - pattern: $EXECUTOR.run(...)
-              # Callable agent/executor (bare call syntax).
-              # Narrowed to variable names that look like user input to avoid
-              # matching every 1-arg call in the codebase. The broad pattern
-              # `$EXECUTOR($ARG, ...)` was matching things like
-              # `self.container.markdown(self.text)` in LangChain callback
-              # handler classes — a Turn 5b false positive discovered during
-              # real-world validation on shashankdeshpande/langchain-chatbot.
+              # Legacy LangChain v0 bare-call form — `chain({"question": q})`.
+              # Common in older tutorials and ConversationalRetrievalChain
+              # usage. Real example: Faridghr/RAG-ChatBot app.py.
+              - pattern: '$CHAIN({"question": $X})'
+              - pattern: '$CHAIN({"question": $X, ...})'
+              - pattern: '$CHAIN({"input": $X})'
+              - pattern: '$CHAIN({"input": $X, ...})'
+              - pattern: '$CHAIN({"query": $X})'
+              - pattern: '$CHAIN({"query": $X, ...})'
+              # Bare-call patterns — original set restored. The narrow
+              # arg-name approach was a Turn 5b attempt to prevent matching
+              # every 1-arg call. The residual FP class (`st.write(prompt)`,
+              # `session_state.messages.append(message)`) is handled via
+              # `pattern-not` exclusions below in the same `patterns:` block.
               - pattern: $EXECUTOR(prompt, ...)
               - pattern: $EXECUTOR(user_query, ...)
               - pattern: $EXECUTOR(user_input, ...)
@@ -386,6 +393,54 @@ rules:
               - pattern: $CREW.kickoff_async(...)
               - pattern: $AGENT.chat(...)
               - pattern: $GRAPH.invoke(...)
+          # ==== Surgical sink exclusions (Turn 5c) =======================
+          # Exclude Streamlit UI calls, logging, and session-state storage
+          # that match `$EXECUTOR(prompt, ...)` etc. but are neither LLM
+          # sinks nor taint propagators of interest. Each `pattern-not`
+          # removes ONE specific false-sink shape without constraining
+          # the rest of the rule.
+          - pattern-not: st.write(...)
+          - pattern-not: st.markdown(...)
+          - pattern-not: st.text(...)
+          - pattern-not: st.code(...)
+          - pattern-not: st.caption(...)
+          - pattern-not: st.chat_message(...)
+          - pattern-not: st.info(...)
+          - pattern-not: st.warning(...)
+          - pattern-not: st.error(...)
+          - pattern-not: st.success(...)
+          - pattern-not: st.sidebar.write(...)
+          - pattern-not: st.sidebar.markdown(...)
+          - pattern-not: print(...)
+          - pattern-not: logger.info(...)
+          - pattern-not: logger.debug(...)
+          - pattern-not: logger.warning(...)
+          - pattern-not: logger.error(...)
+          - pattern-not: log.info(...)
+          - pattern-not: log.debug(...)
+          - pattern-not: $X.session_state.$Y.append(...)
+          - pattern-not: st.session_state[$K].append(...)
+          - pattern-not: st.session_state.$Y.append(...)
+          - pattern-not: $X.messages.append(...)
+          - pattern-not: $X.chunks.append(...)
+          # ==== Literal-string-argument exclusions (Turn 5c) =============
+          # Hardcoded string prompts inside dev main() harnesses — no
+          # taint source possible, developer typed the prompt by hand.
+          # Semgrep's `"..."` pattern is a string-literal match (verified
+          # via test_literal.yaml probe), not the ellipsis wildcard.
+          - pattern-not: $X.invoke("...")
+          - pattern-not: $X.ainvoke("...")
+          - pattern-not: $X.run("...")
+          - pattern-not: $X.arun("...")
+          - pattern-not: $X.batch("...")
+          - pattern-not: $X.query("...")
+          # Dev harness exclusion NOT added: `def main():` exclusion
+          # regresses pi_019 (argparse CLI fixture) which is a legitimate
+          # TP inside def main(). Cannot distinguish dev harness from real
+          # CLI entry point syntactically. The 2 residual FPs in
+          # example-app-langchain-rag (rag_chain.py:84 and vector_store.py:55)
+          # are accepted as the cost of this recall — both are inside
+          # `def main():` dev scaffolds with hardcoded test queries.
           # ==== Function-level guardrail suppression (Turn 5) ============
           # Bedrock Guardrails
           - pattern-not-inside: |
@@ -500,3 +555,4 @@ rules:
                   ...
                   if dk_request_filter(...):
                       ...
+          # ==== Dev `main()` harness exclusion (Turn 5c) — disabled for bisect ===

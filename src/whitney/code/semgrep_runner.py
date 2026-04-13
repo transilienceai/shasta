@@ -87,6 +87,19 @@ def run_semgrep(
         )
         return []
 
+    # Path excludes — vendored code, virtualenvs, test fixtures, example/demo
+    # directories, and build outputs are noise. A finding inside `venv/` or
+    # `tests/fixtures/` is an FP from the user's perspective regardless of
+    # its technical correctness. Added after the blind-test "egg on face"
+    # check flagged that Whitney had no default excludes.
+    _EXCLUDES = [
+        "venv", ".venv", "env", ".env",
+        "__pycache__", ".git", ".tox", ".mypy_cache", ".pytest_cache",
+        "node_modules", "dist", "build", ".eggs", "*.egg-info",
+        "tests", "test", "test_*", "*_test.py", "*_tests.py",
+        "fixtures", "examples", "example", "docs", "doc",
+        "site-packages",
+    ]
     cmd = [
         "semgrep",
         "--config",
@@ -94,8 +107,10 @@ def run_semgrep(
         "--json",
         "--quiet",
         "--no-git-ignore",
-        str(repo_path),
     ]
+    for ex in _EXCLUDES:
+        cmd.extend(["--exclude", ex])
+    cmd.append(str(repo_path))
 
     try:
         # Force UTF-8 decoding. On Windows the default is cp1252 which
