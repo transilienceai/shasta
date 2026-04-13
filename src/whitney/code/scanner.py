@@ -1,127 +1,92 @@
-"""Main code scanning engine for AI security issues.
+"""Whitney code scanner — entry point.
 
-Scans GitHub repositories (cloned or local) for AI-specific security
-vulnerabilities and returns compliance findings.
+This is the public interface for Whitney's code scanner. It runs
+Semgrep (via :mod:`whitney.code.semgrep_runner`) and enriches the
+resulting findings with compliance framework control mappings (via
+:func:`whitney.compliance.mapper.enrich_findings_with_ai_controls`).
 
-Requires Semgrep: ``pip install semgrep``
+The scanner is intentionally thin — ~20 lines of orchestration logic.
+All detection complexity lives in the Semgrep rule YAML files; all
+compliance framework mapping lives in the compliance module. This
+file's only job is to connect them.
+
+Architecture rationale: see module docstring in
+:mod:`whitney.code.__init__`.
 """
-
 from __future__ import annotations
 
 import logging
-import subprocess
 from pathlib import Path
 
 from shasta.evidence.models import Finding
-from whitney.code.checks import PYTHON_ONLY_CHECKS
-from whitney.code.semgrep_runner import run_semgrep, semgrep_available
 
-logger = logging.getLogger(__name__)
+from whitney.code.semgrep_runner import (
+    SemgrepNotInstalledError,
+    run_semgrep,
+)
+
+log = logging.getLogger(__name__)
+
+__all__ = ["scan_repository", "SemgrepNotInstalledError"]
 
 
-class SemgrepNotInstalledError(RuntimeError):
-    """Raised when Semgrep is not installed."""
+def scan_repository(repo_path: Path | str) -> list[Finding]:
+    """Scan a repository for AI security issues.
 
-
-def scan_repository(
-    repo_path: str | Path,
-    *,
-    github_token: str | None = None,
-    github_repo: str | None = None,  # "owner/repo" — clones if repo_path doesn't exist
-) -> list[Finding]:
-    """Scan a code repository for AI security issues.
-
-    Uses Semgrep AST-based rules (48 rules) plus Python-only checks
-    for patterns that require file-level context analysis.
+    Runs Semgrep against the given path using Whitney's bundled rules,
+    then enriches the resulting findings with compliance framework
+    control mappings (ISO 42001, EU AI Act, OWASP LLM Top 10, OWASP
+    Agentic Top 10, NIST AI RMF, MITRE ATLAS).
 
     Args:
-        repo_path: Local path to the repository (or where it should be cloned).
-        github_token: GitHub personal access token for cloning private repos.
-        github_repo: ``owner/repo`` string. If provided and *repo_path* does
-            not exist the repo is cloned automatically.
-
-    Returns:
-        A list of :class:`Finding` objects, one per detected issue.
+        repo_path: Directory or file to scan.
 
     Raises:
-        SemgrepNotInstalledError: If Semgrep is not installed.
-        FileNotFoundError: If the repo path does not exist.
+        SemgrepNotInstalledError: If the ``semgrep`` CLI is missing.
+
+    Returns:
+        A list of :class:`Finding` objects, one per detected issue,
+        with framework mappings populated in ``Finding.details``.
     """
     repo_path = Path(repo_path)
 
-    # Clone if needed
-    if not repo_path.exists() and github_repo:
-        _clone_repo(github_repo, repo_path, token=github_token)
-    elif not repo_path.exists():
-        raise FileNotFoundError(
-            f"Repository path {repo_path} does not exist "
-            f"and no github_repo was provided for cloning."
+    findings = run_semgrep(repo_path)
+
+    # Enrich with compliance framework mappings. This populates
+    # details["iso42001_controls"], details["eu_ai_act"], etc. based
+    # on each finding's check_id. The compliance mapper is the single
+    # source of truth for the check_id → framework mapping.
+    try:
+        from whitney.compliance.mapper import enrich_findings_with_ai_controls
+
+        enrich_findings_with_ai_controls(findings)
+    except ImportError as exc:
+        # Compliance mapper not available — return findings without
+        # framework enrichment. This lets the scanner work standalone
+        # without requiring the full Whitney package.
+        log.debug("Compliance mapper not available, skipping enrichment: %s", exc)
+
+    # Phase D — LLM-as-judge triage (opt-in via WHITNEY_STRICT_JUDGE_PROMPTS).
+    # When disabled (the default), this is a no-op. When enabled, findings
+    # on files containing a correctly-implemented LLM-as-judge defense are
+    # suppressed. See whitney.code.llm_triage for details.
+    try:
+        from whitney.code.llm_triage import (
+            apply_llm_triage_to_findings,
+            is_triage_enabled,
         )
 
-    if not repo_path.is_dir():
-        raise NotADirectoryError(f"{repo_path} is not a directory.")
-
-    if not semgrep_available():
-        raise SemgrepNotInstalledError(
-            "Semgrep is required for Whitney code scanning. Install it with: pip install semgrep"
-        )
-
-    logger.info("Scanning repository at %s", repo_path)
-    findings: list[Finding] = []
-
-    # Semgrep AST-based rules (48 rules across 16 files)
-    logger.info("Running Semgrep AST scanner (48 rules)")
-    semgrep_findings = run_semgrep(repo_path)
-    findings.extend(semgrep_findings)
-    logger.info("Semgrep engine: %d finding(s)", len(semgrep_findings))
-
-    # Python-only checks — patterns requiring file-level context analysis
-    # (rate limiting, outdated SDK, MCP/A2A protocol checks)
-    for check_fn in PYTHON_ONLY_CHECKS:
-        check_name = check_fn.__name__
-        try:
-            results = check_fn(repo_path)
-            findings.extend(results)
-            if results:
-                logger.info(
-                    "Python check %s: %d finding(s)",
-                    check_name,
-                    len(results),
+        if is_triage_enabled():
+            findings, suppressed = apply_llm_triage_to_findings(
+                findings, scan_root=repo_path
+            )
+            if suppressed:
+                log.info(
+                    "LLM triage suppressed %d finding(s) on %d file(s)",
+                    len(suppressed),
+                    len({f.details.get("file_path") for f in suppressed}),
                 )
-        except Exception:
-            logger.exception("Check %s failed", check_name)
+    except ImportError as exc:
+        log.debug("llm_triage module not available, skipping: %s", exc)
 
-    logger.info("Scan complete: %d total finding(s)", len(findings))
     return findings
-
-
-def _clone_repo(
-    github_repo: str,
-    dest: Path,
-    *,
-    token: str | None = None,
-) -> None:
-    """Clone a GitHub repository to *dest*.
-
-    Uses ``git clone`` via subprocess. If a *token* is provided it is
-    embedded in the HTTPS URL for private repos.
-    """
-    if token:
-        clone_url = f"https://x-access-token:{token}@github.com/{github_repo}.git"
-    else:
-        clone_url = f"https://github.com/{github_repo}.git"
-
-    dest.parent.mkdir(parents=True, exist_ok=True)
-
-    logger.info("Cloning %s to %s", github_repo, dest)
-    result = subprocess.run(
-        ["git", "clone", "--depth", "1", clone_url, str(dest)],
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
-    if result.returncode != 0:
-        # Sanitise error output to avoid leaking tokens
-        stderr = result.stderr.replace(token, "***") if token else result.stderr
-        raise RuntimeError(f"Failed to clone {github_repo}: {stderr.strip()}")
-    logger.info("Clone complete: %s", dest)
