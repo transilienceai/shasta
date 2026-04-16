@@ -254,7 +254,7 @@ SIG_LITE_QUESTIONS: list[Question] = [
     ),
     Question(
         id="SIG-D.01.02",
-        text="Is AWS Config or equivalent enabled to record resource configuration changes?",
+        text="Is resource configuration recording enabled (e.g., AWS Config, Azure Policy)?",
         category="Change Management",
         expected_answer="yes_no",
         check_ids=["config-enabled", "azure-policy-compliance"],

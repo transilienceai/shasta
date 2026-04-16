@@ -101,8 +101,16 @@ def check_lambda_function_url_auth(
     findings: list[Finding] = []
     try:
         lam = client.client("lambda")
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="lambda-function-url-auth",
+            title="Unable to check Lambda Function URL auth",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.IAM,
+            resource_type="AWS::Lambda::Url",
+            account_id=account_id,
+            region=region,
+        )]
 
     fns = _lambda_functions(client)
     if not fns:
@@ -282,8 +290,16 @@ def check_apigw_client_certificate(
     try:
         apigw = client.client("apigateway")
         apis = apigw.get_rest_apis().get("items", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="apigw-client-cert",
+            title="Unable to check API Gateway client certificates",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.IAM,
+            resource_type="AWS::ApiGateway::Stage",
+            account_id=account_id,
+            region=region,
+        )]
 
     if not apis:
         return []
@@ -362,8 +378,16 @@ def check_apigw_authorizer_required(
     try:
         apigw = client.client("apigateway")
         apis = apigw.get_rest_apis().get("items", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="apigw-authorizer",
+            title="Unable to check API Gateway authorizers",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.IAM,
+            resource_type="AWS::ApiGateway::Method",
+            account_id=account_id,
+            region=region,
+        )]
 
     if not apis:
         return []
@@ -447,8 +471,16 @@ def check_apigw_throttling(
     try:
         apigw = client.client("apigateway")
         apis = apigw.get_rest_apis().get("items", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="apigw-throttling",
+            title="Unable to check API Gateway throttling",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.NETWORKING,
+            resource_type="AWS::ApiGateway::Stage",
+            account_id=account_id,
+            region=region,
+        )]
 
     if not apis:
         return []
@@ -531,8 +563,16 @@ def check_apigw_request_validation(
     try:
         apigw = client.client("apigateway")
         apis = apigw.get_rest_apis().get("items", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="apigw-request-validation",
+            title="Unable to check API Gateway request validation",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.NETWORKING,
+            resource_type="AWS::ApiGateway::RestApi",
+            account_id=account_id,
+            region=region,
+        )]
 
     if not apis:
         return []
@@ -855,8 +895,16 @@ def check_apigw_logging(client: AWSClient, account_id: str, region: str) -> list
     try:
         apigw = client.client("apigateway")
         apis = apigw.get_rest_apis().get("items", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="apigw-logging",
+            title="Unable to check API Gateway logging",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.LOGGING,
+            resource_type="AWS::ApiGateway::Stage",
+            account_id=account_id,
+            region=region,
+        )]
 
     for api in apis:
         api_id = api.get("id", "")
@@ -922,8 +970,16 @@ def check_apigw_waf(client: AWSClient, account_id: str, region: str) -> list[Fin
     try:
         apigw = client.client("apigateway")
         apis = apigw.get_rest_apis().get("items", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="apigw-waf",
+            title="Unable to check API Gateway WAF",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.NETWORKING,
+            resource_type="AWS::ApiGateway::Stage",
+            account_id=account_id,
+            region=region,
+        )]
 
     if not apis:
         return []
@@ -1000,8 +1056,16 @@ def check_stepfunctions_logging(client: AWSClient, account_id: str, region: str)
     try:
         sfn = client.client("stepfunctions")
         machines = sfn.list_state_machines().get("stateMachines", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="sfn-logging",
+            title="Unable to check Step Functions logging",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.LOGGING,
+            resource_type="AWS::StepFunctions::StateMachine",
+            account_id=account_id,
+            region=region,
+        )]
 
     if not machines:
         return []

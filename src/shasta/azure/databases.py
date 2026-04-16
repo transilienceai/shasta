@@ -124,8 +124,17 @@ def check_cosmos_disable_local_auth(
                         remediation="az cosmosdb update -g <rg> -n <acct> --disable-local-auth true",
                     )
                 )
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-cosmos-disable-local-auth",
+            title="Unable to check Cosmos DB local auth",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.STORAGE,
+            resource_type="Azure::Cosmos::DatabaseAccount",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
     return findings
 
 
@@ -167,8 +176,17 @@ def check_cosmos_public_network_access(
                         remediation="Set publicNetworkAccess=Disabled and create a Private Endpoint.",
                     )
                 )
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-cosmos-public-access",
+            title="Unable to check Cosmos DB public network access",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.STORAGE,
+            resource_type="Azure::Cosmos::DatabaseAccount",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
     return findings
 
 
@@ -224,8 +242,17 @@ def check_cosmos_firewall_rules(
                         ["4.5.3"],
                     )
                 )
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-cosmos-firewall",
+            title="Unable to check Cosmos DB firewall rules",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.STORAGE,
+            resource_type="Azure::Cosmos::DatabaseAccount",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
     return findings
 
 
@@ -256,8 +283,17 @@ def check_cosmos_metadata_write_disabled(
                     ),
                 )
             )
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-cosmos-metadata-write",
+            title="Unable to check Cosmos DB metadata write access",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.STORAGE,
+            resource_type="Azure::Cosmos::DatabaseAccount",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
     return findings
 
 
@@ -298,8 +334,17 @@ def check_cosmos_cmk(client: AzureClient, subscription_id: str, region: str) -> 
                         remediation="Configure CMK from a Key Vault key URI when re-creating the account.",
                     )
                 )
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-cosmos-cmk",
+            title="Unable to check Cosmos DB CMK encryption",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.STORAGE,
+            resource_type="Azure::Cosmos::DatabaseAccount",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
     return findings
 
 
@@ -368,8 +413,17 @@ def check_postgresql_secure_transport(
                     details={"server": server.name, "value": val},
                 )
             )
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-postgres-secure-transport",
+            title="Unable to check PostgreSQL secure transport",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.ENCRYPTION,
+            resource_type="Azure::DBforPostgreSQL::FlexibleServer",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
     return findings
 
 
@@ -429,8 +483,17 @@ def check_postgresql_log_settings(
                         details={"server": server.name, "settings": actual, "missing": missing},
                     )
                 )
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-postgres-log-settings",
+            title="Unable to check PostgreSQL log settings",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.LOGGING,
+            resource_type="Azure::DBforPostgreSQL::FlexibleServer",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
     return findings
 
 
@@ -471,8 +534,17 @@ def check_postgresql_public_access(
                     details={"server": server.name, "public_access": pna},
                 )
             )
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-postgres-public-access",
+            title="Unable to check PostgreSQL public access",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.NETWORKING,
+            resource_type="Azure::DBforPostgreSQL::FlexibleServer",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
     return findings
 
 
@@ -534,8 +606,17 @@ def check_mysql_secure_transport(
                     details={"server": server.name, "value": val},
                 )
             )
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-mysql-secure-transport",
+            title="Unable to check MySQL secure transport",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.ENCRYPTION,
+            resource_type="Azure::DBforMySQL::FlexibleServer",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
     return findings
 
 
@@ -577,8 +658,17 @@ def check_mysql_tls_version(
                     details={"server": server.name, "value": val},
                 )
             )
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-mysql-tls-version",
+            title="Unable to check MySQL TLS version",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.ENCRYPTION,
+            resource_type="Azure::DBforMySQL::FlexibleServer",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
     return findings
 
 
@@ -613,6 +703,15 @@ def check_mysql_audit_log(client: AzureClient, subscription_id: str, region: str
                     details={"server": server.name, "value": val},
                 )
             )
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-mysql-audit-log",
+            title="Unable to check MySQL audit log",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.LOGGING,
+            resource_type="Azure::DBforMySQL::FlexibleServer",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
     return findings

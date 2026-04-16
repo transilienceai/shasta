@@ -103,8 +103,17 @@ def check_appservice_https_only(
                     remediation="" if ok else "az webapp update --https-only true -g <rg> -n <app>",
                 )
             )
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-appservice-https-only",
+            title="Unable to check App Service HTTPS-only",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.COMPUTE,
+            resource_type="Azure::Web::Site",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
     return findings
 
 
@@ -145,8 +154,17 @@ def check_appservice_min_tls(
                     details={"app": app.name, "min_tls": min_tls},
                 )
             )
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-appservice-min-tls",
+            title="Unable to check App Service min TLS",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.COMPUTE,
+            resource_type="Azure::Web::Site",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
     return findings
 
 
@@ -180,8 +198,17 @@ def check_appservice_ftps_disabled(
                     details={"app": app.name, "ftps_state": state},
                 )
             )
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-appservice-ftps",
+            title="Unable to check App Service FTPS state",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.COMPUTE,
+            resource_type="Azure::Web::Site",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
     return findings
 
 
@@ -217,8 +244,17 @@ def check_appservice_remote_debug_disabled(
                     ),
                 )
             )
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-appservice-remote-debug",
+            title="Unable to check App Service remote debugging",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.COMPUTE,
+            resource_type="Azure::Web::Site",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
     return findings
 
 
@@ -249,8 +285,17 @@ def check_appservice_client_cert(
                     ),
                 )
             )
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-appservice-client-cert",
+            title="Unable to check App Service client certificates",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.COMPUTE,
+            resource_type="Azure::Web::Site",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
     return findings
 
 
@@ -285,8 +330,17 @@ def check_appservice_managed_identity(
                     ),
                 )
             )
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-appservice-managed-identity",
+            title="Unable to check App Service managed identity",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.COMPUTE,
+            resource_type="Azure::Web::Site",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
     return findings
 
 
@@ -320,8 +374,17 @@ def check_appservice_public_network_access(
                     ),
                 )
             )
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-appservice-public-access",
+            title="Unable to check App Service public network access",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.COMPUTE,
+            resource_type="Azure::Web::Site",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
     return findings
 
 
@@ -358,6 +421,15 @@ def check_appservice_auth_enabled(
                     ),
                 )
             )
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-appservice-auth",
+            title="Unable to check App Service authentication",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.COMPUTE,
+            resource_type="Azure::Web::Site",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
     return findings

@@ -16,7 +16,7 @@ def enrich_findings_with_hipaa(findings: list[Finding]) -> list[Finding]:
     """
     for finding in findings:
         controls = get_hipaa_controls_for_check(finding.check_id)
-        finding.details["hipaa_controls"] = [c.id for c in controls]
+        finding.hipaa_controls = [c.id for c in controls]
     return findings
 
 

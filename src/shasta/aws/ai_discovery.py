@@ -40,14 +40,45 @@ def discover_aws_ai_services(client: AWSClient) -> dict[str, Any]:
     """Discover AI/ML services in the AWS account.
 
     Returns a dict with service names as keys and discovery details
-    (counts, resource lists) as values.
+    (counts, resource lists) as values. Iterates all enabled regions
+    since Bedrock and SageMaker are regional services.
     """
-    results: dict[str, Any] = {}
+    default_region = client.account_info.region if client.account_info else "us-east-1"
 
-    results["sagemaker"] = _discover_sagemaker(client)
-    results["bedrock"] = _discover_bedrock(client)
-    results["comprehend"] = _discover_comprehend(client)
-    results["lambda_ai"] = _discover_lambda_ai(client)
+    try:
+        regions = client.get_enabled_regions()
+    except ClientError:
+        regions = [default_region]
+
+    results: dict[str, Any] = {
+        "sagemaker": {"available": False, "endpoints": [], "training_jobs": [], "models": [], "total_resources": 0},
+        "bedrock": {"available": False, "models": [], "total_resources": 0},
+        "comprehend": {"available": False, "endpoints": [], "total_resources": 0},
+        "lambda_ai": {"available": False, "functions": [], "total_resources": 0},
+    }
+
+    for r in regions:
+        try:
+            rc = client.for_region(r)
+            for key, discover_fn in [
+                ("sagemaker", _discover_sagemaker),
+                ("bedrock", _discover_bedrock),
+                ("comprehend", _discover_comprehend),
+                ("lambda_ai", _discover_lambda_ai),
+            ]:
+                try:
+                    regional = discover_fn(rc)
+                    if isinstance(regional, dict) and regional.get("available"):
+                        results[key]["available"] = True
+                        results[key]["total_resources"] += regional.get("total_resources", 0)
+                        # Merge list fields
+                        for field_key, field_val in regional.items():
+                            if isinstance(field_val, list) and field_key in results[key]:
+                                results[key][field_key].extend(field_val)
+                except Exception as e:
+                    logger.warning("Discovery %s failed in %s: %s", key, r, e)
+        except ClientError:
+            continue
 
     # Compute totals
     total = 0

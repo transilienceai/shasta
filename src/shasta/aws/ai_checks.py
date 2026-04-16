@@ -57,10 +57,17 @@ def run_full_aws_ai_scan(client: AWSClient) -> list[Finding]:
     Named to match Shasta's ``run_full_scan`` convention. The former name
     ``run_all_aws_ai_checks`` was renamed on 2026-04-11 — update any caller
     that still uses the old spelling.
+
+    Iterates all enabled regions (Bedrock and SageMaker are regional services).
     """
     findings: list[Finding] = []
     account_id = client.account_info.account_id if client.account_info else "unknown"
-    region = client.account_info.region if client.account_info else "us-east-1"
+    default_region = client.account_info.region if client.account_info else "us-east-1"
+
+    try:
+        regions = client.get_enabled_regions()
+    except ClientError:
+        regions = [default_region]
 
     checks = [
         check_bedrock_guardrails_configured,
@@ -80,11 +87,16 @@ def run_full_aws_ai_scan(client: AWSClient) -> list[Finding]:
         check_cloudtrail_ai_events,
     ]
 
-    for check_fn in checks:
+    for r in regions:
         try:
-            findings.extend(check_fn(client, account_id, region))
-        except Exception as e:
-            logger.warning("Check %s failed unexpectedly: %s", check_fn.__name__, e)
+            rc = client.for_region(r)
+            for check_fn in checks:
+                try:
+                    findings.extend(check_fn(rc, account_id, r))
+                except Exception as e:
+                    logger.warning("Check %s failed in %s: %s", check_fn.__name__, r, e)
+        except ClientError:
+            continue
 
     return findings
 

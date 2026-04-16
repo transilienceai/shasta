@@ -182,7 +182,7 @@ ISO27001_CONTROLS: dict[str, ISO27001Control] = {
             "azure-storage-encryption",
             "azure-nsg-unrestricted-ingress",
         ],
-        guidance="This is the catch-all cloud security control. Your full Shasta scan covers this comprehensively across AWS and Azure.",
+        guidance="This is the catch-all cloud security control. Your full Shasta scan covers this comprehensively across all connected cloud providers.",
         soc2_equivalent=["CC6.1", "CC6.6", "CC6.7", "CC7.1"],
     ),
     "A.5.24": ISO27001Control(
@@ -296,7 +296,7 @@ ISO27001_CONTROLS: dict[str, ISO27001Control] = {
             "azure-policy-compliance",
             "azure-activity-log",
         ],
-        guidance="AWS Config / Azure Policy records resource configurations. CloudTrail / Activity Log logs all changes.",
+        guidance="Resource configuration recording (AWS Config / Azure Policy) captures configurations. Audit logging (CloudTrail / Activity Log) logs all changes.",
         soc2_equivalent=["CC7.1", "CC8.1"],
     ),
     "A.8.12": ISO27001Control(
@@ -412,7 +412,7 @@ ISO27001_CONTROLS: dict[str, ISO27001Control] = {
         description="Information security requirements shall be identified, specified, and approved when developing or acquiring applications.",
         theme=ISO27001Theme.TECHNOLOGICAL,
         check_ids=["inspector-enabled", "inspector-critical-findings"],
-        guidance="AWS Inspector scans for vulnerabilities. SBOM tracks dependencies.",
+        guidance="Cloud vulnerability scanning (Inspector / Defender) finds vulnerabilities. SBOM tracks dependencies.",
         soc2_equivalent=["CC7.1"],
     ),
     "A.8.28": ISO27001Control(

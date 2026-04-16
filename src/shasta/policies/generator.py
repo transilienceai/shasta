@@ -59,7 +59,7 @@ This policy applies to all employees, contractors, and third parties with access
 
 ### 3.3 Authentication
 - Multi-factor authentication (MFA) is required for:
-  - All AWS console access
+  - All cloud console access
   - All production system access
   - VPN and remote access
   - All administrative/privileged accounts
@@ -68,7 +68,7 @@ This policy applies to all employees, contractors, and third parties with access
   - Must include uppercase, lowercase, numbers, and symbols
   - Passwords expire every 90 days
   - Last 12 passwords cannot be reused
-- The root AWS account must have MFA enabled and access keys deleted
+- The root/owner account must have MFA enabled and access keys deleted
 - Root account credentials are stored securely and used only for account recovery
 
 ### 3.4 Access Reviews
@@ -140,7 +140,7 @@ This policy covers all changes to production infrastructure, application code, d
 
 ### 4.4 Deployment
 - Deployments follow the documented deployment procedure
-- All deployments are logged in CloudTrail and AWS Config
+- All deployments are logged in the cloud provider's audit trail (e.g., CloudTrail, Activity Log)
 - Rollback procedures must be tested and documented
 
 ### 4.5 Post-Deployment
@@ -148,8 +148,8 @@ This policy covers all changes to production infrastructure, application code, d
 - Emergency changes receive a post-change review within 48 hours
 
 ## 5. Audit Trail
-- AWS CloudTrail is enabled across all regions for API activity logging
-- AWS Config records all resource configuration changes
+- Cloud audit logging is enabled across all regions for API activity logging (e.g., CloudTrail, Activity Log)
+- Resource configuration recording captures all resource changes (e.g., AWS Config, Azure Policy)
 - Git history provides full change attribution and history
 - Logs are retained for a minimum of 1 year
 
@@ -185,8 +185,8 @@ This plan establishes procedures for detecting, responding to, and recovering fr
 ## 3. Detection
 
 - **Amazon GuardDuty** monitors for threats continuously
-- **AWS CloudTrail** logs all API activity for investigation
-- **AWS Config** tracks configuration changes
+- **Cloud audit logging** (CloudTrail / Activity Log) logs all API activity for investigation
+- **Resource configuration recording** (AWS Config / Azure Policy) tracks configuration changes
 - **CloudWatch Alarms** alert on key metrics
 - Team members can report incidents to: {{ incident_email | default('security@' + company_name.lower().replace(' ', '') + '.com') }}
 
@@ -435,18 +435,18 @@ This policy applies to all employees, contractors, and third parties with access
 
 ## 4. Prohibited Activities
 
-- Sharing AWS credentials, access keys, or MFA devices
+- Sharing cloud credentials, access keys, or MFA devices
 - Storing credentials in code, wikis, or unencrypted files
 - Bypassing security controls or access restrictions
 - Installing unauthorized software on production systems
 - Accessing data or systems beyond your authorization
 - Using company systems for illegal activities
 
-## 5. AWS-Specific Requirements
+## 5. Cloud Provider Requirements
 
-- Never use the root account for daily operations
-- Always use MFA for AWS console access
-- Never commit AWS access keys to source code repositories
+- Never use the root/owner account for daily operations
+- Always use MFA for cloud console access
+- Never commit cloud provider access keys to source code repositories
 - Use IAM roles for service-to-service authentication (not access keys)
 - Follow the change management policy for all infrastructure changes
 

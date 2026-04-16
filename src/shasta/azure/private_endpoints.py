@@ -111,8 +111,17 @@ def _walk_storage(client: AzureClient, sub_id: str, region: str) -> list[Finding
                 )
             )
         return out
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-private-endpoint-storageaccount",
+            title="Unable to check Storage private endpoints",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.NETWORKING,
+            resource_type="Azure::Storage::StorageAccount",
+            account_id=sub_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
 
 
 def _walk_keyvaults(client: AzureClient, sub_id: str, region: str) -> list[Finding]:
@@ -138,8 +147,17 @@ def _walk_keyvaults(client: AzureClient, sub_id: str, region: str) -> list[Findi
                 )
             )
         return out
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-private-endpoint-vault",
+            title="Unable to check Key Vault private endpoints",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.NETWORKING,
+            resource_type="Azure::KeyVault::Vault",
+            account_id=sub_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
 
 
 def _walk_sql_servers(client: AzureClient, sub_id: str, region: str) -> list[Finding]:
@@ -170,8 +188,17 @@ def _walk_sql_servers(client: AzureClient, sub_id: str, region: str) -> list[Fin
                 )
             )
         return out
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-private-endpoint-server",
+            title="Unable to check SQL Server private endpoints",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.NETWORKING,
+            resource_type="Azure::Sql::Server",
+            account_id=sub_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
 
 
 def _walk_cosmos(client: AzureClient, sub_id: str, region: str) -> list[Finding]:
@@ -195,8 +222,17 @@ def _walk_cosmos(client: AzureClient, sub_id: str, region: str) -> list[Finding]
                 )
             )
         return out
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-private-endpoint-databaseaccount",
+            title="Unable to check Cosmos DB private endpoints",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.NETWORKING,
+            resource_type="Azure::Cosmos::DatabaseAccount",
+            account_id=sub_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
 
 
 def _walk_acr(client: AzureClient, sub_id: str, region: str) -> list[Finding]:
@@ -225,8 +261,17 @@ def _walk_acr(client: AzureClient, sub_id: str, region: str) -> list[Finding]:
                 )
             )
         return out
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-private-endpoint-registry",
+            title="Unable to check Container Registry private endpoints",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.NETWORKING,
+            resource_type="Azure::ContainerRegistry::Registry",
+            account_id=sub_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
 
 
 def _walk_app_service(client: AzureClient, sub_id: str, region: str) -> list[Finding]:
@@ -257,8 +302,17 @@ def _walk_app_service(client: AzureClient, sub_id: str, region: str) -> list[Fin
                 )
             )
         return out
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-private-endpoint-site",
+            title="Unable to check App Service private endpoints",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.NETWORKING,
+            resource_type="Azure::Web::Site",
+            account_id=sub_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
 
 
 def _walk_cognitive(client: AzureClient, sub_id: str, region: str) -> list[Finding]:
@@ -283,5 +337,14 @@ def _walk_cognitive(client: AzureClient, sub_id: str, region: str) -> list[Findi
                 )
             )
         return out
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-private-endpoint-account",
+            title="Unable to check Cognitive Services private endpoints",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.NETWORKING,
+            resource_type="Azure::CognitiveServices::Account",
+            account_id=sub_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]

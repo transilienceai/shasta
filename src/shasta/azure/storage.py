@@ -315,8 +315,17 @@ def _check_storage_soft_delete(
                 )
             ]
 
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-storage-soft-delete",
+            title="Unable to check storage soft delete",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.STORAGE,
+            resource_type="Azure::Storage::StorageAccount",
+            account_id=sub_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
 
 
 def _check_shared_key_access(account, name, acct_id, rg, sub_id, region) -> list[Finding]:

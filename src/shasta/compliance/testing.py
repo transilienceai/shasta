@@ -11,7 +11,7 @@ auditors expect to see. Each test has:
 
 This is the bridge between "security scanner" and "compliance platform."
 An auditor reviewing these tests should be able to form an opinion on each
-control without touching the AWS console.
+control without touching the cloud console.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from shasta.evidence.models import ComplianceStatus, Finding, ScanResult
+from shasta.evidence.models import CloudProvider, ComplianceStatus, Finding, ScanResult
 
 
 @dataclass
@@ -71,7 +71,7 @@ TEST_DEFINITIONS: list[dict[str, Any]] = [
         "title": "Account Password Policy Meets Minimum Standards",
         "soc2_controls": ["CC6.1"],
         "category": "Access Control",
-        "objective": "Verify that the AWS account password policy enforces strong passwords per organizational standards.",
+        "objective": "Verify that the account password policy enforces strong passwords per organizational standards.",
         "procedure": "Query the IAM account password policy via API. Evaluate minimum length (>=14), complexity requirements (upper, lower, number, symbol), expiration (<=90 days), and reuse prevention (>=12).",
         "expected_result": "Password policy exists with: minimum 14 characters, all four complexity types required, 90-day expiration, and 12-password reuse prevention.",
         "check_ids": ["iam-password-policy"],
@@ -81,7 +81,7 @@ TEST_DEFINITIONS: list[dict[str, Any]] = [
         "title": "Root Account MFA Enabled",
         "soc2_controls": ["CC6.1"],
         "category": "Access Control",
-        "objective": "Verify that the root AWS account has multi-factor authentication enabled.",
+        "objective": "Verify that the root account has multi-factor authentication enabled.",
         "procedure": "Query IAM account summary for AccountMFAEnabled flag. Check credential report for root account access key status.",
         "expected_result": "Root account MFA is enabled. Root account has no active access keys.",
         "check_ids": ["iam-root-mfa", "iam-root-access-keys"],
@@ -223,23 +223,23 @@ TEST_DEFINITIONS: list[dict[str, Any]] = [
     },
     {
         "test_id": "CT-MON-003",
-        "title": "AWS Config Is Recording All Resources",
+        "title": "Resource Configuration Recording Is Active",
         "soc2_controls": ["CC7.1", "CC8.1"],
         "category": "Monitoring",
-        "objective": "Verify that AWS Config is enabled and recording all supported resource types including global resources.",
+        "objective": "Verify that resource configuration recording is enabled and capturing all supported resource types including global resources.",
         "procedure": "Query Config recorders and their status. Verify recording is active with all-supported and global resource types.",
-        "expected_result": "AWS Config recorder is active, recording all supported resource types including global resources.",
+        "expected_result": "Resource configuration recorder is active, recording all supported resource types including global resources.",
         "check_ids": ["config-enabled"],
     },
     # --- CC7.1: Vulnerability Management ---
     {
         "test_id": "CT-VULN-001",
-        "title": "AWS Inspector Is Enabled for Vulnerability Scanning",
+        "title": "Vulnerability Scanning Is Enabled",
         "soc2_controls": ["CC7.1"],
         "category": "Vulnerability Management",
-        "objective": "Verify that AWS Inspector is enabled for continuous vulnerability scanning of EC2 instances, Lambda functions, and container images.",
+        "objective": "Verify that vulnerability scanning is enabled for continuous scanning of compute resources, functions, and container images.",
         "procedure": "Query Inspector status. Verify scanning is active and check for critical/high findings.",
-        "expected_result": "AWS Inspector is enabled. No critical or high severity unresolved vulnerabilities exist.",
+        "expected_result": "Vulnerability scanning is enabled. No critical or high severity unresolved vulnerabilities exist.",
         "check_ids": ["inspector-enabled"],
     },
 ]
@@ -366,9 +366,14 @@ def _evaluate_test(defn: dict, findings_by_check: dict, now: datetime) -> Contro
 
 
 def save_control_test_report(
-    suite: ControlTestSuite, output_path: Path | str = "data/reports"
+    suite: ControlTestSuite,
+    output_path: Path | str = "data/reports",
+    cloud_provider: CloudProvider = CloudProvider.AWS,
 ) -> Path:
     """Save the control test suite as a formal Markdown report for auditors."""
+    from shasta.reports.generator import _provider_labels
+
+    labels = _provider_labels(cloud_provider)
     output_dir = Path(output_path)
     output_dir.mkdir(parents=True, exist_ok=True)
     filepath = output_dir / f"control-tests-{suite.account_id}-{suite.test_period}.md"
@@ -377,7 +382,7 @@ def save_control_test_report(
         "# SOC 2 Control Test Report",
         "",
         f"**Suite ID:** {suite.suite_id}",
-        f"**AWS Account:** {suite.account_id}",
+        f"**{labels['account_label']}:** {suite.account_id}",
         f"**Test Period:** {suite.test_period}",
         f"**Tested At:** {suite.tested_at}",
         f"**Tested By:** Shasta Automated Compliance Testing",
@@ -462,7 +467,7 @@ def save_control_test_report(
             "| Review date | ___________________ |",
             "| Opinion | ___________________ |",
             "",
-            "*This report was generated by Shasta Automated Compliance Testing. All tests were performed programmatically against the live AWS environment. Evidence artifacts are available in the evidence store for detailed review.*",
+            "*This report was generated by Shasta Automated Compliance Testing. All tests were performed programmatically against the live cloud environment. Evidence artifacts are available in the evidence store for detailed review.*",
         ]
     )
 

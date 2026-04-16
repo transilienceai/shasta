@@ -65,7 +65,16 @@ def run_all_azure_diagnostic_settings_checks(client: AzureClient) -> list[Findin
         from azure.mgmt.monitor import MonitorManagementClient
         from azure.mgmt.resource import ResourceManagementClient
     except ImportError:
-        return []
+        return [Finding.not_assessed(
+            check_id="azure-diagnostic-settings",
+            title="Unable to check diagnostic settings (SDK not installed)",
+            description="azure-mgmt-monitor or azure-mgmt-resource package not installed.",
+            domain=CheckDomain.LOGGING,
+            resource_type="Azure::Monitor::DiagnosticSetting",
+            account_id=sub_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
 
     monitor = client.mgmt_client(MonitorManagementClient)
     rm = client.mgmt_client(ResourceManagementClient)

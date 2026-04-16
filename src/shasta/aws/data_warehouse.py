@@ -189,8 +189,16 @@ def check_redshift_audit_logging(
     findings: list[Finding] = []
     try:
         rs = client.client("redshift")
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="redshift-audit-logging",
+            title="Unable to check Redshift audit logging",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.LOGGING,
+            resource_type="AWS::Redshift::Cluster",
+            account_id=account_id,
+            region=region,
+        )]
     for cluster in _redshift_clusters(client):
         cid = cluster.get("ClusterIdentifier", "unknown")
         arn = f"arn:aws:redshift:{region}:{account_id}:cluster:{cid}"
@@ -254,8 +262,16 @@ def check_redshift_require_ssl(
     findings: list[Finding] = []
     try:
         rs = client.client("redshift")
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="redshift-require-ssl",
+            title="Unable to check Redshift SSL requirement",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.ENCRYPTION,
+            resource_type="AWS::Redshift::Cluster",
+            account_id=account_id,
+            region=region,
+        )]
 
     for cluster in _redshift_clusters(client):
         cid = cluster.get("ClusterIdentifier", "unknown")
@@ -520,8 +536,16 @@ def check_neptune_encryption(
     try:
         neptune = client.client("neptune")
         clusters = neptune.describe_db_clusters().get("DBClusters", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="neptune-encryption",
+            title="Unable to check Neptune encryption",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.ENCRYPTION,
+            resource_type="AWS::Neptune::DBCluster",
+            account_id=account_id,
+            region=region,
+        )]
 
     findings: list[Finding] = []
     for cluster in clusters:

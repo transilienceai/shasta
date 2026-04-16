@@ -104,8 +104,16 @@ def check_ec2_imdsv2_enforced(
     findings: list[Finding] = []
     try:
         ec2 = client.client("ec2")
-    except ClientError:
-        return findings
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="ec2-imdsv2-enforced",
+            title="Unable to check EC2 IMDSv2 enforcement",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.COMPUTE,
+            resource_type="AWS::EC2::Instance",
+            account_id=account_id,
+            region=region,
+        )]
 
     instances = _list_running_instances(ec2)
     if not instances:
@@ -195,8 +203,16 @@ def check_ec2_public_ips(
     """
     try:
         ec2 = client.client("ec2")
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="ec2-public-ips",
+            title="Unable to check EC2 public IPs",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.COMPUTE,
+            resource_type="AWS::EC2::Instance",
+            account_id=account_id,
+            region=region,
+        )]
 
     instances = _list_running_instances(ec2)
     if not instances:
@@ -278,8 +294,16 @@ def check_ec2_instance_profile_attached(
     """
     try:
         ec2 = client.client("ec2")
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="ec2-instance-profile",
+            title="Unable to check EC2 instance profiles",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.IAM,
+            resource_type="AWS::EC2::Instance",
+            account_id=account_id,
+            region=region,
+        )]
 
     instances = _list_running_instances(ec2)
     if not instances:
@@ -345,8 +369,16 @@ def check_ami_age(
     """
     try:
         ec2 = client.client("ec2")
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="ec2-ami-age",
+            title="Unable to check AMI age",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.COMPUTE,
+            resource_type="AWS::EC2::Image",
+            account_id=account_id,
+            region=region,
+        )]
 
     instances = _list_running_instances(ec2)
     if not instances:
@@ -360,8 +392,16 @@ def check_ami_age(
     try:
         ami_resp = ec2.describe_images(ImageIds=list(ami_ids))
         amis = {a["ImageId"]: a for a in ami_resp.get("Images", [])}
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="ec2-ami-age",
+            title="Unable to check AMI age",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.COMPUTE,
+            resource_type="AWS::EC2::Image",
+            account_id=account_id,
+            region=region,
+        )]
 
     threshold = datetime.now(timezone.utc) - timedelta(days=AMI_AGE_DAYS_THRESHOLD)
     stale_amis: list[dict] = []

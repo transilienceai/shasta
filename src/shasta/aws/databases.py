@@ -549,8 +549,16 @@ def check_documentdb_encryption(client: AWSClient, account_id: str, region: str)
     try:
         docdb = client.client("docdb")
         clusters = docdb.describe_db_clusters().get("DBClusters", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="docdb-encryption",
+            title="Unable to check DocumentDB encryption",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.ENCRYPTION,
+            resource_type="AWS::DocDB::DBCluster",
+            account_id=account_id,
+            region=region,
+        )]
 
     for cluster in clusters:
         if "docdb" not in (cluster.get("Engine") or ""):
@@ -598,8 +606,16 @@ def check_documentdb_audit_logs(client: AWSClient, account_id: str, region: str)
     try:
         docdb = client.client("docdb")
         clusters = docdb.describe_db_clusters().get("DBClusters", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="docdb-audit-logs",
+            title="Unable to check DocumentDB audit logs",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.LOGGING,
+            resource_type="AWS::DocDB::DBCluster",
+            account_id=account_id,
+            region=region,
+        )]
 
     for cluster in clusters:
         if "docdb" not in (cluster.get("Engine") or ""):
@@ -660,8 +676,16 @@ def check_dynamodb_pitr(client: AWSClient, account_id: str, region: str) -> list
     try:
         ddb = client.client("dynamodb")
         tables = ddb.list_tables().get("TableNames", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="dynamodb-pitr",
+            title="Unable to check DynamoDB PITR",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.STORAGE,
+            resource_type="AWS::DynamoDB::Table",
+            account_id=account_id,
+            region=region,
+        )]
 
     no_pitr: list[str] = []
     pitr: list[str] = []
@@ -732,8 +756,16 @@ def check_dynamodb_encryption_kms(client: AWSClient, account_id: str, region: st
     try:
         ddb = client.client("dynamodb")
         tables = ddb.list_tables().get("TableNames", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="dynamodb-kms",
+            title="Unable to check DynamoDB encryption",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.ENCRYPTION,
+            resource_type="AWS::DynamoDB::Table",
+            account_id=account_id,
+            region=region,
+        )]
 
     for t in tables:
         try:

@@ -196,8 +196,17 @@ def check_network_watcher_per_region(
         network = client.mgmt_client(NetworkManagementClient)
         vnets = list(network.virtual_networks.list_all())
         watchers = list(network.network_watchers.list_all())
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="azure-network-watcher-coverage",
+            title="Unable to check Network Watcher coverage",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.NETWORKING,
+            resource_type="Azure::Network::NetworkWatcher",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        )]
 
     vnet_regions = {(v.location or "").lower() for v in vnets if v.location}
     watcher_regions = {(w.location or "").lower() for w in watchers if w.location}
@@ -471,8 +480,17 @@ def check_nsg_default_restricted(
                     )
                 )
 
-    except Exception:
-        pass  # Non-critical — covered by nsg-unrestricted-ingress
+    except Exception as e:
+        findings.append(Finding.not_assessed(
+            check_id="azure-nsg-default-restricted",
+            title="Unable to check NSG default restriction",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.NETWORKING,
+            resource_type="Azure::Network::NetworkSecurityGroup",
+            account_id=subscription_id,
+            region=region,
+            cloud_provider=CloudProvider.AZURE,
+        ))
 
     return findings
 

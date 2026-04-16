@@ -11,8 +11,7 @@ def enrich_findings_with_iso27001(findings: list[Finding]) -> list[Finding]:
     """Add iso27001_controls field to findings based on check_id mapping."""
     for finding in findings:
         controls = get_iso27001_controls_for_check(finding.check_id)
-        # Store in details since Finding model uses soc2_controls for SOC 2
-        finding.details["iso27001_controls"] = [c.id for c in controls]
+        finding.iso27001_controls = [c.id for c in controls]
     return findings
 
 

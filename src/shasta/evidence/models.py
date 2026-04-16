@@ -58,6 +58,38 @@ class Finding(BaseModel):
     """
 
     id: str = Field(default_factory=lambda: uuid4().hex[:12])
+
+    @classmethod
+    def not_assessed(
+        cls,
+        check_id: str,
+        title: str,
+        description: str,
+        domain: "CheckDomain",
+        resource_type: str,
+        account_id: str,
+        region: str,
+        cloud_provider: "CloudProvider" = CloudProvider.AWS,  # type: ignore[assignment]
+    ) -> "Finding":
+        """Create a NOT_ASSESSED finding for when an API call fails.
+
+        Use this instead of returning an empty list on error — empty lists
+        are indistinguishable from 'no resources found', which produces
+        false-clean reports.
+        """
+        return cls(
+            check_id=check_id,
+            title=title,
+            description=description,
+            severity=Severity.MEDIUM,
+            status=ComplianceStatus.NOT_ASSESSED,
+            domain=domain,
+            resource_type=resource_type,
+            resource_id="N/A",
+            region=region,
+            account_id=account_id,
+            cloud_provider=cloud_provider,
+        )
     check_id: str  # e.g., "iam-mfa-enabled", "azure-nsg-unrestricted-ingress"
     title: str  # Human-readable title
     description: str  # What was found
@@ -75,6 +107,8 @@ class Finding(BaseModel):
     cis_aws_controls: list[str] = Field(default_factory=list)  # e.g., ["1.4", "3.1"]
     cis_azure_controls: list[str] = Field(default_factory=list)  # e.g., ["1.1.4", "5.2.1"]
     mcsb_controls: list[str] = Field(default_factory=list)  # e.g., ["IM-6", "DP-5"]
+    iso27001_controls: list[str] = Field(default_factory=list)  # e.g., ["A.8.5", "A.5.15"]
+    hipaa_controls: list[str] = Field(default_factory=list)  # e.g., ["164.312(a)(1)", "164.312(e)(1)"]
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 

@@ -59,8 +59,16 @@ def check_efs_encryption(client: AWSClient, account_id: str, region: str) -> lis
     try:
         efs = client.client("efs")
         fs_list = efs.describe_file_systems().get("FileSystems", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="efs-encryption",
+            title="Unable to check EFS encryption",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.ENCRYPTION,
+            resource_type="AWS::EFS::FileSystem",
+            account_id=account_id,
+            region=region,
+        )]
 
     for fs in fs_list:
         fs_id = fs.get("FileSystemId", "unknown")
@@ -122,8 +130,16 @@ def check_sns_topic_encryption(client: AWSClient, account_id: str, region: str) 
         topics: list[str] = []
         for page in paginator.paginate():
             topics.extend(t["TopicArn"] for t in page.get("Topics", []))
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="sns-encryption",
+            title="Unable to check SNS topic encryption",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.ENCRYPTION,
+            resource_type="AWS::SNS::Topic",
+            account_id=account_id,
+            region=region,
+        )]
 
     encrypted = 0
     unencrypted: list[str] = []
@@ -190,8 +206,16 @@ def check_sqs_queue_encryption(client: AWSClient, account_id: str, region: str) 
     try:
         sqs = client.client("sqs")
         queues = sqs.list_queues().get("QueueUrls", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="sqs-encryption",
+            title="Unable to check SQS queue encryption",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.ENCRYPTION,
+            resource_type="AWS::SQS::Queue",
+            account_id=account_id,
+            region=region,
+        )]
 
     encrypted = 0
     unencrypted: list[str] = []
@@ -263,8 +287,16 @@ def check_secrets_manager_rotation(
         secrets = []
         for page in paginator.paginate():
             secrets.extend(page.get("SecretList", []))
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="secrets-manager-rotation",
+            title="Unable to check Secrets Manager rotation",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.ENCRYPTION,
+            resource_type="AWS::SecretsManager::Secret",
+            account_id=account_id,
+            region=region,
+        )]
 
     if not secrets:
         return []
@@ -329,8 +361,16 @@ def check_acm_expiring_certificates(
         certs = []
         for page in paginator.paginate():
             certs.extend(page.get("CertificateSummaryList", []))
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="acm-expiring-certs",
+            title="Unable to check ACM certificates",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.ENCRYPTION,
+            resource_type="AWS::CertificateManager::Certificate",
+            account_id=account_id,
+            region=region,
+        )]
 
     if not certs:
         return []
@@ -552,8 +592,16 @@ def check_ebs_volumes(client: AWSClient, account_id: str, region: str) -> list[F
                 )
             )
 
-    except ClientError:
-        pass
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="ebs-volume-encrypted",
+            title="Unable to check EBS volume encryption",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.ENCRYPTION,
+            resource_type="AWS::EC2::Volume",
+            account_id=account_id,
+            region=region,
+        )]
 
     return findings
 
@@ -614,8 +662,16 @@ def check_rds_encryption(client: AWSClient, account_id: str, region: str) -> lis
                             details={"db_id": db_id, "engine": engine, "encrypted": False},
                         )
                     )
-    except ClientError:
-        pass
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="rds-encryption-at-rest",
+            title="Unable to check RDS encryption",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.ENCRYPTION,
+            resource_type="AWS::RDS::DBInstance",
+            account_id=account_id,
+            region=region,
+        )]
 
     return findings
 
@@ -656,8 +712,16 @@ def check_rds_public_access(client: AWSClient, account_id: str, region: str) -> 
                             },
                         )
                     )
-    except ClientError:
-        pass
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="rds-no-public-access",
+            title="Unable to check RDS public access",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.ENCRYPTION,
+            resource_type="AWS::RDS::DBInstance",
+            account_id=account_id,
+            region=region,
+        )]
 
     return findings
 
@@ -728,7 +792,15 @@ def check_rds_backups(client: AWSClient, account_id: str, region: str) -> list[F
                             },
                         )
                     )
-    except ClientError:
-        pass
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="rds-backup-enabled",
+            title="Unable to check RDS backups",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.ENCRYPTION,
+            resource_type="AWS::RDS::DBInstance",
+            account_id=account_id,
+            region=region,
+        )]
 
     return findings

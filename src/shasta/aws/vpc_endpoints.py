@@ -66,8 +66,16 @@ def _check_region(client: AWSClient, account_id: str, region: str) -> list[Findi
         ec2 = client.client("ec2")
         vpcs = ec2.describe_vpcs().get("Vpcs", [])
         endpoints = ec2.describe_vpc_endpoints().get("VpcEndpoints", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="aws-vpc-endpoints",
+            title="Unable to check VPC endpoints",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.NETWORKING,
+            resource_type="AWS::EC2::VPC",
+            account_id=account_id,
+            region=region,
+        )]
 
     if not vpcs:
         return []

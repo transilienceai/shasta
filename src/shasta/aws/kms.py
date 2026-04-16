@@ -94,8 +94,16 @@ def check_kms_key_rotation(
     findings: list[Finding] = []
     try:
         kms = client.client("kms")
-    except ClientError:
-        return findings
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="kms-key-rotation",
+            title="Unable to check KMS key rotation",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.ENCRYPTION,
+            resource_type="AWS::KMS::Key",
+            account_id=account_id,
+            region=region,
+        )]
 
     keys = _list_customer_keys(client)
     if not keys:

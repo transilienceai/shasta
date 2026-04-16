@@ -16,7 +16,7 @@ Shasta is a Claude Code-native SOC 2 and ISO 27001 compliance platform. It scans
 - `src/shasta/aws/ai_checks.py` — AWS AI service checks (Bedrock, SageMaker)
 - `src/shasta/azure/ai_checks.py` — Azure AI service checks (Azure OpenAI, Azure ML)
 - `.claude/skills/` — Claude Code skill definitions
-- `tests/` — pytest test suite (739 tests; uses moto for AWS mocking)
+- `tests/` — pytest test suite (uses moto for AWS mocking, unittest.mock for Azure)
 - `data/` — runtime data (gitignored)
 
 ## Commands

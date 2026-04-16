@@ -164,8 +164,16 @@ def check_cloudtrail_kms_encryption(
     try:
         ct = client.client("cloudtrail")
         trails = ct.describe_trails().get("trailList", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="cloudtrail-kms-encryption",
+            title="Unable to check CloudTrail KMS encryption",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.MONITORING,
+            resource_type="AWS::CloudTrail::Trail",
+            account_id=account_id,
+            region=region,
+        )]
 
     for trail in trails:
         name = trail.get("Name", "unknown")
@@ -228,8 +236,16 @@ def check_cloudtrail_log_validation(
     try:
         ct = client.client("cloudtrail")
         trails = ct.describe_trails().get("trailList", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="cloudtrail-log-validation",
+            title="Unable to check CloudTrail log validation",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.MONITORING,
+            resource_type="AWS::CloudTrail::Trail",
+            account_id=account_id,
+            region=region,
+        )]
 
     for trail in trails:
         name = trail.get("Name", "unknown")
@@ -291,8 +307,16 @@ def check_cloudtrail_s3_object_lock(
         ct = client.client("cloudtrail")
         s3 = client.client("s3")
         trails = ct.describe_trails().get("trailList", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="cloudtrail-s3-object-lock",
+            title="Unable to check CloudTrail S3 Object Lock",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.MONITORING,
+            resource_type="AWS::S3::Bucket",
+            account_id=account_id,
+            region=region,
+        )]
 
     seen_buckets: set[str] = set()
     for trail in trails:

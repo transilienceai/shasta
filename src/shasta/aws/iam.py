@@ -466,8 +466,16 @@ def check_inactive_users(iam: Any, account_id: str, region: str) -> list[Finding
     try:
         _generate_credential_report(iam)
         report = _parse_credential_report(iam)
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="iam-inactive-user",
+            title="Unable to check inactive users",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.IAM,
+            resource_type="AWS::IAM::User",
+            account_id=account_id,
+            region=region,
+        )]
 
     for entry in report:
         if entry["user"] == "<root_account>":
@@ -708,8 +716,16 @@ def check_iam_policy_wildcards(
         custom_policies = []
         for page in paginator.paginate(Scope="Local", OnlyAttached=False):
             custom_policies.extend(page.get("Policies", []))
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="iam-policy-wildcards",
+            title="Unable to check IAM policy wildcards",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.IAM,
+            resource_type="AWS::IAM::ManagedPolicy",
+            account_id=account_id,
+            region=region,
+        )]
 
     if not custom_policies:
         return []
@@ -825,8 +841,16 @@ def check_iam_role_trust_external_account(
         roles = []
         for page in paginator.paginate():
             roles.extend(page.get("Roles", []))
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="iam-role-trust-external",
+            title="Unable to check IAM role trust policies",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.IAM,
+            resource_type="AWS::IAM::Role",
+            account_id=account_id,
+            region=region,
+        )]
 
     if not roles:
         return []
@@ -949,8 +973,16 @@ def check_iam_unused_roles(
         roles = []
         for page in paginator.paginate():
             roles.extend(page.get("Roles", []))
-    except Exception:
-        return []
+    except Exception as e:
+        return [Finding.not_assessed(
+            check_id="iam-unused-roles",
+            title="Unable to check unused IAM roles",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.IAM,
+            resource_type="AWS::IAM::Role",
+            account_id=account_id,
+            region=region,
+        )]
 
     if not roles:
         return []

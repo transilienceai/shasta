@@ -8,6 +8,7 @@ from pathlib import Path
 from shasta.compliance.hipaa_mapper import get_hipaa_control_summary
 from shasta.compliance.hipaa_scorer import calculate_hipaa_score
 from shasta.evidence.models import ScanResult
+from shasta.reports.generator import _provider_labels
 
 
 def save_hipaa_report(scan: ScanResult, output_path: Path | str = "data/reports") -> Path:
@@ -25,6 +26,7 @@ def save_hipaa_report(scan: ScanResult, output_path: Path | str = "data/reports"
 
     score = calculate_hipaa_score(scan.findings)
     controls = get_hipaa_control_summary(scan.findings)
+    labels = _provider_labels(scan.cloud_provider)
 
     status_icon = {
         "pass": "PASS",
@@ -38,7 +40,7 @@ def save_hipaa_report(scan: ScanResult, output_path: Path | str = "data/reports"
         "# HIPAA Security Rule Gap Analysis Report",
         "",
         f"**Generated:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
-        f"**Account:** {scan.account_id}",
+        f"**{labels['account_label']}:** {scan.account_id}",
         f"**Region:** {scan.region}",
         "",
         "---",
@@ -118,7 +120,7 @@ def save_hipaa_report(scan: ScanResult, output_path: Path | str = "data/reports"
         [
             "## Physical Safeguards (164.310)",
             "",
-            "Physical safeguards are largely handled by your cloud provider (AWS/Azure) for cloud-native organizations. Ensure your BAA is signed and reference the provider's SOC 2 Type II report.",
+            f"Physical safeguards are largely handled by your cloud provider for cloud-native organizations. Ensure your BAA with {labels['account_label'].split()[0]} is signed and reference the provider's SOC 2 Type II report.",
             "",
             "| Control | Title | Status | Pass | Fail | Policy Required |",
             "|---------|-------|--------|------|------|-----------------|",
@@ -196,10 +198,10 @@ def save_hipaa_report(scan: ScanResult, output_path: Path | str = "data/reports"
             "",
             "Beyond the technical controls above, organizations handling ePHI should implement:",
             "",
-            "1. **Data Classification**: Tag all resources containing ePHI with `data-classification=phi` or equivalent labels. Use AWS resource tags or Azure resource tags to identify PHI-bearing systems.",
+            f"1. **Data Classification**: Tag all resources containing ePHI with `data-classification=phi` or equivalent labels. Use {labels['account_label'].split()[0]} resource tags to identify PHI-bearing systems.",
             "2. **Minimum Necessary Standard**: Restrict ePHI access to the minimum necessary for each workforce member's role. Implement column-level or row-level security on databases containing PHI.",
-            "3. **Audit Log Retention**: HIPAA requires 6-year retention for security-related documentation. Configure CloudTrail/Activity Log retention accordingly.",
-            "4. **Business Associate Agreements**: Verify signed BAAs with AWS, Azure, and all SaaS vendors that may access ePHI.",
+            f"3. **Audit Log Retention**: HIPAA requires 6-year retention for security-related documentation. Configure {labels['logging_service']} retention accordingly.",
+            f"4. **Business Associate Agreements**: Verify signed BAAs with {labels['account_label'].split()[0]} and all SaaS vendors that may access ePHI.",
             "5. **Encryption Key Management**: Use customer-managed KMS/Key Vault keys for ePHI workloads. Rotate keys annually and maintain key access logs.",
             "6. **Incident Response for PHI**: Your incident response plan must include PHI-specific procedures including the 60-day breach notification timeline.",
             "7. **Risk Analysis**: Conduct a formal risk analysis annually, documenting threats to ePHI confidentiality, integrity, and availability.",

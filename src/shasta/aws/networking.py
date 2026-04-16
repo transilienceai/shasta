@@ -73,8 +73,16 @@ def check_elb_listeners(client: AWSClient, account_id: str, region: str) -> list
     try:
         elbv2 = client.client("elbv2")
         lbs = elbv2.describe_load_balancers().get("LoadBalancers", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="elb-listener-tls",
+            title="Unable to check ELB listener TLS",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.NETWORKING,
+            resource_type="AWS::ElasticLoadBalancingV2::LoadBalancer",
+            account_id=account_id,
+            region=region,
+        )]
 
     for lb in lbs:
         arn = lb.get("LoadBalancerArn", "")
@@ -162,8 +170,16 @@ def check_elb_access_logs(client: AWSClient, account_id: str, region: str) -> li
     try:
         elbv2 = client.client("elbv2")
         lbs = elbv2.describe_load_balancers().get("LoadBalancers", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="elb-access-logs",
+            title="Unable to check ELB access logs",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.NETWORKING,
+            resource_type="AWS::ElasticLoadBalancingV2::LoadBalancer",
+            account_id=account_id,
+            region=region,
+        )]
 
     for lb in lbs:
         arn = lb.get("LoadBalancerArn", "")
@@ -234,8 +250,16 @@ def check_elb_drop_invalid_headers(
     try:
         elbv2 = client.client("elbv2")
         lbs = elbv2.describe_load_balancers().get("LoadBalancers", [])
-    except ClientError:
-        return []
+    except ClientError as e:
+        return [Finding.not_assessed(
+            check_id="elb-drop-invalid-headers",
+            title="Unable to check ELB invalid header handling",
+            description=f"API call failed: {e}",
+            domain=CheckDomain.NETWORKING,
+            resource_type="AWS::ElasticLoadBalancingV2::LoadBalancer",
+            account_id=account_id,
+            region=region,
+        )]
 
     for lb in lbs:
         if lb.get("Type") != "application":
