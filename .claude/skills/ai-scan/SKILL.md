@@ -16,7 +16,7 @@ Read `shasta.config.json` for `python_cmd`, `aws_profile`, `azure_subscription_i
 
 Whitney (the code scanner) ships as a separate open-source tool at
 [github.com/transilienceai/whitney](https://github.com/transilienceai/whitney).
-If it isn't installed yet, run `pip install whitney-scanner` first.
+If it isn't installed yet, run `pip install whitney` first.
 This skill shells out to the `whitney` CLI for source-code findings
 and imports the Shasta cloud AI checks directly for cloud findings.
 

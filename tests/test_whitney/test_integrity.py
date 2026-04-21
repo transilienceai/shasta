@@ -36,7 +36,7 @@ class TestModulesExistAndHaveCode:
         "module_path",
         [
             # Whitney code scanner is now a standalone repo
-            # (github.com/transilienceai/whitney, pip install whitney-scanner).
+            # (github.com/transilienceai/whitney, pip install whitney).
             # Nothing under src/whitney/ in Shasta anymore.
             "shasta.aws.ai_sbom",
             # Cloud AI checks (now shasta.*)

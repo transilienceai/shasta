@@ -15,7 +15,7 @@ Whitney is a separate open-source tool shipped at
 Install it first if it is not already on `PATH`:
 
 ```bash
-pip install whitney-scanner
+pip install whitney
 ```
 
 The `whitney` CLI does the static detection. This skill wraps it with

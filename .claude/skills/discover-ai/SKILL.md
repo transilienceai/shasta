@@ -46,7 +46,7 @@ print(json.dumps(result, indent=2, default=str))
 
 Whitney is the standalone source-code scanner, shipped at
 [github.com/transilienceai/whitney](https://github.com/transilienceai/whitney).
-Install with `pip install whitney-scanner` if it is not already present.
+Install with `pip install whitney` if it is not already present.
 
 ```bash
 whitney scan . --json > /tmp/whitney-findings.json 2>/dev/null || echo '[]' > /tmp/whitney-findings.json

@@ -21,7 +21,7 @@ Semgrep architecture), see the standalone Whitney repo at
 
 Shasta and Whitney together ship the following, all integrity-tested:
 
-- **221 check functions** (221 cloud compliance + 0 AI governance — Whitney now ships as a separate repo at [github.com/transilienceai/whitney](https://github.com/transilienceai/whitney); install with `pip install whitney-scanner` for source-code scanning)
+- **221 check functions** (221 cloud compliance + 0 AI governance — Whitney now ships as a separate repo at [github.com/transilienceai/whitney](https://github.com/transilienceai/whitney); install with `pip install whitney` for source-code scanning)
 - **112 Terraform remediation templates** (81 AWS + 31 Azure)
 - **632 tests** that all pass on every commit
 

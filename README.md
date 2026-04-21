@@ -36,7 +36,7 @@ Whitney is Shasta's sibling open-source tool, shipped at
 [**github.com/transilienceai/whitney**](https://github.com/transilienceai/whitney).
 It is a pure static AI security scanner (prompt injection across 15 source
 types, broken LLM-as-judge detection, AI dependency SBOM) and installs
-as `pip install whitney-scanner`.
+as `pip install whitney`.
 
 The two tools are complementary:
 
@@ -47,7 +47,7 @@ The two tools are complementary:
 | **Findings carry** | CWE + OWASP LLM Top 10 + OWASP Agentic | SOC 2 + ISO 27001 + HIPAA + ISO 42001 + EU AI Act controls |
 | **Audience** | ML engineers, AI app devs, security researchers | Founders, compliance buyers, SOC 2 auditors |
 | **Runtime deps** | `semgrep` only (+ optional `anthropic` for triage) | `boto3`, `azure-*`, `pydantic`, `jinja2` |
-| **Install** | `pip install whitney-scanner` | `pip install -e .` from this repo |
+| **Install** | `pip install whitney` | `pip install -e .` from this repo |
 
 Shasta's `/ai-scan` and `/ai-code-review` skills shell out to the
 installed `whitney` CLI for source-code findings, then enrich the JSON
