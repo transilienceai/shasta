@@ -62,12 +62,7 @@ def check_service_account_key_rotation(
     """
     try:
         iam = client.service("iam", "v1")
-        sa_response = (
-            iam.projects()
-            .serviceAccounts()
-            .list(name=f"projects/{project_id}")
-            .execute()
-        )
+        sa_response = iam.projects().serviceAccounts().list(name=f"projects/{project_id}").execute()
         accounts = sa_response.get("accounts", [])
     except Exception as e:
         return [
@@ -105,6 +100,7 @@ def check_service_account_key_rotation(
     now = datetime.now(timezone.utc)
     threshold = now - timedelta(days=SA_KEY_MAX_AGE_DAYS)
     stale: list[dict[str, Any]] = []
+    access_errors: list[dict[str, str]] = []
     findings: list[Finding] = []
 
     for sa in accounts:
@@ -123,7 +119,8 @@ def check_service_account_key_rotation(
                 .execute()
             )
             keys = keys_resp.get("keys", [])
-        except Exception:
+        except Exception as e:
+            access_errors.append({"service_account": sa_email or sa_name, "error": str(e)})
             continue
 
         for key in keys:
@@ -146,52 +143,72 @@ def check_service_account_key_rotation(
                     }
                 )
 
-    if not stale:
-        return [
+    if stale:
+        findings.append(
             Finding(
                 check_id="gcp-iam-sa-key-rotation",
-                title=f"All user-managed SA keys are ≤{SA_KEY_MAX_AGE_DAYS} days old",
-                description=f"No stale user-managed service account keys found across {len(accounts)} accounts.",
-                severity=Severity.INFO,
-                status=ComplianceStatus.PASS,
+                title=f"{len(stale)} user-managed SA key(s) are >{SA_KEY_MAX_AGE_DAYS} days old",
+                description=(
+                    f"{len(stale)} user-managed service account key(s) have not been rotated within "
+                    f"{SA_KEY_MAX_AGE_DAYS} days. Long-lived keys expand the breach window if stolen. "
+                    "Prefer Workload Identity Federation over SA keys for GCE/GKE workloads."
+                ),
+                severity=Severity.HIGH,
+                status=ComplianceStatus.FAIL,
                 domain=CheckDomain.IAM,
                 resource_type="GCP::IAM::ServiceAccountKey",
                 resource_id=f"projects/{project_id}/serviceAccounts",
                 region=region,
                 account_id=project_id,
                 cloud_provider=CloudProvider.GCP,
+                remediation=(
+                    "Rotate or delete stale keys: "
+                    "`gcloud iam service-accounts keys delete KEY_ID --iam-account=SA_EMAIL`. "
+                    "For GCE/GKE workloads, migrate to Workload Identity Federation to eliminate "
+                    "key management entirely."
+                ),
                 soc2_controls=["CC6.3"],
                 cis_gcp_controls=["1.4"],
+                iso27001_controls=["A.8.3"],
+                details={"stale_keys": stale[:20]},
             )
-        ]
+        )
+
+    if access_errors:
+        finding = Finding.not_assessed(
+            check_id="gcp-iam-sa-key-rotation",
+            title="Some service account keys could not be assessed",
+            description=(
+                f"Unable to list user-managed keys for {len(access_errors)} service account(s). "
+                "The scan cannot prove all keys meet the rotation policy."
+            ),
+            domain=CheckDomain.IAM,
+            resource_type="GCP::IAM::ServiceAccountKey",
+            account_id=project_id,
+            region=region,
+            cloud_provider=CloudProvider.GCP,
+        )
+        finding.details["access_errors"] = access_errors[:20]
+        findings.append(finding)
+
+    if findings:
+        return findings
 
     return [
         Finding(
             check_id="gcp-iam-sa-key-rotation",
-            title=f"{len(stale)} user-managed SA key(s) are >{SA_KEY_MAX_AGE_DAYS} days old",
-            description=(
-                f"{len(stale)} user-managed service account key(s) have not been rotated within "
-                f"{SA_KEY_MAX_AGE_DAYS} days. Long-lived keys expand the breach window if stolen. "
-                "Prefer Workload Identity Federation over SA keys for GCE/GKE workloads."
-            ),
-            severity=Severity.HIGH,
-            status=ComplianceStatus.FAIL,
+            title=f"All user-managed SA keys are ≤{SA_KEY_MAX_AGE_DAYS} days old",
+            description=f"No stale user-managed service account keys found across {len(accounts)} accounts.",
+            severity=Severity.INFO,
+            status=ComplianceStatus.PASS,
             domain=CheckDomain.IAM,
             resource_type="GCP::IAM::ServiceAccountKey",
             resource_id=f"projects/{project_id}/serviceAccounts",
             region=region,
             account_id=project_id,
             cloud_provider=CloudProvider.GCP,
-            remediation=(
-                "Rotate or delete stale keys: "
-                "`gcloud iam service-accounts keys delete KEY_ID --iam-account=SA_EMAIL`. "
-                "For GCE/GKE workloads, migrate to Workload Identity Federation to eliminate "
-                "key management entirely."
-            ),
             soc2_controls=["CC6.3"],
             cis_gcp_controls=["1.4"],
-            iso27001_controls=["A.8.3"],
-            details={"stale_keys": stale[:20]},
         )
     ]
 
@@ -368,9 +385,7 @@ def check_primitive_roles_not_used(
     ]
 
 
-def check_iam_no_allusers_access(
-    client: GCPClient, project_id: str, region: str
-) -> list[Finding]:
+def check_iam_no_allusers_access(client: GCPClient, project_id: str, region: str) -> list[Finding]:
     """[CIS 1.2] allUsers and allAuthenticatedUsers should not appear in IAM policies.
 
     These special members grant access to the public internet. A project-level
@@ -563,12 +578,7 @@ def check_iam_workload_identity_preferred(
     """
     try:
         iam = client.service("iam", "v1")
-        sa_response = (
-            iam.projects()
-            .serviceAccounts()
-            .list(name=f"projects/{project_id}")
-            .execute()
-        )
+        sa_response = iam.projects().serviceAccounts().list(name=f"projects/{project_id}").execute()
         accounts = sa_response.get("accounts", [])
     except Exception as e:
         return [
@@ -586,6 +596,7 @@ def check_iam_workload_identity_preferred(
 
     total_user_keys = 0
     sa_with_keys: list[str] = []
+    access_errors: list[dict[str, str]] = []
     for sa in accounts:
         sa_name = sa.get("name", "")
         try:
@@ -600,8 +611,27 @@ def check_iam_workload_identity_preferred(
             if count > 0:
                 total_user_keys += count
                 sa_with_keys.append(sa.get("email", sa_name))
-        except Exception:
+        except Exception as e:
+            access_errors.append({"service_account": sa.get("email", sa_name), "error": str(e)})
             continue
+
+    if access_errors:
+        finding = Finding.not_assessed(
+            check_id="gcp-iam-workload-identity",
+            title="Some service account keys could not be assessed",
+            description=(
+                f"Unable to list user-managed keys for {len(access_errors)} service account(s). "
+                "The scan cannot prove Workload Identity is used everywhere."
+            ),
+            domain=CheckDomain.IAM,
+            resource_type="GCP::IAM::ServiceAccount",
+            account_id=project_id,
+            region=region,
+            cloud_provider=CloudProvider.GCP,
+        )
+        finding.details["access_errors"] = access_errors[:20]
+        if total_user_keys == 0:
+            return [finding]
 
     if total_user_keys == 0:
         return [
@@ -626,7 +656,7 @@ def check_iam_workload_identity_preferred(
             )
         ]
 
-    return [
+    findings = [
         Finding(
             check_id="gcp-iam-workload-identity",
             title=f"{total_user_keys} user-managed SA key(s) across {len(sa_with_keys)} account(s)",
@@ -658,3 +688,6 @@ def check_iam_workload_identity_preferred(
             },
         )
     ]
+    if access_errors:
+        findings.append(finding)
+    return findings

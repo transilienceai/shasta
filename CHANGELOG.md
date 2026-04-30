@@ -4,6 +4,23 @@ All notable changes to Shasta are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+- Add GCP compliance scanning coverage across IAM, networking, storage,
+  encryption, logging, compute, and Cloud Run, including CIS GCP mappings,
+  Google provider Terraform remediation templates, GCP dependencies, and
+  GCP smoke/functional tests.
+
+### Fixed
+- Surface GCP domain, project, IAM, and GCS per-resource API failures as
+  `NOT_ASSESSED` findings instead of silently dropping checks or reporting
+  false `PASS` results.
+- Use Cloud Resource Manager's `projects/NUMBER` resource name when recording
+  GCP project numbers.
+- Render GCP provider labels and CIS GCP controls in Markdown, HTML,
+  consolidated reports, and dashboard finding details.
+
 ## [1.6.1] — 2026-04-11 — Prod-scan bug sweep
 
 Five bugs surfaced during a live SOC 2 / ISO 27001 / HIPAA / Whitney scan

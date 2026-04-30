@@ -80,9 +80,7 @@ class GCPClient:
                 if not self._project_id and project_id:
                     self._project_id = project_id
             except ImportError:
-                raise GCPClientError(
-                    "GCP SDK not installed. Run: pip install -e '.[gcp]'"
-                )
+                raise GCPClientError("GCP SDK not installed. Run: pip install -e '.[gcp]'")
             except Exception as e:
                 raise GCPClientError(f"Failed to obtain GCP credentials: {e}")
         return self._credentials
@@ -175,7 +173,9 @@ class GCPClient:
 
             self._account_info = GCPProjectInfo(
                 project_id=self._project_id,
-                project_number=project.get("projectId", self._project_id),
+                project_number=project.get("name", "").replace("projects/", "")
+                or project.get("projectNumber", "")
+                or self._project_id,
                 project_name=project.get("displayName", self._project_id),
                 principal=principal,
                 region=self._region,
@@ -242,7 +242,9 @@ class GCPClient:
             return out
         except Exception:
             pid = self._project_id or "unknown"
-            return [{"project_id": pid, "display_name": "", "project_number": "", "state": "ACTIVE"}]
+            return [
+                {"project_id": pid, "display_name": "", "project_number": "", "state": "ACTIVE"}
+            ]
 
     def for_project(self, project_id: str) -> "GCPClient":
         """Return a sibling GCPClient bound to a different project.
@@ -275,16 +277,8 @@ class GCPClient:
         """Return all available GCP compute regions for this project."""
         try:
             compute = self.service("compute", "v1")
-            response = (
-                compute.regions()
-                .list(project=self.project_id)
-                .execute()
-            )
-            return sorted(
-                r["name"]
-                for r in response.get("items", [])
-                if r.get("status") == "UP"
-            )
+            response = compute.regions().list(project=self.project_id).execute()
+            return sorted(r["name"] for r in response.get("items", []) if r.get("status") == "UP")
         except Exception:
             return list(_FALLBACK_REGIONS)
 

@@ -1,6 +1,6 @@
 """Shasta compliance scanner — orchestrates all check modules.
 
-Supports multi-cloud scanning (AWS + Azure) with unified compliance
+Supports multi-cloud scanning (AWS + Azure + GCP) with unified compliance
 framework mapping and multi-region AWS scanning.
 """
 
@@ -75,9 +75,7 @@ def run_full_scan(
         region = azure_client.account_info.region if azure_client.account_info else "unknown"
         cloud_provider = CloudProvider.AZURE
     elif gcp_client is not None:
-        account_id = (
-            gcp_client.account_info.project_id if gcp_client.account_info else "unknown"
-        )
+        account_id = gcp_client.account_info.project_id if gcp_client.account_info else "unknown"
         region = gcp_client.account_info.region if gcp_client.account_info else "unknown"
         cloud_provider = CloudProvider.GCP
 
@@ -456,8 +454,9 @@ def _run_gcp_checks(gcp_client: Any, domains: list[CheckDomain]) -> list[Finding
         if runner:
             try:
                 findings.extend(runner(gcp_client))
-            except Exception:
-                pass
+            except Exception as e:
+                runner_name = getattr(runner, "__name__", f"{domain.value} runner")
+                findings.append(_gcp_not_assessed(gcp_client, domain, runner_name, e))
 
     # Cloud Run (serverless compute + networking + encryption checks)
     if CheckDomain.COMPUTE in domains or CheckDomain.NETWORKING in domains:
@@ -465,10 +464,41 @@ def _run_gcp_checks(gcp_client: Any, domains: list[CheckDomain]) -> list[Finding
             from shasta.gcp.cloud_run import run_all_gcp_cloud_run_checks
 
             findings.extend(run_all_gcp_cloud_run_checks(gcp_client))
-        except Exception:
-            pass
+        except Exception as e:
+            findings.append(
+                _gcp_not_assessed(
+                    gcp_client,
+                    CheckDomain.COMPUTE,
+                    "run_all_gcp_cloud_run_checks",
+                    e,
+                )
+            )
 
     return findings
+
+
+def _gcp_not_assessed(
+    gcp_client: Any,
+    domain: CheckDomain,
+    runner_name: str,
+    error: Exception,
+) -> Finding:
+    """Create a visible GCP scan failure instead of silently dropping a domain."""
+    account_info = getattr(gcp_client, "account_info", None)
+    project_id = getattr(account_info, "project_id", None) or getattr(
+        gcp_client, "_project_id", "unknown"
+    )
+    region = getattr(account_info, "region", "unknown")
+    return Finding.not_assessed(
+        check_id=f"gcp-{domain.value}-scan-error",
+        title=f"GCP {domain.value} checks could not be assessed",
+        description=f"{runner_name} failed before completing: {error}",
+        domain=domain,
+        resource_type="GCP::Project",
+        account_id=project_id,
+        region=region,
+        cloud_provider=CloudProvider.GCP,
+    )
 
 
 def run_gcp_multi_project(
@@ -490,6 +520,17 @@ def run_gcp_multi_project(
             sib = gcp_client.for_project(pid)
             sib.validate_credentials()
             findings.extend(_run_gcp_checks(sib, domains))
-        except Exception:
-            continue
+        except Exception as e:
+            findings.append(
+                Finding.not_assessed(
+                    check_id="gcp-project-scan-error",
+                    title=f"GCP project {pid} could not be assessed",
+                    description=f"Project-level scan failed before checks completed: {e}",
+                    domain=CheckDomain.IAM,
+                    resource_type="GCP::Project",
+                    account_id=pid,
+                    region="unknown",
+                    cloud_provider=CloudProvider.GCP,
+                )
+            )
     return findings

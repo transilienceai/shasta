@@ -28,8 +28,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -232,17 +230,17 @@ def test_readme_total_check_count() -> None:
         README,
         r"Multi-Cloud Security Scanning \(\d+ Domains, (\d+)\+? Checks\)",
         actual=shasta_check_count(),
-        description="Shasta check_* function count (AWS + Azure)",
+        description="Shasta check_* function count (AWS + Azure + GCP)",
         tolerance=2,
     )
 
 
 def test_readme_technical_controls_check_count() -> None:
     """The 'Technical cloud controls' table row must match total checks."""
-    # Matches: '125+ automated checks across AWS and Azure'
+    # Matches: '125+ automated checks across AWS, Azure, and GCP'
     assert_claim(
         README,
-        r"\| (\d+)\+? automated checks across AWS and Azure",
+        r"\| (\d+)\+? automated checks across AWS, Azure, and GCP",
         actual=shasta_check_count(),
         description="Shasta automated checks (technical-controls table row)",
         tolerance=2,
@@ -258,7 +256,9 @@ def test_readme_intro_total_check_count() -> None:
     grand total, not just the Shasta-only count.
     """
     text = README.read_text(encoding="utf-8")
-    pattern = re.compile(r"(\d+)\s+automated checks(?!\s+across AWS and Azure)")
+    pattern = re.compile(
+        r"(\d+)\s+automated checks(?!\s+across AWS, Azure, and GCP)"
+    )
     for lineno, line in enumerate(text.splitlines(), start=1):
         if "~~" in line:
             continue

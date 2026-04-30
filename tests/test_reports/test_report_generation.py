@@ -8,8 +8,6 @@ Covers provider-aware labelling, content correctness, and file I/O for:
 
 from __future__ import annotations
 
-import pytest
-
 from shasta.evidence.models import (
     CheckDomain,
     CloudProvider,
@@ -113,6 +111,12 @@ class TestProviderLabels:
     def test_provider_labels_dict_has_both(self):
         assert "aws" in PROVIDER_LABELS
         assert "azure" in PROVIDER_LABELS
+        assert "gcp" in PROVIDER_LABELS
+
+    def test_gcp_labels(self):
+        labels = _provider_labels(CloudProvider.GCP)
+        assert labels["account_label"] == "GCP Project"
+        assert labels["console"] == "Google Cloud console"
 
 
 # ---------------------------------------------------------------------------
@@ -134,6 +138,14 @@ class TestMarkdownReport:
         report = generate_markdown_report(scan)
         assert "Azure Subscription:" in report
         assert "AWS Account:" not in report
+
+    def test_markdown_report_gcp_provider(self):
+        scan = _make_scan(cloud_provider=CloudProvider.GCP)
+        scan.findings[0].cis_gcp_controls = ["1.4"]
+        report = generate_markdown_report(scan)
+        assert "GCP Project:" in report
+        assert "AWS Account:" not in report
+        assert "CIS GCP Control(s):" in report
 
     def test_markdown_contains_findings(self):
         scan = _make_scan()
@@ -197,6 +209,14 @@ class TestHtmlReport:
         report = generate_html_report(scan)
         assert "Azure Subscription:" in report
         assert "AWS Account:" not in report
+
+    def test_html_report_gcp_provider(self):
+        scan = _make_scan(cloud_provider=CloudProvider.GCP)
+        scan.findings[0].cis_gcp_controls = ["1.4"]
+        report = generate_html_report(scan)
+        assert "GCP Project:" in report
+        assert "AWS Account:" not in report
+        assert "CIS GCP:" in report
 
     def test_html_is_valid_document(self):
         scan = _make_scan()

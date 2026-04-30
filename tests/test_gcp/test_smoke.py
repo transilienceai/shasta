@@ -14,7 +14,13 @@ import inspect
 
 import pytest
 
-from shasta.evidence.models import CheckDomain, CloudProvider, Finding, Severity
+from shasta.evidence.models import (
+    CheckDomain,
+    CloudProvider,
+    ComplianceStatus,
+    Finding,
+    Severity,
+)
 
 
 GCP_MODULES = [
@@ -108,6 +114,45 @@ def test_run_gcp_checks_returns_list(mock_gcp_client) -> None:
     assert isinstance(findings, list)
 
 
+def test_run_gcp_checks_returns_not_assessed_when_runner_raises(mock_gcp_client) -> None:
+    """A broken GCP domain runner must be visible instead of silently dropped."""
+    from unittest.mock import patch
+
+    from shasta.scanner import _run_gcp_checks
+
+    with patch("shasta.gcp.iam.run_all_gcp_iam_checks", side_effect=RuntimeError("boom")):
+        findings = _run_gcp_checks(mock_gcp_client, [CheckDomain.IAM])
+
+    assert findings
+    assert findings[0].status == ComplianceStatus.NOT_ASSESSED
+    assert findings[0].check_id == "gcp-iam-scan-error"
+    assert findings[0].cloud_provider == CloudProvider.GCP
+
+
+def test_gcp_client_project_number_uses_resource_name() -> None:
+    """Cloud Resource Manager v3 project number comes from name=projects/NUMBER."""
+    from unittest.mock import MagicMock, patch
+
+    from shasta.gcp.client import GCPClient
+
+    crm = MagicMock()
+    crm.projects.return_value.get.return_value.execute.return_value = {
+        "name": "projects/123456789",
+        "projectId": "my-project",
+        "displayName": "My Project",
+    }
+
+    client = GCPClient(project_id="my-project", credentials=object())
+    with (
+        patch.object(client, "service", return_value=crm),
+        patch.object(client, "_get_principal", return_value="user@example.com"),
+    ):
+        info = client.validate_credentials()
+
+    assert info.project_id == "my-project"
+    assert info.project_number == "123456789"
+
+
 def test_run_gcp_multi_project(mock_gcp_client) -> None:
     """run_gcp_multi_project iterates provided project_ids."""
     from unittest.mock import patch
@@ -121,11 +166,25 @@ def test_run_gcp_multi_project(mock_gcp_client) -> None:
     mock_gcp_client.validate_credentials.return_value = None
 
     with patch("shasta.scanner._run_gcp_checks", return_value=[]) as mock_run:
-        results = run_gcp_multi_project(
-            mock_gcp_client, [CheckDomain.IAM], ["proj-a", "proj-b"]
-        )
+        results = run_gcp_multi_project(mock_gcp_client, [CheckDomain.IAM], ["proj-a", "proj-b"])
     assert isinstance(results, list)
     assert mock_run.call_count == 2
+
+
+def test_run_gcp_multi_project_returns_not_assessed_when_project_fails(
+    mock_gcp_client,
+) -> None:
+    """A failed project scan should be visible in multi-project mode."""
+    from shasta.scanner import run_gcp_multi_project
+
+    mock_gcp_client.for_project.side_effect = RuntimeError("no access")
+
+    results = run_gcp_multi_project(mock_gcp_client, [CheckDomain.IAM], ["proj-a"])
+
+    assert len(results) == 1
+    assert results[0].status == ComplianceStatus.NOT_ASSESSED
+    assert results[0].check_id == "gcp-project-scan-error"
+    assert results[0].account_id == "proj-a"
 
 
 def test_gcp_cloud_provider_enum() -> None:
