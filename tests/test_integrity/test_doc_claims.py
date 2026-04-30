@@ -61,12 +61,16 @@ def azure_check_count() -> int:
     return _ast_count_functions(REPO_ROOT / "src" / "shasta" / "azure", "check_")
 
 
+def gcp_check_count() -> int:
+    return _ast_count_functions(REPO_ROOT / "src" / "shasta" / "gcp", "check_")
+
+
 def whitney_check_count() -> int:
     return _ast_count_functions(REPO_ROOT / "src" / "whitney", "check_")
 
 
 def shasta_check_count() -> int:
-    return aws_check_count() + azure_check_count()
+    return aws_check_count() + azure_check_count() + gcp_check_count()
 
 
 def total_check_count() -> int:
@@ -82,13 +86,22 @@ def finding_to_risk_count() -> int:
 def aws_terraform_template_count() -> int:
     from shasta.remediation.engine import TERRAFORM_TEMPLATES
 
-    return sum(1 for k in TERRAFORM_TEMPLATES if not k.startswith("azure-"))
+    return sum(
+        1 for k in TERRAFORM_TEMPLATES
+        if not k.startswith("azure-") and not k.startswith("gcp-")
+    )
 
 
 def azure_terraform_template_count() -> int:
     from shasta.remediation.engine import TERRAFORM_TEMPLATES
 
     return sum(1 for k in TERRAFORM_TEMPLATES if k.startswith("azure-"))
+
+
+def gcp_terraform_template_count() -> int:
+    from shasta.remediation.engine import TERRAFORM_TEMPLATES
+
+    return sum(1 for k in TERRAFORM_TEMPLATES if k.startswith("gcp-"))
 
 
 def total_terraform_template_count() -> int:
@@ -324,10 +337,11 @@ def test_readme_test_count_in_tree_block() -> None:
 
 
 def test_readme_terraform_template_breakdown() -> None:
-    """The remediation-row 'X Terraform templates (Y AWS + Z Azure)' must match registry."""
+    """The remediation-row 'X Terraform templates (Y AWS + Z Azure + W GCP)' must match registry."""
     text = README.read_text(encoding="utf-8")
+    # Accept "(Y AWS + Z Azure[...] + W GCP[...])" — optional trailing words like "azurerm" / "google"
     pattern = re.compile(
-        r"(\d+)\s+Terraform templates?\s+\((\d+)\s+AWS\s*\+\s*(\d+)\s+Azure"
+        r"(\d+)\s+Terraform templates?\s+\((\d+)\s+AWS\s*\+\s*(\d+)\s+Azure(?:\s+\w+)?(?:\s*\+\s*(\d+)\s+GCP)?"
     )
     matches = []
     for lineno, line in enumerate(text.splitlines(), start=1):
@@ -336,17 +350,21 @@ def test_readme_terraform_template_breakdown() -> None:
         m = pattern.search(line)
         if m:
             matches.append((lineno, m))
-    assert matches, "README has no live 'X Terraform templates (Y AWS + Z Azure)' claim"
+    assert matches, "README has no live 'X Terraform templates (Y AWS + Z Azure ...)' claim"
 
     actual_total = total_terraform_template_count()
     actual_aws = aws_terraform_template_count()
     actual_az = azure_terraform_template_count()
+    actual_gcp = gcp_terraform_template_count()
 
     for lineno, m in matches:
-        total, aws, az = (int(m.group(i)) for i in (1, 2, 3))
-        assert (total, aws, az) == (actual_total, actual_aws, actual_az), (
-            f"README.md:{lineno} claims {total} templates ({aws} AWS + {az} Azure) "
-            f"but registry has {actual_total} ({actual_aws} AWS + {actual_az} Azure)."
+        total = int(m.group(1))
+        aws = int(m.group(2))
+        az = int(m.group(3))
+        gcp = int(m.group(4)) if m.group(4) else 0
+        assert (total, aws, az, gcp) == (actual_total, actual_aws, actual_az, actual_gcp), (
+            f"README.md:{lineno} claims {total} templates ({aws} AWS + {az} Azure + {gcp} GCP) "
+            f"but registry has {actual_total} ({actual_aws} AWS + {actual_az} Azure + {actual_gcp} GCP)."
         )
 
 
