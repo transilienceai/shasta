@@ -10,7 +10,7 @@ forward-looking discipline. Principles say what we promise to do.
 Trust says how you check that we did it.
 
 For the Whitney AI scanner's specific validation story (vulnerability
-fixtures, live cloud validation against AWS + Azure, dual-engine
+fixtures, live cloud validation across AWS, Azure, and GCP, dual-engine
 Semgrep architecture), see the standalone Whitney repo at
 [github.com/transilienceai/whitney](https://github.com/transilienceai/whitney).
 (`src/whitney/TRUST.md` was retired in the 2026-04-13 Whitney/Shasta split.)
@@ -58,7 +58,7 @@ Every finding is produced by:
 
 | Mechanism | Used in |
 |---|---|
-| `boto3` / `azure.mgmt.*` SDK calls | All AWS / Azure cloud checks |
+| `boto3` / `azure.mgmt.*` / Google Cloud SDK calls | AWS, Azure, and GCP cloud checks |
 | Semgrep AST-based pattern matching (with regex fallback) | Whitney code scanning |
 | Dictionary lookups | Framework control mapping |
 | Arithmetic | Compliance scoring |

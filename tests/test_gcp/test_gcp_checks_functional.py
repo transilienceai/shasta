@@ -12,9 +12,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
-from shasta.evidence.models import ComplianceStatus, Finding
+from shasta.evidence.models import ComplianceStatus
 
 
 PROJECT_ID = "test-project"
@@ -833,6 +831,55 @@ class TestFindingShape:
             assert f.soc2_controls or f.cis_gcp_controls, (
                 f"{f.check_id} should have compliance controls populated"
             )
+
+    def test_storage_bucket_policy_error_is_not_assessed_not_pass(self):
+        from shasta.gcp.storage import check_bucket_no_public_access
+
+        client = _make_client()
+
+        mock_bucket = MagicMock()
+        mock_bucket.name = "unknown-access-bucket"
+        mock_bucket.get_iam_policy.side_effect = Exception("permission denied")
+
+        storage_client = MagicMock()
+        storage_client.list_buckets.return_value = [mock_bucket]
+        client.storage_client.return_value = storage_client
+
+        findings = check_bucket_no_public_access(client, PROJECT_ID)
+        assert findings
+        assert any(f.status == ComplianceStatus.NOT_ASSESSED for f in findings)
+        assert not any(f.status == ComplianceStatus.PASS for f in findings)
+
+    def test_storage_bucket_attribute_errors_are_not_assessed_not_pass(self):
+        from shasta.gcp.storage import (
+            check_bucket_access_logging_enabled,
+            check_bucket_retention_policy,
+        )
+
+        for check in (
+            check_bucket_access_logging_enabled,
+            check_bucket_retention_policy,
+        ):
+            client = _make_client()
+
+            class InaccessibleBucket:
+                name = "unknown-access-bucket"
+
+                def get_logging_config(self):
+                    raise Exception("permission denied")
+
+                @property
+                def retention_policy(self):
+                    raise Exception("permission denied")
+
+            storage_client = MagicMock()
+            storage_client.list_buckets.return_value = [InaccessibleBucket()]
+            client.storage_client.return_value = storage_client
+
+            findings = check(client, PROJECT_ID)
+            assert findings
+            assert any(f.status == ComplianceStatus.NOT_ASSESSED for f in findings)
+            assert not any(f.status == ComplianceStatus.PASS for f in findings)
 
     def test_networking_findings_cloud_provider_is_gcp(self):
         from shasta.gcp.networking import check_firewall_no_unrestricted_ssh

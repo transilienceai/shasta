@@ -31,6 +31,7 @@ def _enrich_all_frameworks(findings):
     enrich_findings_with_hipaa(findings)
     return findings
 
+
 router = APIRouter()
 
 
@@ -195,6 +196,7 @@ async def finding_detail(request: Request, finding_id: str):
 
     # Get mapped controls
     soc2_controls = finding.soc2_controls
+    cis_gcp_controls = finding.cis_gcp_controls
     iso_controls = finding.details.get("iso27001_controls", [])
     hipaa_controls = finding.details.get("hipaa_controls", [])
 
@@ -204,6 +206,7 @@ async def finding_detail(request: Request, finding_id: str):
             "request": request,
             "finding": finding,
             "soc2_controls": soc2_controls,
+            "cis_gcp_controls": cis_gcp_controls,
             "iso_controls": iso_controls,
             "hipaa_controls": hipaa_controls,
             "details_json": json.dumps(finding.details, indent=2, default=str),

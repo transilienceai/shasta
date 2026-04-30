@@ -42,9 +42,7 @@ def _list_buckets(client: GCPClient, project_id: str) -> list[Any]:
     return list(storage.list_buckets(project=project_id))
 
 
-def check_bucket_no_public_access(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_bucket_no_public_access(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 5.1] GCS buckets should not allow allUsers or allAuthenticatedUsers.
 
     Public buckets expose all objects to the internet. Even buckets without sensitive
@@ -88,20 +86,20 @@ def check_bucket_no_public_access(
         ]
 
     public_buckets: list[dict[str, str]] = []
+    access_errors: list[dict[str, str]] = []
     for bucket in buckets:
         try:
             policy = bucket.get_iam_policy(requested_policy_version=3)
             for binding in policy.bindings:
                 members = list(binding.get("members", []))
                 if "allUsers" in members or "allAuthenticatedUsers" in members:
-                    public_buckets.append(
-                        {"bucket": bucket.name, "role": binding.get("role", "")}
-                    )
+                    public_buckets.append({"bucket": bucket.name, "role": binding.get("role", "")})
                     break
-        except Exception:
+        except Exception as e:
+            access_errors.append({"bucket": getattr(bucket, "name", "unknown"), "error": str(e)})
             continue
 
-    if not public_buckets:
+    if not public_buckets and not access_errors:
         return [
             Finding(
                 check_id="gcp-storage-bucket-public-access",
@@ -120,41 +118,58 @@ def check_bucket_no_public_access(
             )
         ]
 
-    return [
-        Finding(
+    findings: list[Finding] = []
+    if public_buckets:
+        findings.append(
+            Finding(
+                check_id="gcp-storage-bucket-public-access",
+                title=f"{len(public_buckets)} GCS bucket(s) are publicly accessible",
+                description=(
+                    f"{len(public_buckets)} bucket(s) grant access to allUsers or "
+                    "allAuthenticatedUsers. These buckets are readable from the internet."
+                ),
+                severity=Severity.CRITICAL,
+                status=ComplianceStatus.FAIL,
+                domain=CheckDomain.STORAGE,
+                resource_type="GCP::Storage::Bucket",
+                resource_id=f"projects/{project_id}",
+                region=region,
+                account_id=project_id,
+                cloud_provider=CloudProvider.GCP,
+                remediation=(
+                    "Remove public access: `gcloud storage buckets remove-iam-policy-binding "
+                    "gs://BUCKET_NAME --member=allUsers --role=ROLE`. "
+                    "Enable 'Public Access Prevention' at the org or project level to block "
+                    "future public grants: `gcloud resource-manager org-policies enable-enforce "
+                    "constraints/storage.publicAccessPrevention --project=PROJECT_ID`."
+                ),
+                soc2_controls=["CC6.7"],
+                cis_gcp_controls=["5.1"],
+                iso27001_controls=["A.8.3"],
+                hipaa_controls=["164.312(c)(1)"],
+                details={"public_buckets": public_buckets[:20]},
+            )
+        )
+    if access_errors:
+        finding = Finding.not_assessed(
             check_id="gcp-storage-bucket-public-access",
-            title=f"{len(public_buckets)} GCS bucket(s) are publicly accessible",
+            title="Some GCS bucket IAM policies could not be assessed",
             description=(
-                f"{len(public_buckets)} bucket(s) grant access to allUsers or "
-                "allAuthenticatedUsers. These buckets are readable from the internet."
+                f"Unable to read IAM policy for {len(access_errors)} bucket(s). "
+                "The scan cannot prove every bucket is non-public."
             ),
-            severity=Severity.CRITICAL,
-            status=ComplianceStatus.FAIL,
             domain=CheckDomain.STORAGE,
             resource_type="GCP::Storage::Bucket",
-            resource_id=f"projects/{project_id}",
-            region=region,
             account_id=project_id,
+            region=region,
             cloud_provider=CloudProvider.GCP,
-            remediation=(
-                "Remove public access: `gcloud storage buckets remove-iam-policy-binding "
-                "gs://BUCKET_NAME --member=allUsers --role=ROLE`. "
-                "Enable 'Public Access Prevention' at the org or project level to block "
-                "future public grants: `gcloud resource-manager org-policies enable-enforce "
-                "constraints/storage.publicAccessPrevention --project=PROJECT_ID`."
-            ),
-            soc2_controls=["CC6.7"],
-            cis_gcp_controls=["5.1"],
-            iso27001_controls=["A.8.3"],
-            hipaa_controls=["164.312(c)(1)"],
-            details={"public_buckets": public_buckets[:20]},
         )
-    ]
+        finding.details["access_errors"] = access_errors[:20]
+        findings.append(finding)
+    return findings
 
 
-def check_bucket_uniform_access_enabled(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_bucket_uniform_access_enabled(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 5.2] Uniform bucket-level access should be enabled on all GCS buckets.
 
     When uniform access is disabled, individual objects can have ACLs that override
@@ -183,15 +198,17 @@ def check_bucket_uniform_access_enabled(
         return []
 
     missing: list[str] = []
+    access_errors: list[dict[str, str]] = []
     for bucket in buckets:
         try:
             iam_config = bucket.iam_configuration
             if not getattr(iam_config, "uniform_bucket_level_access_enabled", False):
                 missing.append(bucket.name)
-        except Exception:
+        except Exception as e:
+            access_errors.append({"bucket": getattr(bucket, "name", "unknown"), "error": str(e)})
             continue
 
-    if not missing:
+    if not missing and not access_errors:
         return [
             Finding(
                 check_id="gcp-storage-uniform-access",
@@ -210,39 +227,56 @@ def check_bucket_uniform_access_enabled(
             )
         ]
 
-    return [
-        Finding(
+    findings: list[Finding] = []
+    if missing:
+        findings.append(
+            Finding(
+                check_id="gcp-storage-uniform-access",
+                title=f"{len(missing)} GCS bucket(s) have ACL-based (non-uniform) access",
+                description=(
+                    f"{len(missing)} bucket(s) do not have uniform bucket-level access enabled: "
+                    f"{', '.join(missing[:10])}{'...' if len(missing) > 10 else ''}. "
+                    "Object-level ACLs can bypass bucket IAM policies, making access control "
+                    "hard to audit."
+                ),
+                severity=Severity.MEDIUM,
+                status=ComplianceStatus.FAIL,
+                domain=CheckDomain.STORAGE,
+                resource_type="GCP::Storage::Bucket",
+                resource_id=f"projects/{project_id}",
+                region=region,
+                account_id=project_id,
+                cloud_provider=CloudProvider.GCP,
+                remediation=(
+                    "Enable uniform access: `gcloud storage buckets update gs://BUCKET_NAME "
+                    "--uniform-bucket-level-access`. Note: once enabled for 90+ days, this "
+                    "cannot be reverted."
+                ),
+                soc2_controls=["CC6.7"],
+                cis_gcp_controls=["5.2"],
+                details={"buckets_without_uniform_access": missing},
+            )
+        )
+    if access_errors:
+        finding = Finding.not_assessed(
             check_id="gcp-storage-uniform-access",
-            title=f"{len(missing)} GCS bucket(s) have ACL-based (non-uniform) access",
+            title="Some GCS bucket access modes could not be assessed",
             description=(
-                f"{len(missing)} bucket(s) do not have uniform bucket-level access enabled: "
-                f"{', '.join(missing[:10])}{'...' if len(missing) > 10 else ''}. "
-                "Object-level ACLs can bypass bucket IAM policies, making access control "
-                "hard to audit."
+                f"Unable to read uniform bucket-level access settings for "
+                f"{len(access_errors)} bucket(s)."
             ),
-            severity=Severity.MEDIUM,
-            status=ComplianceStatus.FAIL,
             domain=CheckDomain.STORAGE,
             resource_type="GCP::Storage::Bucket",
-            resource_id=f"projects/{project_id}",
-            region=region,
             account_id=project_id,
+            region=region,
             cloud_provider=CloudProvider.GCP,
-            remediation=(
-                "Enable uniform access: `gcloud storage buckets update gs://BUCKET_NAME "
-                "--uniform-bucket-level-access`. Note: once enabled for 90+ days, this "
-                "cannot be reverted."
-            ),
-            soc2_controls=["CC6.7"],
-            cis_gcp_controls=["5.2"],
-            details={"buckets_without_uniform_access": missing},
         )
-    ]
+        finding.details["access_errors"] = access_errors[:20]
+        findings.append(finding)
+    return findings
 
 
-def check_bucket_versioning_enabled(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_bucket_versioning_enabled(client: GCPClient, project_id: str) -> list[Finding]:
     """GCS buckets storing important data should have versioning enabled.
 
     Versioning protects against accidental or malicious deletion and overwrites.
@@ -270,14 +304,16 @@ def check_bucket_versioning_enabled(
         return []
 
     missing: list[str] = []
+    access_errors: list[dict[str, str]] = []
     for bucket in buckets:
         try:
             if not bucket.versioning_enabled:
                 missing.append(bucket.name)
-        except Exception:
+        except Exception as e:
+            access_errors.append({"bucket": getattr(bucket, "name", "unknown"), "error": str(e)})
             continue
 
-    if not missing:
+    if not missing and not access_errors:
         return [
             Finding(
                 check_id="gcp-storage-versioning",
@@ -296,38 +332,52 @@ def check_bucket_versioning_enabled(
             )
         ]
 
-    return [
-        Finding(
+    findings: list[Finding] = []
+    if missing:
+        findings.append(
+            Finding(
+                check_id="gcp-storage-versioning",
+                title=f"{len(missing)} GCS bucket(s) do not have versioning enabled",
+                description=(
+                    f"{len(missing)} bucket(s) do not have object versioning: "
+                    f"{', '.join(missing[:10])}{'...' if len(missing) > 10 else ''}. "
+                    "Without versioning, deleted or overwritten objects cannot be recovered."
+                ),
+                severity=Severity.MEDIUM,
+                status=ComplianceStatus.FAIL,
+                domain=CheckDomain.STORAGE,
+                resource_type="GCP::Storage::Bucket",
+                resource_id=f"projects/{project_id}",
+                region=region,
+                account_id=project_id,
+                cloud_provider=CloudProvider.GCP,
+                remediation=(
+                    "Enable versioning: `gcloud storage buckets update gs://BUCKET_NAME "
+                    "--versioning`. Add a lifecycle rule to expire old versions after N days "
+                    "to control storage costs."
+                ),
+                soc2_controls=["CC6.7"],
+                cis_gcp_controls=["5.3"],
+                details={"buckets_without_versioning": missing},
+            )
+        )
+    if access_errors:
+        finding = Finding.not_assessed(
             check_id="gcp-storage-versioning",
-            title=f"{len(missing)} GCS bucket(s) do not have versioning enabled",
-            description=(
-                f"{len(missing)} bucket(s) do not have object versioning: "
-                f"{', '.join(missing[:10])}{'...' if len(missing) > 10 else ''}. "
-                "Without versioning, deleted or overwritten objects cannot be recovered."
-            ),
-            severity=Severity.MEDIUM,
-            status=ComplianceStatus.FAIL,
+            title="Some GCS bucket versioning settings could not be assessed",
+            description=f"Unable to read versioning settings for {len(access_errors)} bucket(s).",
             domain=CheckDomain.STORAGE,
             resource_type="GCP::Storage::Bucket",
-            resource_id=f"projects/{project_id}",
-            region=region,
             account_id=project_id,
+            region=region,
             cloud_provider=CloudProvider.GCP,
-            remediation=(
-                "Enable versioning: `gcloud storage buckets update gs://BUCKET_NAME "
-                "--versioning`. Add a lifecycle rule to expire old versions after N days "
-                "to control storage costs."
-            ),
-            soc2_controls=["CC6.7"],
-            cis_gcp_controls=["5.3"],
-            details={"buckets_without_versioning": missing},
         )
-    ]
+        finding.details["access_errors"] = access_errors[:20]
+        findings.append(finding)
+    return findings
 
 
-def check_bucket_access_logging_enabled(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_bucket_access_logging_enabled(client: GCPClient, project_id: str) -> list[Finding]:
     """GCS buckets should have access logging enabled.
 
     Access logs record every GET/PUT/DELETE against the bucket, providing an
@@ -354,19 +404,24 @@ def check_bucket_access_logging_enabled(
         return []
 
     missing: list[str] = []
+    access_errors: list[dict[str, str]] = []
     for bucket in buckets:
         try:
-            logging_cfg = bucket.get_logging_config() if callable(getattr(bucket, "get_logging_config", None)) else None
+            logging_cfg = (
+                bucket.get_logging_config()
+                if callable(getattr(bucket, "get_logging_config", None))
+                else None
+            )
             if not logging_cfg:
                 # Fallback: check via reload
                 bucket.reload()
                 logging_cfg = bucket._properties.get("logging")  # type: ignore[attr-defined]
             if not logging_cfg:
                 missing.append(bucket.name)
-        except Exception:
-            missing.append(getattr(bucket, "name", "unknown"))
+        except Exception as e:
+            access_errors.append({"bucket": getattr(bucket, "name", "unknown"), "error": str(e)})
 
-    if not missing:
+    if not missing and not access_errors:
         return [
             Finding(
                 check_id="gcp-storage-access-logging",
@@ -385,39 +440,53 @@ def check_bucket_access_logging_enabled(
             )
         ]
 
-    return [
-        Finding(
+    findings: list[Finding] = []
+    if missing:
+        findings.append(
+            Finding(
+                check_id="gcp-storage-access-logging",
+                title=f"{len(missing)} GCS bucket(s) lack access logging",
+                description=(
+                    f"{len(missing)} bucket(s) do not have access logging enabled: "
+                    f"{', '.join(missing[:10])}{'...' if len(missing) > 10 else ''}. "
+                    "Without access logs, you cannot audit who accessed, modified, or deleted objects."
+                ),
+                severity=Severity.MEDIUM,
+                status=ComplianceStatus.FAIL,
+                domain=CheckDomain.STORAGE,
+                resource_type="GCP::Storage::Bucket",
+                resource_id=f"projects/{project_id}",
+                region=region,
+                account_id=project_id,
+                cloud_provider=CloudProvider.GCP,
+                remediation=(
+                    "Enable access logging by pointing the bucket at a dedicated log bucket: "
+                    "`gcloud storage buckets update gs://BUCKET_NAME "
+                    "--log-bucket=LOG_BUCKET_NAME --log-object-prefix=PREFIX`."
+                ),
+                soc2_controls=["CC7.1"],
+                cis_gcp_controls=["5.4"],
+                iso27001_controls=["A.8.15"],
+                details={"buckets_without_access_logging": missing},
+            )
+        )
+    if access_errors:
+        finding = Finding.not_assessed(
             check_id="gcp-storage-access-logging",
-            title=f"{len(missing)} GCS bucket(s) lack access logging",
-            description=(
-                f"{len(missing)} bucket(s) do not have access logging enabled: "
-                f"{', '.join(missing[:10])}{'...' if len(missing) > 10 else ''}. "
-                "Without access logs, you cannot audit who accessed, modified, or deleted objects."
-            ),
-            severity=Severity.MEDIUM,
-            status=ComplianceStatus.FAIL,
+            title="Some GCS bucket access logging settings could not be assessed",
+            description=f"Unable to read access logging settings for {len(access_errors)} bucket(s).",
             domain=CheckDomain.STORAGE,
             resource_type="GCP::Storage::Bucket",
-            resource_id=f"projects/{project_id}",
-            region=region,
             account_id=project_id,
+            region=region,
             cloud_provider=CloudProvider.GCP,
-            remediation=(
-                "Enable access logging by pointing the bucket at a dedicated log bucket: "
-                "`gcloud storage buckets update gs://BUCKET_NAME "
-                "--log-bucket=LOG_BUCKET_NAME --log-object-prefix=PREFIX`."
-            ),
-            soc2_controls=["CC7.1"],
-            cis_gcp_controls=["5.4"],
-            iso27001_controls=["A.8.15"],
-            details={"buckets_without_access_logging": missing},
         )
-    ]
+        finding.details["access_errors"] = access_errors[:20]
+        findings.append(finding)
+    return findings
 
 
-def check_bucket_retention_policy(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_bucket_retention_policy(client: GCPClient, project_id: str) -> list[Finding]:
     """GCS buckets that store audit logs or compliance data should have a retention policy.
 
     A retention policy prevents objects from being deleted or overwritten before a
@@ -445,15 +514,16 @@ def check_bucket_retention_policy(
         return []
 
     missing: list[str] = []
+    access_errors: list[dict[str, str]] = []
     for bucket in buckets:
         try:
             retention = bucket.retention_policy
             if not retention or not getattr(retention, "retention_period", None):
                 missing.append(bucket.name)
-        except Exception:
-            missing.append(getattr(bucket, "name", "unknown"))
+        except Exception as e:
+            access_errors.append({"bucket": getattr(bucket, "name", "unknown"), "error": str(e)})
 
-    if not missing:
+    if not missing and not access_errors:
         return [
             Finding(
                 check_id="gcp-storage-retention-policy",
@@ -472,31 +542,47 @@ def check_bucket_retention_policy(
             )
         ]
 
-    return [
-        Finding(
+    findings: list[Finding] = []
+    if missing:
+        findings.append(
+            Finding(
+                check_id="gcp-storage-retention-policy",
+                title=f"{len(missing)} GCS bucket(s) have no retention policy",
+                description=(
+                    f"{len(missing)} bucket(s) lack a retention policy: "
+                    f"{', '.join(missing[:10])}{'...' if len(missing) > 10 else ''}. "
+                    "Buckets storing audit logs or compliance artifacts should have a minimum "
+                    "retention period to prevent premature deletion."
+                ),
+                severity=Severity.LOW,
+                status=ComplianceStatus.PARTIAL,
+                domain=CheckDomain.STORAGE,
+                resource_type="GCP::Storage::Bucket",
+                resource_id=f"projects/{project_id}",
+                region=region,
+                account_id=project_id,
+                cloud_provider=CloudProvider.GCP,
+                remediation=(
+                    "Set a retention policy: `gcloud storage buckets update gs://BUCKET_NAME "
+                    "--retention-period=2678400s` (31 days). For audit log buckets, use a "
+                    "longer period (e.g., 365 days) and consider locking the policy."
+                ),
+                soc2_controls=["CC6.7", "CC7.1"],
+                cis_gcp_controls=["5.5"],
+                details={"buckets_without_retention": missing},
+            )
+        )
+    if access_errors:
+        finding = Finding.not_assessed(
             check_id="gcp-storage-retention-policy",
-            title=f"{len(missing)} GCS bucket(s) have no retention policy",
-            description=(
-                f"{len(missing)} bucket(s) lack a retention policy: "
-                f"{', '.join(missing[:10])}{'...' if len(missing) > 10 else ''}. "
-                "Buckets storing audit logs or compliance artifacts should have a minimum "
-                "retention period to prevent premature deletion."
-            ),
-            severity=Severity.LOW,
-            status=ComplianceStatus.PARTIAL,
+            title="Some GCS bucket retention policies could not be assessed",
+            description=f"Unable to read retention policy settings for {len(access_errors)} bucket(s).",
             domain=CheckDomain.STORAGE,
             resource_type="GCP::Storage::Bucket",
-            resource_id=f"projects/{project_id}",
-            region=region,
             account_id=project_id,
+            region=region,
             cloud_provider=CloudProvider.GCP,
-            remediation=(
-                "Set a retention policy: `gcloud storage buckets update gs://BUCKET_NAME "
-                "--retention-period=2678400s` (31 days). For audit log buckets, use a "
-                "longer period (e.g., 365 days) and consider locking the policy."
-            ),
-            soc2_controls=["CC6.7", "CC7.1"],
-            cis_gcp_controls=["5.5"],
-            details={"buckets_without_retention": missing},
         )
-    ]
+        finding.details["access_errors"] = access_errors[:20]
+        findings.append(finding)
+    return findings
