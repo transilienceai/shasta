@@ -5,7 +5,7 @@
 **Multi-Cloud Compliance & AI Governance, Claude-Native**
 
 AI-native compliance toolkit — SOC 2, ISO 27001, HIPAA, ISO 42001 and EU AI Act
-across AWS and Azure. Through conversation, not dashboards. From the team at [Transilience.ai](https://www.transilience.ai).
+across AWS, Azure, and GCP. Through conversation, not dashboards. From the team at [Transilience.ai](https://www.transilience.ai).
 
 [![Built by Transilience](https://img.shields.io/badge/Built%20by-Transilience.ai-4A90D9)](https://www.transilience.ai)
 [![CI](https://github.com/transilienceai/shasta/actions/workflows/integrity.yml/badge.svg)](https://github.com/transilienceai/shasta/actions/workflows/integrity.yml)
@@ -20,7 +20,7 @@ across AWS and Azure. Through conversation, not dashboards. From the team at [Tr
 
 ---
 
-Shasta scans your cloud infrastructure for SOC 2, ISO 27001, HIPAA, ISO 42001, EU AI Act, OWASP LLM Top 10 and more. The standalone Whitney static scanner ([github.com/transilienceai/whitney](https://github.com/transilienceai/whitney)) handles application source-code prompt-injection detection. Together, they cover 13 compliance frameworks, 221 automated checks, and 199 security questionnaire answers — with a web dashboard, 112 Terraform remediation templates, and auditor-grade evidence. Built for founders running <50 employee companies who need compliance without the $30K/year Vanta bill.
+Shasta scans your cloud infrastructure for SOC 2, ISO 27001, HIPAA, ISO 42001, EU AI Act, OWASP LLM Top 10 and more. The standalone Whitney static scanner ([github.com/transilienceai/whitney](https://github.com/transilienceai/whitney)) handles application source-code prompt-injection detection. Together, they cover 13 compliance frameworks, 267 automated checks, and 199 security questionnaire answers — with a web dashboard, 132 Terraform remediation templates, and auditor-grade evidence. Built for founders running <50 employee companies who need compliance without the $30K/year Vanta bill.
 
 > **Three load-bearing artifacts at the repo root, in order of what to read:**
 > [`README.md`](./README.md) (this file — what it does) →
@@ -74,7 +74,7 @@ continues normally.
 
 ## Platform Capabilities
 
-### 1. Multi-Cloud Security Scanning (5 Domains, 174+ Checks)
+### 1. Multi-Cloud Security Scanning (5 Domains, 267+ Checks)
 
 #### AWS Checks (40+)
 
@@ -202,7 +202,7 @@ Attack surface analysis that produces auditor-grade pen test evidence:
 ### 11. Risk Register (SOC 2 CC3.1)
 
 Automated risk management workflow required for SOC 2 Risk Assessment:
-- **Auto-seeds from scan findings** — failing checks automatically create risk items with pre-mapped likelihood, impact, and treatment plans (34 check-to-risk mappings across AWS + Azure)
+- **Auto-seeds from scan findings** — failing checks automatically create risk items with pre-mapped likelihood, impact, and treatment plans (34 check-to-risk mappings across AWS, Azure, and GCP)
 - **Risk scoring** — 3x3 likelihood/impact matrix (1-9 score, low/medium/high levels)
 - **Treatment tracking** — mitigate, accept, transfer, or avoid with documented plans
 - **Status workflow** — open → in_progress → accepted/resolved
@@ -272,7 +272,8 @@ git clone https://github.com/kkmookhey/shasta.git
 cd shasta
 pip install -e ".[dev]"           # Core + dev tools
 pip install -e ".[azure]"         # Add Azure support (optional)
-pip install -e ".[dev,azure]"     # Everything
+pip install -e ".[gcp]"           # Add GCP support (optional)
+pip install -e ".[dev,azure,gcp]" # Everything
 
 # 2a. Configure AWS (read-only access)
 aws configure --profile shasta
@@ -282,10 +283,15 @@ aws configure --profile shasta
 az login
 az account show   # Note your subscription_id and tenant_id
 
+# 2c. Configure GCP (read access via Application Default Credentials)
+gcloud auth application-default login
+gcloud config set project YOUR_PROJECT_ID
+
 # 3. Open Claude Code and run
 /connect-aws      # Validate AWS credentials, discover services
 /connect-azure    # Validate Azure credentials, discover services
-/scan             # Full SOC 2 compliance scan (AWS, Azure, or both)
+/connect-gcp      # Validate GCP credentials, discover project and services
+/scan             # Full SOC 2 compliance scan (AWS, Azure, GCP, or any combination)
 /gap-analysis     # Interactive gap analysis with AI guidance
 /report           # Generate PDF/HTML/MD reports
 /remediate        # Get Terraform fixes for findings
@@ -306,7 +312,8 @@ Skills are the building blocks Claude uses behind the scenes. You can invoke the
 |-------|-------------|--------|
 | `/connect-aws` | Validate AWS credentials, discover account topology and services | Account info, service list |
 | `/connect-azure` | Validate Azure credentials, discover subscription and services | Subscription info, service list |
-| `/scan` | Run all compliance checks across AWS and/or Azure (IAM, network, storage, encryption, monitoring) | Findings with AI explanations |
+| `/connect-gcp` | Validate GCP credentials, discover project and enabled services | Project info, service list |
+| `/scan` | Run all compliance checks across AWS, Azure, and/or GCP (IAM, network, storage, encryption, monitoring) | Findings with AI explanations |
 | `/gap-analysis` | Interactive SOC 2 gap analysis with control-by-control walkthrough | Gap analysis report |
 | `/report` | Generate compliance reports in all formats | MD, HTML, PDF files |
 | `/remediate` | Interactive remediation with Terraform code and step-by-step instructions | Terraform bundle + guidance |
@@ -334,14 +341,14 @@ For a **<50 employee startup** pursuing compliance:
 
 | Category | Coverage | Method |
 |----------|----------|--------|
-| Technical cloud controls | ~90% | 190+ automated checks across AWS and Azure (full CIS AWS v3.0 + CIS Azure v3.0 coverage, including EC2/EKS/ECS hardening, KMS posture, CIS 4.x CloudWatch alarms, CloudFront, Redshift, ElastiCache, Neptune, Lambda Function URL auth, S3 Object Ownership, AWS Backup cross-region copy + access policy) |
+| Technical cloud controls | ~90% | 267+ automated checks across AWS, Azure, and GCP (full CIS AWS v3.0 + CIS Azure v3.0 coverage plus CIS GCP mappings, including EC2/EKS/ECS hardening, KMS posture, CIS 4.x CloudWatch alarms, CloudFront, Redshift, ElastiCache, Neptune, Lambda Function URL auth, S3 Object Ownership, AWS Backup cross-region copy + access policy) |
 | Policy/process controls | ~80% | 8 generated policy documents |
 | Continuous monitoring | ~90% | 12 Config Rules + 6 EventBridge rules + GuardDuty + Inspector + Azure Defender (per-plan) + Azure Policy + CIS 5.2.x Activity Log alerts |
 | Audit evidence | ~85% | Control tests, evidence snapshots (AWS + Azure), access reviews, reports |
 | Vulnerability management | ~85% | Inspector + SBOM + OSV.dev + CISA KEV |
 | Supply chain security | ~80% | SBOM discovery + known-compromised DB + live scanning |
 | Change management | ~80% | GitHub integration + CloudTrail + Config + Azure Activity Log |
-| Remediation guidance | ~90% | 112 Terraform templates (81 AWS + 31 Azure azurerm) covering CloudTrail/KMS/Object Lock, Security Hub, Access Analyzer, EC2 IMDSv2 + instance profiles, EKS private endpoint + audit logging + secrets KMS, ECS task hardening, KMS rotation + key policy + scheduled deletion, IAM policy wildcards + role trust + unused roles, CIS 4.x CloudWatch alarms, Config conformance packs, CloudFront HTTPS+TLS+WAF+OAC, Redshift encryption+public-access+audit+SSL, ElastiCache TLS+at-rest+AUTH, Neptune encryption, RDS force_ssl + log_settings + min TLS, Lambda Function URL auth + layer origin, API Gateway client cert + authorizer + throttling + request validation, S3 Object Ownership + access logging + KMS-CMK, AWS Backup cross-region copy + access policy, EFS/SNS/SQS/Secrets/ACM, ELB v2 TLS+logs+headers, RDS deep+IAM auth+PITR, Lambda runtime+CMK+DLQ, API Gateway WAF+logging, AWS Backup vault lock, VPC endpoints, CloudWatch Logs KMS+retention, AWS Org SCPs+tag policies — plus the full Azure set |
+| Remediation guidance | ~90% | 132 Terraform templates (81 AWS + 31 Azure azurerm + 20 GCP google) covering CloudTrail/KMS/Object Lock, Security Hub, Access Analyzer, EC2 IMDSv2 + instance profiles, EKS private endpoint + audit logging + secrets KMS, ECS task hardening, KMS rotation + key policy + scheduled deletion, IAM policy wildcards + role trust + unused roles, CIS 4.x CloudWatch alarms, Config conformance packs, CloudFront HTTPS+TLS+WAF+OAC, Redshift encryption+public-access+audit+SSL, ElastiCache TLS+at-rest+AUTH, Neptune encryption, RDS force_ssl + log_settings + min TLS, Lambda Function URL auth + layer origin, API Gateway client cert + authorizer + throttling + request validation, S3 Object Ownership + access logging + KMS-CMK, AWS Backup cross-region copy + access policy, EFS/SNS/SQS/Secrets/ACM, ELB v2 TLS+logs+headers, RDS deep+IAM auth+PITR, Lambda runtime+CMK+DLQ, API Gateway WAF+logging, AWS Backup vault lock, VPC endpoints, CloudWatch Logs KMS+retention, AWS Org SCPs+tag policies — plus the full Azure and GCP sets |
 | Security questionnaires | ~70% | 199 questions auto-filled from scan evidence (SIG Lite, CAIQ, Enterprise) |
 | AI governance | ~85% | Cloud AI checks (Bedrock + SageMaker + Azure OpenAI + Azure ML) + AI SBOM, 7 frameworks (ISO 42001, EU AI Act, NIST AI RMF, NIST AI 600-1, OWASP LLM Top 10, OWASP Agentic Top 10, MITRE ATLAS); application source-code prompt-injection scanning lives in the standalone Whitney scanner (separate repo) |
 | Visual dashboard | Yes | FastAPI + Tailwind + Chart.js at localhost:8080 |
@@ -663,7 +670,7 @@ Tier 2 and 3 used 4 parallel agents in isolated worktrees for maximum throughput
 | Terraform templates | 14 | 36 | **36** |
 | Unit tests | 9 | 100 | **100** |
 | Compliance frameworks | 1 (SOC 2) | 2 (SOC 2 + ISO 27001) | **5** (+ HIPAA, ISO 42001, EU AI Act) |
-| Cloud providers | 1 (AWS) | 2 (AWS + Azure) | **2** |
+| Cloud providers | 1 (AWS) | 2 (AWS + Azure) | **3** (AWS + Azure + GCP) |
 
 ### Token Consumption Estimate
 
@@ -721,7 +728,8 @@ shasta/
 ├── .claude/skills/                        # Claude Code skills (auto-discovered)
 │   ├── connect-aws/SKILL.md               # AWS connection and validation
 │   ├── connect-azure/SKILL.md             # Azure connection and validation
-│   ├── scan/SKILL.md                      # Full compliance scan (AWS + Azure)
+│   ├── connect-gcp/SKILL.md               # GCP connection and validation
+│   ├── scan/SKILL.md                      # Full compliance scan (AWS + Azure + GCP)
 │   ├── gap-analysis.md                    # Interactive gap analysis
 │   ├── report.md                          # Report generation (MD/HTML/PDF)
 │   ├── remediate.md                       # Terraform remediation guidance
@@ -794,7 +802,7 @@ shasta/
 │   └── azure-test-env/                    # Azure test environment
 │       └── main.tf                        # Azure test resources (compliant + non-compliant)
 │
-├── tests/                                 # pytest test suite (500+ tests)
+├── tests/                                 # pytest test suite (720+ tests)
 │   ├── conftest.py
 │   ├── test_aws/
 │   │   ├── test_client.py                 # AWS client tests (moto)
@@ -868,7 +876,7 @@ shasta/
 - [ ] Network ACL checks (AWS)
 
 ### Medium Term
-- [ ] GCP scanning modules
+- [x] ~~GCP scanning modules~~ — IAM, networking, storage, encryption, monitoring, compute, and Cloud Run checks with CIS GCP mappings
 - [ ] Okta integration (identity provider checks)
 - [ ] Google Workspace integration
 - [ ] Trust center page generation

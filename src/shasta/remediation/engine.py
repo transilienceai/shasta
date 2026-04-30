@@ -2448,6 +2448,728 @@ resource "azurerm_subscription_policy_assignment" "mcsb" {
 
 
 # ---------------------------------------------------------------------------
+# GCP Terraform templates (google provider)
+# ---------------------------------------------------------------------------
+
+
+@_tf("gcp-iam-primitive-roles")
+def _tf_gcp_primitive_roles(f: Finding) -> str:
+    project = f.account_id or "PROJECT_ID"
+    return f'''\
+# Remove primitive Owner/Editor roles and replace with purpose-specific roles.
+# First audit current bindings:
+#   gcloud projects get-iam-policy {project} --format=json | jq '.bindings[] | select(.role | test("roles/(owner|editor)"))'
+
+data "google_project" "project" {{
+  project_id = "{project}"
+}}
+
+# Example: grant a scoped role to a specific user instead of Editor
+resource "google_project_iam_member" "scoped_role" {{
+  project = "{project}"
+  role    = "roles/storage.objectViewer"  # Replace with the minimum needed role
+  member  = "user:REPLACE_WITH_USER_EMAIL"
+}}
+
+# Remove the primitive role binding (use google_project_iam_binding to manage
+# the full membership list, or google_project_iam_member with lifecycle remove):
+resource "google_project_iam_binding" "remove_editor" {{
+  project = "{project}"
+  role    = "roles/editor"
+  members = []  # Empty = remove all editor bindings
+
+  lifecycle {{
+    prevent_destroy = false
+  }}
+}}
+# IMPORTANT: Review and test before applying — removing Editor may break services
+# that rely on broad permissions. Use IAM Recommender to generate least-privilege replacements.'''
+
+
+@_tf("gcp-iam-service-account-not-admin")
+def _tf_gcp_sa_not_admin(f: Finding) -> str:
+    project = f.account_id or "PROJECT_ID"
+    offenders = f.details.get("offenders", [])
+    sa_email = offenders[0]["member"].replace("serviceAccount:", "") if offenders else "SA_EMAIL@PROJECT.iam.gserviceaccount.com"
+    role = offenders[0].get("role", "roles/editor") if offenders else "roles/editor"
+    return f'''\
+# Remove admin role from service account and replace with scoped role.
+
+# Step 1: Remove the broad role
+resource "google_project_iam_member" "remove_sa_admin" {{
+  project = "{project}"
+  role    = "{role}"
+  member  = "serviceAccount:{sa_email}"
+
+  lifecycle {{
+    prevent_destroy = false
+  }}
+}}
+
+# Step 2: Grant only what the SA actually needs (example for Cloud Storage access):
+resource "google_project_iam_member" "sa_scoped" {{
+  project = "{project}"
+  role    = "roles/storage.objectAdmin"  # Customize to minimum required role
+  member  = "serviceAccount:{sa_email}"
+}}
+
+# Run IAM Recommender to get suggestions:
+#   gcloud recommender recommendations list \\
+#     --project={project} --recommender=google.iam.policy.Recommender \\
+#     --location=global --format=json'''
+
+
+@_tf("gcp-firewall-unrestricted-ssh")
+def _tf_gcp_firewall_ssh(f: Finding) -> str:
+    project = f.account_id or "PROJECT_ID"
+    offenders = f.details.get("offending_rules", [])
+    rule_name = offenders[0]["name"] if offenders else "default-allow-ssh"
+    network = offenders[0].get("network", "default") if offenders else "default"
+    return f'''\
+# Replace unrestricted SSH rule with IAP-based access.
+# IAP TCP forwarding eliminates the need to open port 22 to the internet.
+
+# Step 1: Remove the unrestricted rule
+resource "google_compute_firewall" "deny_ssh_world" {{
+  name    = "{rule_name}-restricted"
+  network = "{network}"
+  project = "{project}"
+
+  deny {{
+    protocol = "tcp"
+    ports    = ["22"]
+  }}
+
+  source_ranges = ["0.0.0.0/0"]
+  priority      = 900
+}}
+
+# Step 2: Allow SSH only from IAP (Google's managed proxy range)
+resource "google_compute_firewall" "allow_ssh_iap" {{
+  name    = "allow-ssh-from-iap"
+  network = "{network}"
+  project = "{project}"
+
+  allow {{
+    protocol = "tcp"
+    ports    = ["22"]
+  }}
+
+  # IAP's source IP range — only allow SSH from IAP tunnel
+  source_ranges = ["35.235.240.0/20"]
+  target_tags   = ["allow-iap-ssh"]  # Apply to specific VMs
+  priority      = 1000
+}}
+
+# Use IAP to SSH: gcloud compute ssh INSTANCE_NAME --tunnel-through-iap --project={project}'''
+
+
+@_tf("gcp-firewall-unrestricted-rdp")
+def _tf_gcp_firewall_rdp(f: Finding) -> str:
+    project = f.account_id or "PROJECT_ID"
+    offenders = f.details.get("offending_rules", [])
+    rule_name = offenders[0]["name"] if offenders else "default-allow-rdp"
+    network = offenders[0].get("network", "default") if offenders else "default"
+    return f'''\
+# Replace unrestricted RDP rule with IAP-based access.
+
+resource "google_compute_firewall" "deny_rdp_world" {{
+  name    = "{rule_name}-restricted"
+  network = "{network}"
+  project = "{project}"
+
+  deny {{
+    protocol = "tcp"
+    ports    = ["3389"]
+  }}
+
+  source_ranges = ["0.0.0.0/0"]
+  priority      = 900
+}}
+
+# Allow RDP only through IAP TCP forwarding
+resource "google_compute_firewall" "allow_rdp_iap" {{
+  name    = "allow-rdp-from-iap"
+  network = "{network}"
+  project = "{project}"
+
+  allow {{
+    protocol = "tcp"
+    ports    = ["3389"]
+  }}
+
+  source_ranges = ["35.235.240.0/20"]  # IAP range
+  target_tags   = ["allow-iap-rdp"]
+  priority      = 1000
+}}
+
+# Connect via IAP: gcloud compute start-iap-tunnel INSTANCE_NAME 3389 --local-host-port=localhost:3389'''
+
+
+@_tf("gcp-vpc-flow-logs")
+def _tf_gcp_flow_logs(f: Finding) -> str:
+    project = f.account_id or "PROJECT_ID"
+    region = f.region or "us-central1"
+    missing = f.details.get("subnets_without_flow_logs", ["SUBNET_NAME"])
+    subnet = missing[0] if missing else "SUBNET_NAME"
+    network = "default"
+    return f'''\
+# Enable VPC flow logs on subnets in {region}.
+
+resource "google_compute_subnetwork" "{subnet.replace("-", "_")}_flow_logs" {{
+  name          = "{subnet}"
+  ip_cidr_range = "10.0.0.0/24"  # Keep existing CIDR — only updating log_config
+  region        = "{region}"
+  network       = "projects/{project}/global/networks/{network}"
+  project       = "{project}"
+
+  log_config {{
+    aggregation_interval = "INTERVAL_5_SEC"
+    flow_sampling        = 0.5
+    metadata             = "INCLUDE_ALL_METADATA"
+  }}
+}}
+
+# For all subnets without flow logs, use gcloud:
+#   for subnet in {' '.join(missing[:5])}; do
+#     gcloud compute networks subnets update $subnet \\
+#       --region={region} --enable-flow-logs \\
+#       --logging-aggregation-interval=interval-5-sec \\
+#       --logging-flow-sampling=0.5 --project={project}
+#   done'''
+
+
+@_tf("gcp-kms-key-rotation")
+def _tf_gcp_kms_rotation(f: Finding) -> str:
+    project = f.account_id or "PROJECT_ID"
+    keys_info = f.details.get("keys_with_issues", [])
+    key_name = keys_info[0]["key"].split("/")[-1] if keys_info else "my-key"
+    keyring = keys_info[0]["key"].split("/keyRings/")[1].split("/")[0] if keys_info and "/keyRings/" in keys_info[0].get("key", "") else "my-keyring"
+    location = keys_info[0]["key"].split("/locations/")[1].split("/")[0] if keys_info and "/locations/" in keys_info[0].get("key", "") else "global"
+    return f'''\
+# Configure KMS key rotation period to ≤90 days (7,776,000 seconds).
+
+resource "google_kms_key_ring" "keyring" {{
+  name     = "{keyring}"
+  location = "{location}"
+  project  = "{project}"
+}}
+
+resource "google_kms_crypto_key" "{key_name.replace("-", "_")}" {{
+  name            = "{key_name}"
+  key_ring        = google_kms_key_ring.keyring.id
+  rotation_period = "7776000s"  # 90 days
+
+  lifecycle {{
+    prevent_destroy = true
+  }}
+}}
+
+# For existing keys, set rotation via gcloud:
+#   gcloud kms keys update {key_name} \\
+#     --keyring={keyring} --location={location} \\
+#     --rotation-period=7776000s \\
+#     --next-rotation-time=$(date -d "+1 day" --iso-8601=seconds) \\
+#     --project={project}'''
+
+
+@_tf("gcp-storage-bucket-public-access")
+def _tf_gcp_bucket_public(f: Finding) -> str:
+    project = f.account_id or "PROJECT_ID"
+    pub_buckets = f.details.get("public_buckets", [])
+    bucket_name = pub_buckets[0]["bucket"] if pub_buckets else "my-bucket"
+    return f'''\
+# Remove public access from GCS bucket and enable Public Access Prevention.
+
+resource "google_storage_bucket_iam_binding" "remove_public_{bucket_name.replace("-", "_")}" {{
+  bucket = "{bucket_name}"
+  role   = "roles/storage.objectViewer"
+  members = []  # Empty list removes all members from this role binding
+}}
+
+# Enable Public Access Prevention at the project level (prevents future public grants):
+resource "google_project_organization_policy" "public_access_prevention" {{
+  project    = "{project}"
+  constraint = "constraints/storage.publicAccessPrevention"
+
+  boolean_policy {{
+    enforced = true
+  }}
+}}
+
+# Remove public access via gcloud:
+#   gcloud storage buckets remove-iam-policy-binding gs://{bucket_name} \\
+#     --member=allUsers --role=roles/storage.objectViewer --project={project}'''
+
+
+@_tf("gcp-storage-uniform-access")
+def _tf_gcp_bucket_uniform(f: Finding) -> str:
+    missing = f.details.get("buckets_without_uniform_access", ["my-bucket"])
+    bucket = missing[0] if missing else "my-bucket"
+    return f'''\
+# Enable uniform bucket-level access on GCS bucket.
+# Note: once enabled for 90+ days, this setting cannot be reverted.
+
+resource "google_storage_bucket" "{bucket.replace("-", "_")}_uniform" {{
+  name     = "{bucket}"
+  location = "US"  # Keep existing location
+
+  uniform_bucket_level_access = true
+}}
+
+# Via gcloud:
+#   gcloud storage buckets update gs://{bucket} --uniform-bucket-level-access'''
+
+
+@_tf("gcp-logging-audit-config")
+def _tf_gcp_audit_config(f: Finding) -> str:
+    project = f.account_id or "PROJECT_ID"
+    missing_types = f.details.get("missing_log_types", ["DATA_READ", "DATA_WRITE"])
+    return f'''\
+# Enable Data Access audit logs (DATA_READ + DATA_WRITE) for all GCP services.
+# WARNING: This significantly increases log volume. Budget ~$X/GB for Cloud Logging.
+
+resource "google_project_iam_audit_config" "all_services" {{
+  project = "{project}"
+  service = "allServices"
+
+  audit_log_config {{
+    log_type = "ADMIN_READ"
+  }}
+
+  audit_log_config {{
+    log_type = "DATA_READ"
+  }}
+
+  audit_log_config {{
+    log_type = "DATA_WRITE"
+  }}
+}}
+
+# Missing log types: {", ".join(missing_types)}
+# Note: DATA_READ generates high volume — consider enabling per-service
+# for high-sensitivity services (Cloud Storage, BigQuery, Cloud SQL) first.'''
+
+
+@_tf("gcp-logging-metric-alerting")
+def _tf_gcp_log_metric(f: Finding) -> str:
+    project = f.account_id or "PROJECT_ID"
+    missing = f.details.get("missing_metrics", [])
+    cis_id = missing[0]["cis_id"] if missing else "2.x"
+    desc = missing[0]["description"] if missing else "security events"
+    return f'''\
+# Create log-based metric and alert policy for {desc} (CIS {cis_id}).
+
+resource "google_logging_metric" "security_metric_{cis_id.replace(".", "_")}" {{
+  name        = "cis-{cis_id.replace(".", "-")}-{desc.replace(" ", "-")[:30]}"
+  filter      = "resource.type=gce_firewall_rule"  # Update with correct CIS filter
+  description = "CIS {cis_id}: {desc}"
+  project     = "{project}"
+
+  metric_descriptor {{
+    metric_kind  = "DELTA"
+    value_type   = "INT64"
+    display_name = "CIS {cis_id} {desc}"
+  }}
+}}
+
+resource "google_monitoring_notification_channel" "email_channel" {{
+  display_name = "Security Alerts Email"
+  type         = "email"
+  project      = "{project}"
+
+  labels = {{
+    email_address = "security@YOURDOMAIN.com"  # Update with your email
+  }}
+}}
+
+resource "google_monitoring_alert_policy" "cis_{cis_id.replace(".", "_")}_alert" {{
+  display_name = "CIS {cis_id}: {desc}"
+  combiner     = "OR"
+  project      = "{project}"
+
+  conditions {{
+    display_name = "{desc}"
+
+    condition_threshold {{
+      filter          = "metric.type=\\"logging.googleapis.com/user/cis-{cis_id.replace(".", "-")}\\" AND resource.type=\\"global\\""
+      duration        = "0s"
+      comparison      = "COMPARISON_GT"
+      threshold_value = 0
+
+      aggregations {{
+        alignment_period   = "60s"
+        per_series_aligner = "ALIGN_COUNT"
+      }}
+    }}
+  }}
+
+  notification_channels = [google_monitoring_notification_channel.email_channel.name]
+}}'''
+
+
+@_tf("gcp-compute-os-login")
+def _tf_gcp_os_login(f: Finding) -> str:
+    project = f.account_id or "PROJECT_ID"
+    return f'''\
+# Enable OS Login at the project level.
+
+resource "google_compute_project_metadata_item" "os_login" {{
+  project = "{project}"
+  key     = "enable-oslogin"
+  value   = "TRUE"
+}}
+
+# Grant users SSH access via IAM roles:
+# Non-admin SSH: roles/compute.osLogin
+# Admin SSH (sudo): roles/compute.osAdminLogin
+
+resource "google_project_iam_member" "os_login_user" {{
+  project = "{project}"
+  role    = "roles/compute.osLogin"
+  member  = "user:REPLACE_WITH_USER_EMAIL"
+}}
+
+# Disable SSH key-based access for existing instances by removing
+# project-level SSH keys from project metadata (if any are set).'''
+
+
+@_tf("gcp-compute-serial-port")
+def _tf_gcp_serial_port(f: Finding) -> str:
+    project = f.account_id or "PROJECT_ID"
+    return f'''\
+# Disable serial port access at the project level.
+
+resource "google_compute_project_metadata_item" "disable_serial_port" {{
+  project = "{project}"
+  key     = "serial-port-enable"
+  value   = "false"
+}}
+
+# Also enforce via Organization Policy (prevents instance-level override):
+resource "google_project_organization_policy" "no_serial_port" {{
+  project    = "{project}"
+  constraint = "constraints/compute.disableSerialPortAccess"
+
+  boolean_policy {{
+    enforced = true
+  }}
+}}'''
+
+
+@_tf("gcp-sql-require-ssl")
+def _tf_gcp_sql_ssl(f: Finding) -> str:
+    project = f.account_id or "PROJECT_ID"
+    instances = f.details.get("instances_without_ssl", [])
+    inst_name = instances[0]["instance"] if instances else "my-db-instance"
+    return f'''\
+# Enforce SSL on Cloud SQL instance.
+
+resource "google_sql_database_instance" "{inst_name.replace("-", "_")}" {{
+  name    = "{inst_name}"
+  project = "{project}"
+  # Keep existing region/version — only updating settings
+
+  settings {{
+    tier = "db-f1-micro"  # Keep existing tier
+
+    ip_configuration {{
+      require_ssl = true
+    }}
+  }}
+
+  deletion_protection = true
+}}
+
+# Create client SSL certificate:
+resource "google_sql_ssl_cert" "client_cert" {{
+  common_name = "client-cert"
+  instance    = "{inst_name}"
+  project     = "{project}"
+}}
+
+# Update connection string in your app to use SSL:
+# Host={inst_name} SSLMode=verify-ca SSLCert=client.crt SSLKey=client.key SSLRootCert=server-ca.pem'''
+
+
+@_tf("gcp-gke-workload-identity")
+def _tf_gcp_gke_workload_identity(f: Finding) -> str:
+    project = f.account_id or "PROJECT_ID"
+    region = f.region or "us-central1"
+    clusters = f.details.get("clusters_without_workload_identity", ["my-cluster"])
+    cluster = clusters[0] if clusters else "my-cluster"
+    return f'''\
+# Enable Workload Identity on GKE cluster.
+# This allows pods to authenticate to GCP APIs without service account key files.
+
+resource "google_container_cluster" "{cluster.replace("-", "_")}_wi" {{
+  name     = "{cluster}"
+  location = "{region}"
+  project  = "{project}"
+
+  workload_identity_config {{
+    workload_pool = "{project}.svc.id.goog"
+  }}
+}}
+
+resource "google_container_node_pool" "{cluster.replace("-", "_")}_nodes" {{
+  name     = "default-pool"
+  cluster  = "{cluster}"
+  location = "{region}"
+  project  = "{project}"
+
+  node_config {{
+    workload_metadata_config {{
+      mode = "GKE_METADATA"
+    }}
+  }}
+}}
+
+# After enabling, bind a Kubernetes SA to a GCP SA:
+# kubectl create serviceaccount KSA_NAME --namespace=NAMESPACE
+# gcloud iam service-accounts add-iam-policy-binding GSA_EMAIL \\
+#   --role=roles/iam.workloadIdentityUser \\
+#   --member="serviceAccount:{project}.svc.id.goog[NAMESPACE/KSA_NAME]"'''
+
+
+@_tf("gcp-gke-private-cluster")
+def _tf_gcp_gke_private(f: Finding) -> str:
+    project = f.account_id or "PROJECT_ID"
+    region = f.region or "us-central1"
+    clusters = f.details.get("clusters_without_private_nodes", ["my-cluster"])
+    old_cluster = clusters[0] if clusters else "my-cluster"
+    return f'''\
+# Create a new private GKE cluster to replace the non-private one.
+# Note: Private nodes cannot be enabled on existing clusters — migration required.
+
+resource "google_container_cluster" "{old_cluster.replace("-", "_")}_private" {{
+  name     = "{old_cluster}-private"
+  location = "{region}"
+  project  = "{project}"
+
+  # Remove default node pool immediately and manage via google_container_node_pool
+  remove_default_node_pool = true
+  initial_node_count       = 1
+
+  network    = "projects/{project}/global/networks/default"
+  subnetwork = "projects/{project}/regions/{region}/subnetworks/default"
+
+  private_cluster_config {{
+    enable_private_nodes    = true
+    enable_private_endpoint = false  # Set true if you want private control plane
+    master_ipv4_cidr_block  = "172.16.0.0/28"
+  }}
+
+  master_authorized_networks_config {{
+    cidr_blocks {{
+      cidr_block   = "10.0.0.0/8"  # Restrict to your VPN/internal range
+      display_name = "internal"
+    }}
+  }}
+
+  workload_identity_config {{
+    workload_pool = "{project}.svc.id.goog"
+  }}
+}}
+
+# After migration: drain old cluster, update DNS/LB targets, delete old cluster.'''
+
+
+@_tf("gcp-cloudrun-no-unauth-access")
+def _tf_gcp_cloudrun_unauth(f: Finding) -> str:
+    project = f.account_id or "PROJECT_ID"
+    region = f.region or "us-central1"
+    services = f.details.get("services_with_public_access", [{"service": "my-service"}])
+    svc_name = services[0].get("service", "my-service") if services else "my-service"
+    return f'''\
+# Remove the unauthenticated invoker binding from the Cloud Run service.
+# Replace with a specific member list for authorized callers.
+
+resource "google_cloud_run_v2_service_iam_binding" "{svc_name.replace("-", "_")}_invoker" {{
+  project  = "{project}"
+  location = "{region}"
+  name     = "{svc_name}"
+  role     = "roles/run.invoker"
+
+  # List only the specific service accounts or users that need to invoke this service.
+  # Remove "allUsers" and "allAuthenticatedUsers" from this list.
+  members = [
+    "serviceAccount:caller-sa@{project}.iam.gserviceaccount.com",
+  ]
+}}'''
+
+
+@_tf("gcp-cloudrun-no-default-sa")
+def _tf_gcp_cloudrun_default_sa(f: Finding) -> str:
+    project = f.account_id or "PROJECT_ID"
+    region = f.region or "us-central1"
+    services = f.details.get("services_using_default_sa", [{"service": "my-service"}])
+    svc_name = services[0].get("service", "my-service") if services else "my-service"
+    sa_id = svc_name.replace("-", "")[:28]
+    return f'''\
+# Create a dedicated service account with minimal permissions,
+# then update the Cloud Run service to use it.
+
+resource "google_service_account" "{sa_id}_sa" {{
+  account_id   = "{svc_name}-sa"
+  display_name = "Cloud Run SA for {svc_name}"
+  project      = "{project}"
+}}
+
+# Grant only the permissions this service actually needs (example: Cloud SQL client)
+resource "google_project_iam_member" "{sa_id}_sa_roles" {{
+  project = "{project}"
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${{google_service_account.{sa_id}_sa.email}}"
+}}
+
+resource "google_cloud_run_v2_service" "{svc_name.replace("-", "_")}" {{
+  name     = "{svc_name}"
+  location = "{region}"
+  project  = "{project}"
+
+  template {{
+    service_account = google_service_account.{sa_id}_sa.email
+
+    containers {{
+      image = "IMAGE_URI"  # Replace with your container image URI
+    }}
+  }}
+}}'''
+
+
+@_tf("gcp-cloudrun-ingress-restricted")
+def _tf_gcp_cloudrun_ingress(f: Finding) -> str:
+    project = f.account_id or "PROJECT_ID"
+    region = f.region or "us-central1"
+    services = f.details.get("services_with_open_ingress", [{"service": "my-service"}])
+    svc_name = services[0].get("service", "my-service") if services else "my-service"
+    return f'''\
+# Restrict Cloud Run ingress to internal + Cloud Load Balancing only.
+# This prevents direct access to the *.run.app URL, forcing all traffic through
+# your Cloud Armor / load balancer policy.
+
+resource "google_cloud_run_v2_service" "{svc_name.replace("-", "_")}" {{
+  name     = "{svc_name}"
+  location = "{region}"
+  project  = "{project}"
+
+  ingress = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+  # Use "INGRESS_TRAFFIC_INTERNAL_ONLY" if this is a pure internal microservice.
+
+  template {{
+    containers {{
+      image = "IMAGE_URI"  # Replace with your container image URI
+    }}
+  }}
+}}'''
+
+
+@_tf("gcp-cloudrun-binary-authorization")
+def _tf_gcp_cloudrun_binauthz(f: Finding) -> str:
+    project = f.account_id or "PROJECT_ID"
+    region = f.region or "us-central1"
+    services = f.details.get("services_without_binauthz", ["my-service"])
+    svc_name = services[0] if services else "my-service"
+    return f'''\
+# Enable Binary Authorization on the Cloud Run service.
+# Requires a project-level Binary Authorization policy to be configured first.
+
+# Step 1: Configure the project Binary Authorization policy
+resource "google_binary_authorization_policy" "policy" {{
+  project = "{project}"
+
+  default_admission_rule {{
+    evaluation_mode         = "REQUIRE_ATTESTATION"
+    enforcement_mode        = "ENFORCED_BLOCK_AND_AUDIT_LOG"
+    require_attestations_by = [
+      # google_binary_authorization_attestor.my_attestor.name
+    ]
+  }}
+
+  # Allow Google-managed images (Cloud Run base images)
+  global_policy_evaluation_mode = "ENABLE"
+}}
+
+# Step 2: Enable Binary Authorization on the Cloud Run service
+resource "google_cloud_run_v2_service" "{svc_name.replace("-", "_")}" {{
+  name     = "{svc_name}"
+  location = "{region}"
+  project  = "{project}"
+
+  binary_authorization {{
+    use_default     = true
+    breakglass_justification = null  # Remove to enforce strictly
+  }}
+
+  template {{
+    containers {{
+      image = "IMAGE_URI"  # Replace with your container image URI
+    }}
+  }}
+}}'''
+
+
+@_tf("gcp-cloudrun-no-plaintext-secrets")
+def _tf_gcp_cloudrun_secrets(f: Finding) -> str:
+    project = f.account_id or "PROJECT_ID"
+    region = f.region or "us-central1"
+    suspicious = f.details.get("suspicious_env_vars", [{"service": "my-service", "env_var": "API_KEY"}])
+    svc_name = suspicious[0].get("service", "my-service") if suspicious else "my-service"
+    env_var = suspicious[0].get("env_var", "API_KEY") if suspicious else "API_KEY"
+    secret_id = env_var.lower().replace("_", "-")
+    return f'''\
+# Migrate the plaintext secret environment variable to Secret Manager.
+
+# Step 1: Create the secret in Secret Manager
+resource "google_secret_manager_secret" "{secret_id}" {{
+  secret_id = "{secret_id}"
+  project   = "{project}"
+
+  replication {{
+    auto {{}}
+  }}
+}}
+
+# Step 2: Add the secret value (manage via CI/CD pipeline, not Terraform)
+# resource "google_secret_manager_secret_version" "{secret_id}_v1" {{
+#   secret      = google_secret_manager_secret.{secret_id}.id
+#   secret_data = var.{secret_id}  # Passed in via -var flag, never hardcoded
+# }}
+
+# Step 3: Grant the Cloud Run service account access to the secret
+resource "google_secret_manager_secret_iam_member" "{secret_id}_accessor" {{
+  secret_id = google_secret_manager_secret.{secret_id}.secret_id
+  project   = "{project}"
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:{svc_name}-sa@{project}.iam.gserviceaccount.com"
+}}
+
+# Step 4: Update the Cloud Run service to use the secret reference
+resource "google_cloud_run_v2_service" "{svc_name.replace("-", "_")}" {{
+  name     = "{svc_name}"
+  location = "{region}"
+  project  = "{project}"
+
+  template {{
+    containers {{
+      image = "IMAGE_URI"
+
+      env {{
+        name = "{env_var}"
+        value_source {{
+          secret_key_ref {{
+            secret  = google_secret_manager_secret.{secret_id}.secret_id
+            version = "latest"
+          }}
+        }}
+      }}
+    }}
+  }}
+}}'''
+
+
+# ---------------------------------------------------------------------------
 # Explanation and steps registry
 # ---------------------------------------------------------------------------
 
@@ -3592,6 +4314,208 @@ EXPLANATIONS: dict[str, dict] = {
             "Review the compliance score in Defender for Cloud",
         ],
         "effort": "quick",
+    },
+    # ── GCP ──────────────────────────────────────────────────────────────────
+    "gcp-iam-primitive-roles": {
+        "explanation": "GCP primitive roles (Owner, Editor, Viewer) grant broad project-wide permissions that violate least-privilege. CIS GCP 1.1 requires replacing them with predefined or custom IAM roles that grant only the specific permissions each principal needs.",
+        "steps": [
+            "Run `gcloud projects get-iam-policy PROJECT_ID --format=json` to list all bindings",
+            "Identify all principals with roles/owner or roles/editor",
+            "Replace each with a predefined role (e.g., roles/compute.instanceAdmin, roles/storage.objectAdmin)",
+            "Remove the primitive role binding after granting the replacement",
+            "Use the Terraform template to manage bindings as code going forward",
+        ],
+        "effort": "moderate",
+    },
+    "gcp-iam-service-account-not-admin": {
+        "explanation": "Service accounts should never hold roles/owner or roles/editor at the project level. CIS GCP 1.5 requires granting service accounts only the specific roles needed for their workload — not blanket admin access that persists after the service is decommissioned.",
+        "steps": [
+            "List project IAM bindings: `gcloud projects get-iam-policy PROJECT_ID`",
+            "Identify service account members with owner or editor roles",
+            "Grant narrowly scoped predefined roles that match the service account's actual workload",
+            "Remove the overly permissive role bindings",
+        ],
+        "effort": "moderate",
+    },
+    "gcp-firewall-unrestricted-ssh": {
+        "explanation": "Firewall rules allowing SSH (port 22) from 0.0.0.0/0 or ::/0 expose all instances in the VPC to brute-force and credential-stuffing attacks. CIS GCP 3.6 requires restricting SSH ingress to specific IP ranges or routing through IAP tunnels.",
+        "steps": [
+            "Identify the firewall rule: `gcloud compute firewall-rules list --filter='allowed.ports=22 AND direction=INGRESS'`",
+            "Enable OS Login or use IAP for SSH: `gcloud compute instances add-metadata INSTANCE --metadata enable-oslogin=TRUE`",
+            "If direct SSH is required, restrict source ranges to your corporate CIDR",
+            "Delete or update the 0.0.0.0/0 rule: `gcloud compute firewall-rules update RULE --source-ranges CIDR`",
+        ],
+        "effort": "quick",
+    },
+    "gcp-firewall-unrestricted-rdp": {
+        "explanation": "Firewall rules allowing RDP (port 3389) from 0.0.0.0/0 or ::/0 expose Windows instances to credential attacks and ransomware delivery. CIS GCP 3.7 requires restricting RDP to specific source ranges or eliminating it in favor of IAP Desktop.",
+        "steps": [
+            "List rules: `gcloud compute firewall-rules list --filter='allowed.ports=3389'`",
+            "Enable IAP for Windows: use Google IAP TCP forwarding instead of public RDP",
+            "If direct RDP is required, restrict source-ranges to the corporate IP range",
+            "Remove the unrestricted rule via Console or `gcloud compute firewall-rules delete RULE`",
+        ],
+        "effort": "quick",
+    },
+    "gcp-vpc-flow-logs": {
+        "explanation": "VPC Flow Logs capture network flow metadata (source/destination IP, protocol, bytes) for subnets. CIS GCP 3.8 requires enabling flow logs on all subnets — they are essential for incident response, traffic anomaly detection, and network forensics.",
+        "steps": [
+            "List subnets missing flow logs: `gcloud compute networks subnets list --format='table(name,region,enableFlowLogs)'`",
+            "Enable flow logs per subnet: `gcloud compute networks subnets update SUBNET --region REGION --enable-flow-logs`",
+            "Configure sampling rate and aggregation interval as needed",
+            "Use the Terraform template to enforce flow logs on all future subnets",
+        ],
+        "effort": "moderate",
+    },
+    "gcp-kms-key-rotation": {
+        "explanation": "Cloud KMS symmetric keys should rotate automatically at least every 90 days (CIS GCP 1.10). Stale keys increase the blast radius of a key compromise and may violate compliance mandates that require fresh cryptographic material.",
+        "steps": [
+            "List keys without rotation: `gcloud kms keys list --keyring=KEYRING --location=global`",
+            "Set a rotation schedule: `gcloud kms keys update KEY --keyring=KEYRING --location=LOCATION --rotation-period=7776000s --next-rotation-time=TIMESTAMP`",
+            "For existing keys past rotation deadline, manually rotate: `gcloud kms keys versions create KEY --keyring=KEYRING --location=LOCATION --primary`",
+            "Use the Terraform `rotation_period` argument to enforce this for all new keys",
+        ],
+        "effort": "moderate",
+    },
+    "gcp-storage-bucket-public-access": {
+        "explanation": "GCS buckets with allUsers or allAuthenticatedUsers IAM bindings expose data to the public internet. CIS GCP 5.1 requires removing public access and enabling the uniform bucket-level access policy to prevent ACL-level public grants.",
+        "steps": [
+            "Identify public buckets: `gsutil iam get gs://BUCKET_NAME`",
+            "Remove public members: `gsutil iam ch -d allUsers gs://BUCKET_NAME`",
+            "Enable Public Access Prevention: `gcloud storage buckets update gs://BUCKET_NAME --public-access-prevention=enforced`",
+            "Set uniform bucket-level access to block legacy ACLs",
+        ],
+        "effort": "quick",
+    },
+    "gcp-storage-uniform-access": {
+        "explanation": "Uniform bucket-level access disables legacy object ACLs and enforces IAM-only access control. CIS GCP 5.2 requires enabling it to prevent inconsistent per-object permissions that are hard to audit and can inadvertently expose objects.",
+        "steps": [
+            "Enable for each bucket: `gsutil uniformbucketlevelaccess set on gs://BUCKET_NAME`",
+            "Once enabled, existing ACLs are no longer evaluated",
+            "Verify with: `gsutil uniformbucketlevelaccess get gs://BUCKET_NAME`",
+            "Use the Terraform `uniform_bucket_level_access = true` argument for all new buckets",
+        ],
+        "effort": "quick",
+    },
+    "gcp-logging-audit-config": {
+        "explanation": "GCP audit logs record who did what to which resource and when. CIS GCP 2.1 requires enabling Data Access audit logs (DATA_READ, DATA_WRITE) for all services — by default only admin activity is logged, leaving data-plane operations invisible to forensic investigation.",
+        "steps": [
+            "Check current audit config: `gcloud projects get-iam-policy PROJECT_ID --format=json | jq '.auditConfigs'`",
+            "Enable Data Access logging for all services via Console: IAM > Audit Logs > select all services > enable DATA_READ + DATA_WRITE",
+            "Or set via `gcloud projects set-iam-policy` with an updated policy JSON including auditConfigs",
+            "Use the Terraform `google_project_iam_audit_config` resource to manage this as code",
+        ],
+        "effort": "moderate",
+    },
+    "gcp-logging-metric-alerting": {
+        "explanation": "CIS GCP 2.2–2.13 requires log-based metrics and alerting policies for critical changes: project ownership, IAM changes, custom roles, VPC/firewall/route modifications, and SQL instance changes. Without these, security-relevant events go undetected until a post-incident review.",
+        "steps": [
+            "Create log-based metrics in Cloud Monitoring for each CIS control filter",
+            "Create alerting policies that fire when the metric exceeds threshold (usually 0)",
+            "Configure notification channels (email, PagerDuty, Slack) for each alert",
+            "Use the Terraform template to manage all metrics and alerts as code",
+        ],
+        "effort": "high",
+    },
+    "gcp-compute-os-login": {
+        "explanation": "OS Login binds SSH access to Google identities and enforces 2FA, replacing SSH key management with centralized IAM. CIS GCP 4.4 requires enabling it at the project level so all new instances inherit the setting by default.",
+        "steps": [
+            "Enable at project level: `gcloud compute project-info add-metadata --metadata enable-oslogin=TRUE`",
+            "Grant the `roles/compute.osLogin` or `roles/compute.osAdminLogin` role to users who need SSH",
+            "Ensure 2FA is enforced for all Google accounts in the organization",
+            "Verify on a test instance: `gcloud compute ssh INSTANCE --zone ZONE`",
+        ],
+        "effort": "moderate",
+    },
+    "gcp-compute-serial-port": {
+        "explanation": "The compute instance serial port provides low-level diagnostic access that bypasses normal authentication. CIS GCP 4.5 requires disabling it at the project level — leaving it enabled allows anyone with project-level IAM to access instance consoles interactively.",
+        "steps": [
+            "Disable at project level: `gcloud compute project-info add-metadata --metadata serial-port-enable=false`",
+            "Verify no instances have the override metadata `serial-port-enable=1`",
+            "Use an org policy to enforce: `gcloud resource-manager org-policies enable-enforce --project PROJECT compute.disableSerialPortAccess`",
+        ],
+        "effort": "quick",
+    },
+    "gcp-sql-require-ssl": {
+        "explanation": "Cloud SQL instances should require SSL/TLS for all connections to prevent credential interception in transit. CIS GCP 6.3 requires enabling `requireSsl` on all Cloud SQL instances — without it, applications may connect over plaintext.",
+        "steps": [
+            "Enable SSL requirement: `gcloud sql instances patch INSTANCE --require-ssl`",
+            "Create server CA certificates if not present",
+            "Update application connection strings to include SSL client certificates",
+            "For PostgreSQL, ensure `ssl=require` or `sslmode=require` in connection strings",
+        ],
+        "effort": "moderate",
+    },
+    "gcp-gke-workload-identity": {
+        "explanation": "Workload Identity Federation replaces long-lived service account key files with short-lived tokens issued per workload. CIS GCP 7.4 requires enabling Workload Identity on GKE clusters — key files are the primary credential theft vector in container environments.",
+        "steps": [
+            "Enable Workload Identity on the cluster: `gcloud container clusters update CLUSTER --workload-pool=PROJECT.svc.id.goog`",
+            "Annotate Kubernetes service accounts with the GCP service account: `kubectl annotate serviceaccount KSA iam.gke.io/gcp-service-account=GSA@PROJECT.iam.gserviceaccount.com`",
+            "Grant `roles/iam.workloadIdentityUser` to the Kubernetes SA on the GCP SA",
+            "Remove any key files previously mounted into pods",
+        ],
+        "effort": "high",
+    },
+    "gcp-gke-private-cluster": {
+        "explanation": "Private GKE clusters assign only internal IP addresses to nodes and restrict access to the control plane to authorised networks. CIS GCP 7.1 requires private clusters — public node IPs expose the Kubernetes API and nodes directly to the internet.",
+        "steps": [
+            "Private clusters must be configured at creation time — plan to recreate the cluster",
+            "Create with: `gcloud container clusters create CLUSTER --enable-private-nodes --enable-private-endpoint --master-ipv4-cidr 172.16.0.0/28`",
+            "Authorise control-plane access: `--master-authorized-networks CIDR`",
+            "Migrate workloads to the new private cluster using blue/green deployment",
+        ],
+        "effort": "high",
+    },
+    # ── GCP Cloud Run ─────────────────────────────────────────────────────────
+    "gcp-cloudrun-no-unauth-access": {
+        "explanation": "Cloud Run services that grant roles/run.invoker to allUsers or allAuthenticatedUsers can be called by anyone on the internet without credentials. Unless the service is explicitly a public endpoint (e.g. a landing page), this exposes application logic, data APIs, and compute to anonymous abuse.",
+        "steps": [
+            "List IAM policy: `gcloud run services get-iam-policy SERVICE --region=REGION`",
+            "Remove allUsers: `gcloud run services remove-iam-policy-binding SERVICE --region=REGION --member=allUsers --role=roles/run.invoker`",
+            "For service-to-service calls, use a dedicated invoker SA with `gcloud run services add-iam-policy-binding`",
+            "For user-facing traffic, front the service with Identity-Aware Proxy or a load balancer with authentication",
+        ],
+        "effort": "quick",
+    },
+    "gcp-cloudrun-no-default-sa": {
+        "explanation": "The default Compute Engine service account carries the Editor role at the project level, meaning any Cloud Run service using it can read/write most GCP resources in the project. A dedicated SA with only the required roles reduces the blast radius if the service is compromised.",
+        "steps": [
+            "Create a dedicated SA: `gcloud iam service-accounts create SERVICE-sa --display-name='Cloud Run SA for SERVICE'`",
+            "Grant only the roles the service needs (e.g., `roles/cloudsql.client`, `roles/secretmanager.secretAccessor`)",
+            "Update the service: `gcloud run services update SERVICE --service-account=SERVICE-sa@PROJECT.iam.gserviceaccount.com --region=REGION`",
+        ],
+        "effort": "moderate",
+    },
+    "gcp-cloudrun-ingress-restricted": {
+        "explanation": "Cloud Run services with INGRESS_TRAFFIC_ALL can be reached directly via the *.run.app URL, bypassing any Cloud Armor WAF policy, rate limiting, or authentication headers enforced by the load balancer. Setting ingress to INTERNAL_AND_CLOUD_LOAD_BALANCER forces all traffic through the controlled entry point.",
+        "steps": [
+            "Update ingress: `gcloud run services update SERVICE --ingress=internal-and-cloud-load-balancing --region=REGION`",
+            "For internal-only microservices: `--ingress=internal`",
+            "Set up a Cloud Load Balancer + Cloud Armor policy to be the sole public entry point",
+            "Verify the *.run.app URL is no longer publicly reachable after the change",
+        ],
+        "effort": "moderate",
+    },
+    "gcp-cloudrun-binary-authorization": {
+        "explanation": "Binary Authorization verifies that container images were built by your trusted CI/CD pipeline before allowing deployment to Cloud Run. Without it, any image (including attacker-substituted ones in a supply-chain attack) can be deployed. CIS GCP 5.7 recommends enabling it for all container workloads.",
+        "steps": [
+            "Configure a project-level Binary Authorization policy in the Console: Security > Binary Authorization",
+            "Set up an attestor tied to your CI/CD pipeline (Cloud Build or SLSA attestation)",
+            "Enable on the service: `gcloud run services update SERVICE --binary-authorization=default --region=REGION`",
+            "Test with a non-attested image to confirm it is blocked",
+        ],
+        "effort": "high",
+    },
+    "gcp-cloudrun-no-plaintext-secrets": {
+        "explanation": "Literal secret values in Cloud Run environment variables are stored in plain text in the service spec, visible in the Cloud Console, the API, and Cloud Audit Logs. They also appear in `gcloud run services describe` output. Secret Manager with secretKeyRef mounts secrets at runtime and ensures they are never stored in the service configuration.",
+        "steps": [
+            "Create the secret: `gcloud secrets create SECRET_NAME --replication-policy=automatic`",
+            "Add the secret value: `echo -n 'VALUE' | gcloud secrets versions add SECRET_NAME --data-file=-`",
+            "Grant the service SA access: `gcloud secrets add-iam-policy-binding SECRET_NAME --member=serviceAccount:SA_EMAIL --role=roles/secretmanager.secretAccessor`",
+            "Update the service: `gcloud run services update SERVICE --update-secrets=ENV_VAR=SECRET_NAME:latest --region=REGION`",
+            "Remove the plaintext env var: `gcloud run services update SERVICE --remove-env-vars=ENV_VAR --region=REGION`",
+        ],
+        "effort": "moderate",
     },
 }
 
