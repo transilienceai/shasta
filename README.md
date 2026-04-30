@@ -20,7 +20,7 @@ across AWS and Azure. Through conversation, not dashboards. From the team at [Tr
 
 ---
 
-Shasta scans your cloud infrastructure for SOC 2, ISO 27001, HIPAA, ISO 42001, EU AI Act, OWASP LLM Top 10 and more. The standalone Whitney static scanner ([github.com/transilienceai/whitney](https://github.com/transilienceai/whitney)) handles application source-code prompt-injection detection. Together, they cover 13 compliance frameworks, 221 automated checks, and 199 security questionnaire answers — with a web dashboard, 112 Terraform remediation templates, and auditor-grade evidence. Built for founders running <50 employee companies who need compliance without the $30K/year Vanta bill.
+Shasta scans your cloud infrastructure for SOC 2, ISO 27001, HIPAA, ISO 42001, EU AI Act, OWASP LLM Top 10 and more. The standalone Whitney static scanner ([github.com/transilienceai/whitney](https://github.com/transilienceai/whitney)) handles application source-code prompt-injection detection. Together, they cover 13 compliance frameworks, 267 automated checks, and 199 security questionnaire answers — with a web dashboard, 132 Terraform remediation templates, and auditor-grade evidence. Built for founders running <50 employee companies who need compliance without the $30K/year Vanta bill.
 
 > **Three load-bearing artifacts at the repo root, in order of what to read:**
 > [`README.md`](./README.md) (this file — what it does) →
@@ -74,7 +74,7 @@ continues normally.
 
 ## Platform Capabilities
 
-### 1. Multi-Cloud Security Scanning (5 Domains, 174+ Checks)
+### 1. Multi-Cloud Security Scanning (5 Domains, 267+ Checks)
 
 #### AWS Checks (40+)
 
@@ -334,14 +334,14 @@ For a **<50 employee startup** pursuing compliance:
 
 | Category | Coverage | Method |
 |----------|----------|--------|
-| Technical cloud controls | ~90% | 190+ automated checks across AWS and Azure (full CIS AWS v3.0 + CIS Azure v3.0 coverage, including EC2/EKS/ECS hardening, KMS posture, CIS 4.x CloudWatch alarms, CloudFront, Redshift, ElastiCache, Neptune, Lambda Function URL auth, S3 Object Ownership, AWS Backup cross-region copy + access policy) |
+| Technical cloud controls | ~90% | 267+ automated checks across AWS and Azure (full CIS AWS v3.0 + CIS Azure v3.0 coverage, including EC2/EKS/ECS hardening, KMS posture, CIS 4.x CloudWatch alarms, CloudFront, Redshift, ElastiCache, Neptune, Lambda Function URL auth, S3 Object Ownership, AWS Backup cross-region copy + access policy) |
 | Policy/process controls | ~80% | 8 generated policy documents |
 | Continuous monitoring | ~90% | 12 Config Rules + 6 EventBridge rules + GuardDuty + Inspector + Azure Defender (per-plan) + Azure Policy + CIS 5.2.x Activity Log alerts |
 | Audit evidence | ~85% | Control tests, evidence snapshots (AWS + Azure), access reviews, reports |
 | Vulnerability management | ~85% | Inspector + SBOM + OSV.dev + CISA KEV |
 | Supply chain security | ~80% | SBOM discovery + known-compromised DB + live scanning |
 | Change management | ~80% | GitHub integration + CloudTrail + Config + Azure Activity Log |
-| Remediation guidance | ~90% | 112 Terraform templates (81 AWS + 31 Azure azurerm) covering CloudTrail/KMS/Object Lock, Security Hub, Access Analyzer, EC2 IMDSv2 + instance profiles, EKS private endpoint + audit logging + secrets KMS, ECS task hardening, KMS rotation + key policy + scheduled deletion, IAM policy wildcards + role trust + unused roles, CIS 4.x CloudWatch alarms, Config conformance packs, CloudFront HTTPS+TLS+WAF+OAC, Redshift encryption+public-access+audit+SSL, ElastiCache TLS+at-rest+AUTH, Neptune encryption, RDS force_ssl + log_settings + min TLS, Lambda Function URL auth + layer origin, API Gateway client cert + authorizer + throttling + request validation, S3 Object Ownership + access logging + KMS-CMK, AWS Backup cross-region copy + access policy, EFS/SNS/SQS/Secrets/ACM, ELB v2 TLS+logs+headers, RDS deep+IAM auth+PITR, Lambda runtime+CMK+DLQ, API Gateway WAF+logging, AWS Backup vault lock, VPC endpoints, CloudWatch Logs KMS+retention, AWS Org SCPs+tag policies — plus the full Azure set |
+| Remediation guidance | ~90% | 132 Terraform templates (81 AWS + 31 Azure azurerm + 20 GCP google) covering CloudTrail/KMS/Object Lock, Security Hub, Access Analyzer, EC2 IMDSv2 + instance profiles, EKS private endpoint + audit logging + secrets KMS, ECS task hardening, KMS rotation + key policy + scheduled deletion, IAM policy wildcards + role trust + unused roles, CIS 4.x CloudWatch alarms, Config conformance packs, CloudFront HTTPS+TLS+WAF+OAC, Redshift encryption+public-access+audit+SSL, ElastiCache TLS+at-rest+AUTH, Neptune encryption, RDS force_ssl + log_settings + min TLS, Lambda Function URL auth + layer origin, API Gateway client cert + authorizer + throttling + request validation, S3 Object Ownership + access logging + KMS-CMK, AWS Backup cross-region copy + access policy, EFS/SNS/SQS/Secrets/ACM, ELB v2 TLS+logs+headers, RDS deep+IAM auth+PITR, Lambda runtime+CMK+DLQ, API Gateway WAF+logging, AWS Backup vault lock, VPC endpoints, CloudWatch Logs KMS+retention, AWS Org SCPs+tag policies — plus the full Azure and GCP sets |
 | Security questionnaires | ~70% | 199 questions auto-filled from scan evidence (SIG Lite, CAIQ, Enterprise) |
 | AI governance | ~85% | Cloud AI checks (Bedrock + SageMaker + Azure OpenAI + Azure ML) + AI SBOM, 7 frameworks (ISO 42001, EU AI Act, NIST AI RMF, NIST AI 600-1, OWASP LLM Top 10, OWASP Agentic Top 10, MITRE ATLAS); application source-code prompt-injection scanning lives in the standalone Whitney scanner (separate repo) |
 | Visual dashboard | Yes | FastAPI + Tailwind + Chart.js at localhost:8080 |
@@ -794,7 +794,7 @@ shasta/
 │   └── azure-test-env/                    # Azure test environment
 │       └── main.tf                        # Azure test resources (compliant + non-compliant)
 │
-├── tests/                                 # pytest test suite (500+ tests)
+├── tests/                                 # pytest test suite (720+ tests)
 │   ├── conftest.py
 │   ├── test_aws/
 │   │   ├── test_client.py                 # AWS client tests (moto)
