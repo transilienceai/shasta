@@ -1,0 +1,60 @@
+:root {
+  /* Background */
+  --bg-base: #231F20;
+  --bg-surface: #2D2829;
+  --bg-surface-raised: #3A3537;
+
+  /* Text */
+  --text-primary: #FFFFFF;
+  --text-muted: rgba(255, 255, 255, 0.6);
+  --text-subtle: rgba(255, 255, 255, 0.4);
+
+  /* Brand */
+  --brand-purple: #58298F;
+  --brand-magenta: #B61A3F;
+  --brand-yellow: #FCE205;
+
+  /* Severity (mapped to brand gradient stops) */
+  --severity-critical: #B61A3F;
+  --severity-high: #911961;
+  --severity-medium: #731E7A;
+  --severity-low: #58298F;
+
+  /* Severity tint backgrounds (16% opacity) */
+  --severity-critical-bg: rgba(182, 26, 63, 0.16);
+  --severity-high-bg: rgba(145, 25, 97, 0.16);
+  --severity-medium-bg: rgba(115, 30, 122, 0.16);
+  --severity-low-bg: rgba(88, 41, 143, 0.16);
+
+  /* Brand gradient (signature) */
+  --brand-gradient: linear-gradient(
+    90deg,
+    #58298F 0%,
+    #731E7A 25%,
+    #911961 50%,
+    #A01855 75%,
+    #B61A3F 100%
+  );
+
+  /* Surfaces */
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-card: rgba(255, 255, 255, 0.12);
+
+  /* Type */
+  --font-sans: "Roboto", "Arial", "Trebuchet MS", sans-serif;
+  --fs-body: 15px;
+  --fs-heading: 18px;
+  --fs-title: 24px;
+  --fs-small: 13px;
+
+  /* Layout */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+}
