@@ -97,6 +97,8 @@ export interface ActionResult {
   success: boolean;
   message: string;
   record_id: string | null;
+  new_status?: string;
+  timestamp?: string;
 }
 
 export type ActiveCard =
