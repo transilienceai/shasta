@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from shasta.voice.models import (
     ActionResult,
@@ -49,7 +49,7 @@ def test_finding_detail_extends_summary():
         region="us-east-1",
         account_id="1",
         details={"foo": "bar"},
-        timestamp=datetime(2026, 5, 5, tzinfo=timezone.utc),
+        timestamp=datetime(2026, 5, 5, tzinfo=UTC),
     )
     assert d.description == "desc"
     assert d.details == {"foo": "bar"}
@@ -140,7 +140,7 @@ def test_scan_summary_view():
         scan_id="s1",
         account_id="1",
         cloud_provider="aws",
-        completed_at=datetime(2026, 5, 5, tzinfo=timezone.utc),
+        completed_at=datetime(2026, 5, 5, tzinfo=UTC),
         total_findings=34,
         critical_count=4,
         high_count=11,

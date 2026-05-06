@@ -35,7 +35,6 @@ from shasta.voice.models import (
     ScoreTrendView,
 )
 
-
 # Scoring + mapper dispatch tables
 _SCORERS = {
     "soc2": calculate_score,
@@ -373,14 +372,14 @@ class Store:
         related_finding: str | None = None,
         soc2_controls: list[str] | None = None,
     ) -> ActionResult:
-        from datetime import datetime, UTC
+        from datetime import datetime
         from uuid import uuid4
         risk_id = f"R-{uuid4().hex[:8].upper()}"
         # Score: simple LxI matrix on a 1-3 scale → 1-9
         scale = {"low": 1, "medium": 2, "high": 3}
-        l = scale.get(likelihood.lower(), 2)
-        i = scale.get(impact.lower(), 2)
-        score = l * i
+        likelihood_score = scale.get(likelihood.lower(), 2)
+        impact_score = scale.get(impact.lower(), 2)
+        score = likelihood_score * impact_score
         level = "high" if score >= 6 else "medium" if score >= 3 else "low"
         now = datetime.now(UTC).isoformat()
 
@@ -425,13 +424,13 @@ class Store:
         existing = self.get_risk_item(risk_id, account_id=account_id)
         if existing is None:
             return ActionResult(success=False, message=f"Risk {risk_id} not found")
-        from datetime import datetime, UTC
+        from datetime import datetime
         from types import SimpleNamespace
         # Recreate the row with overrides — save_risk_items uses INSERT OR REPLACE
         scale = {"low": 1, "medium": 2, "high": 3}
-        l = scale.get(existing.likelihood.lower(), 2)
-        i = scale.get(existing.impact.lower(), 2)
-        score = l * i
+        likelihood_score = scale.get(existing.likelihood.lower(), 2)
+        impact_score = scale.get(existing.impact.lower(), 2)
+        score = likelihood_score * impact_score
         level = "high" if score >= 6 else "medium" if score >= 3 else "low"
         item = SimpleNamespace(
             risk_id=existing.risk_id,

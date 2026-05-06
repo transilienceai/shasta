@@ -1,6 +1,11 @@
 import json
 
-from shasta.voice.realtime_config import SYSTEM_PROMPT, TOOL_SCHEMAS, VAD_CONFIG, build_session_payload
+from shasta.voice.realtime_config import (
+    SYSTEM_PROMPT,
+    TOOL_SCHEMAS,
+    VAD_CONFIG,
+    build_session_payload,
+)
 
 
 def test_system_prompt_mentions_shasta_and_25_words():

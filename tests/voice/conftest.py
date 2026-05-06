@@ -163,6 +163,7 @@ def client(seeded_db_path: Path):
     os.environ.setdefault("OPENAI_API_KEY", "test-key")
     os.environ.setdefault("ALLOWED_ORIGINS", "http://localhost:8090")
     from fastapi.testclient import TestClient
+
     from shasta.voice.app import create_app
     app = create_app(db_path=seeded_db_path, serve_static=False)
     return TestClient(app)
