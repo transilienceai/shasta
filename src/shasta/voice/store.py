@@ -23,12 +23,14 @@ from shasta.compliance.scorer import calculate_score
 from shasta.db.schema import ShastaDB
 from shasta.evidence.models import Finding, ScanResult
 from shasta.voice.models import (
+    ActionResult,
     ComplianceScoreView,
     ControlSummaryView,
     FindingDetailView,
     FindingSummary,
     Framework,
     MultiFrameworkScoreView,
+    RiskItemView,
     ScanSummaryView,
     ScoreTrendView,
 )
@@ -321,3 +323,137 @@ class Store:
                 finding_ids=[f.id for f in data.get("findings", [])],
             ))
         return out
+
+    # ---- Risks ----
+
+    def _risk_row_to_view(self, row: dict) -> RiskItemView:
+        import json as _json
+        return RiskItemView(
+            risk_id=row["risk_id"],
+            title=row["title"],
+            description=row["description"],
+            category=row["category"],
+            likelihood=row["likelihood"],
+            impact=row["impact"],
+            risk_score=row["risk_score"],
+            risk_level=row["risk_level"],
+            treatment=row["treatment"],
+            treatment_plan=row.get("treatment_plan"),
+            status=row["status"],
+            soc2_controls=_json.loads(row["soc2_controls"]) if row.get("soc2_controls") else [],
+            related_finding=row.get("related_finding"),
+        )
+
+    def list_risk_items(self, account_id: str, status: str | None = None, level: str | None = None) -> list[RiskItemView]:
+        rows = self._db.get_risk_items(account_id)
+        if status:
+            rows = [r for r in rows if r.get("status") == status]
+        if level:
+            rows = [r for r in rows if r.get("risk_level") == level]
+        return [self._risk_row_to_view(r) for r in rows]
+
+    def get_risk_item(self, risk_id: str, account_id: str = "123456789012") -> RiskItemView | None:
+        rows = self._db.get_risk_items(account_id)
+        for r in rows:
+            if r["risk_id"] == risk_id:
+                return self._risk_row_to_view(r)
+        return None
+
+    def add_risk_item(
+        self,
+        *,
+        account_id: str,
+        title: str,
+        description: str,
+        category: str,
+        likelihood: str,
+        impact: str,
+        treatment: str,
+        treatment_plan: str | None = None,
+        related_finding: str | None = None,
+        soc2_controls: list[str] | None = None,
+    ) -> ActionResult:
+        from datetime import datetime, UTC
+        from uuid import uuid4
+        risk_id = f"R-{uuid4().hex[:8].upper()}"
+        # Score: simple LxI matrix on a 1-3 scale → 1-9
+        scale = {"low": 1, "medium": 2, "high": 3}
+        l = scale.get(likelihood.lower(), 2)
+        i = scale.get(impact.lower(), 2)
+        score = l * i
+        level = "high" if score >= 6 else "medium" if score >= 3 else "low"
+        now = datetime.now(UTC).isoformat()
+
+        # Build a record matching the columns expected by save_risk_items
+        # save_risk_items expects an object with attributes — wrap in a SimpleNamespace
+        from types import SimpleNamespace
+        item = SimpleNamespace(
+            risk_id=risk_id,
+            title=title,
+            description=description,
+            category=category,
+            likelihood=likelihood,
+            impact=impact,
+            risk_score=score,
+            risk_level=level,
+            owner=None,
+            treatment=treatment,
+            treatment_plan=treatment_plan,
+            status="open",
+            soc2_controls=soc2_controls or [],
+            related_finding=related_finding,
+            created_date=now,
+            last_reviewed=now,
+            review_notes=None,
+        )
+        try:
+            self._db.save_risk_items([item], account_id=account_id)
+        except Exception as e:
+            return ActionResult(success=False, message=f"Failed to add risk: {e}")
+        return ActionResult(success=True, message=f"Added risk {risk_id}", record_id=risk_id)
+
+    def update_risk(
+        self,
+        risk_id: str,
+        *,
+        treatment: str | None = None,
+        treatment_plan: str | None = None,
+        status: str | None = None,
+        review_notes: str | None = None,
+        account_id: str = "123456789012",
+    ) -> ActionResult:
+        existing = self.get_risk_item(risk_id, account_id=account_id)
+        if existing is None:
+            return ActionResult(success=False, message=f"Risk {risk_id} not found")
+        from datetime import datetime, UTC
+        from types import SimpleNamespace
+        # Recreate the row with overrides — save_risk_items uses INSERT OR REPLACE
+        scale = {"low": 1, "medium": 2, "high": 3}
+        l = scale.get(existing.likelihood.lower(), 2)
+        i = scale.get(existing.impact.lower(), 2)
+        score = l * i
+        level = "high" if score >= 6 else "medium" if score >= 3 else "low"
+        item = SimpleNamespace(
+            risk_id=existing.risk_id,
+            title=existing.title,
+            description=existing.description,
+            category=existing.category,
+            likelihood=existing.likelihood,
+            impact=existing.impact,
+            risk_score=score,
+            risk_level=level,
+            owner=None,
+            treatment=treatment if treatment is not None else existing.treatment,
+            treatment_plan=treatment_plan if treatment_plan is not None else existing.treatment_plan,
+            status=status if status is not None else existing.status,
+            soc2_controls=existing.soc2_controls,
+            related_finding=existing.related_finding,
+            created_date=datetime.now(UTC).isoformat(),  # save_risk_items doesn't preserve this on REPLACE
+            last_reviewed=datetime.now(UTC).isoformat(),
+            review_notes=review_notes if review_notes is not None else None,
+        )
+        try:
+            self._db.save_risk_items([item], account_id=account_id)
+        except Exception as e:
+            return ActionResult(success=False, message=f"Failed to update risk: {e}")
+        return ActionResult(success=True, message=f"Updated risk {risk_id}", record_id=risk_id)
