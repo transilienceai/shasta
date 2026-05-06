@@ -1,11 +1,13 @@
 <div align="center">
 
-# Shasta + Whitney
+# Shasta
 
-**Multi-Cloud Compliance & AI Governance, Claude-Native**
+**Multi-Cloud Compliance Automation, Claude-Native**
 
-AI-native compliance toolkit — SOC 2, ISO 27001, HIPAA, ISO 42001 and EU AI Act
-across AWS and Azure. Through conversation, not dashboards. From the team at [Transilience.ai](https://www.transilience.ai).
+AI-native compliance toolkit — SOC 2, ISO 27001, HIPAA, ISO 42001, and EU AI Act
+across AWS and Azure. Through conversation, not dashboards — including an opt-in
+**voice console** (`python -m shasta.voice`) that lets you talk to your compliance
+posture hands-free. From the team at [Transilience.ai](https://www.transilience.ai).
 
 [![Built by Transilience](https://img.shields.io/badge/Built%20by-Transilience.ai-4A90D9)](https://www.transilience.ai)
 [![CI](https://github.com/transilienceai/shasta/actions/workflows/integrity.yml/badge.svg)](https://github.com/transilienceai/shasta/actions/workflows/integrity.yml)
@@ -20,7 +22,9 @@ across AWS and Azure. Through conversation, not dashboards. From the team at [Tr
 
 ---
 
-Shasta scans your cloud infrastructure for SOC 2, ISO 27001, HIPAA, ISO 42001, EU AI Act, OWASP LLM Top 10 and more. The standalone Whitney static scanner ([github.com/transilienceai/whitney](https://github.com/transilienceai/whitney)) handles application source-code prompt-injection detection. Together, they cover 13 compliance frameworks, 221 automated checks, and 199 security questionnaire answers — with a web dashboard, 112 Terraform remediation templates, and auditor-grade evidence. Built for founders running <50 employee companies who need compliance without the $30K/year Vanta bill.
+> 📹 **See it in action:** [60-second walkthrough of the voice console](./docs/media/shasta-voice-demo.mp4) — talk to your compliance posture, drill into findings, manage the risk register hands-free. Also attached as a release asset on the [v1.9.0 GitHub Release](https://github.com/transilienceai/shasta/releases/tag/v1.9.0).
+
+Shasta scans your cloud infrastructure for SOC 2, ISO 27001, HIPAA, ISO 42001, EU AI Act, OWASP LLM Top 10 and more. It covers 13 compliance frameworks, 221 automated checks, and 199 security questionnaire answers — with a web dashboard, an opt-in voice console, 112 Terraform remediation templates, and auditor-grade evidence. Application source-code AI scanning lives in the separate [Whitney](https://github.com/transilienceai/whitney) project (`pip install whitney`). Built for founders running <50 employee companies who need compliance without the $30K/year Vanta bill.
 
 > **Three load-bearing artifacts at the repo root, in order of what to read:**
 > [`README.md`](./README.md) (this file — what it does) →
@@ -30,31 +34,9 @@ Shasta scans your cloud infrastructure for SOC 2, ISO 27001, HIPAA, ISO 42001, E
 
 ---
 
-## Sibling project — Whitney static scanner
+## Whitney (separate project)
 
-Whitney is Shasta's sibling open-source tool, shipped at
-[**github.com/transilienceai/whitney**](https://github.com/transilienceai/whitney).
-It is a pure static AI security scanner (prompt injection across 15 source
-types, broken LLM-as-judge detection, AI dependency SBOM) and installs
-as `pip install whitney`.
-
-The two tools are complementary:
-
-| | Whitney | Shasta |
-|---|---|---|
-| **What** | Scan application source code | Scan cloud environments + compliance reporting |
-| **Detection** | Semgrep ruleset + opt-in LLM triage | AWS/Azure SDK calls, compliance mappings |
-| **Findings carry** | CWE + OWASP LLM Top 10 + OWASP Agentic | SOC 2 + ISO 27001 + HIPAA + ISO 42001 + EU AI Act controls |
-| **Audience** | ML engineers, AI app devs, security researchers | Founders, compliance buyers, SOC 2 auditors |
-| **Runtime deps** | `semgrep` only (+ optional `anthropic` for triage) | `boto3`, `azure-*`, `pydantic`, `jinja2` |
-| **Install** | `pip install whitney` | `pip install -e .` from this repo |
-
-Shasta's `/ai-scan` and `/ai-code-review` skills shell out to the
-installed `whitney` CLI for source-code findings, then enrich the JSON
-output with Shasta's ISO 42001 / EU AI Act / NIST AI RMF / MITRE ATLAS
-compliance mappings before scoring and reporting. If Whitney isn't
-installed, the code-scan step returns an empty list and the cloud scan
-continues normally.
+For application source-code AI security scanning — prompt injection detection, broken LLM-as-judge checks, AI dependency SBOM — install the standalone [**Whitney scanner**](https://github.com/transilienceai/whitney): `pip install whitney`. Shasta's `/ai-scan` and `/ai-code-review` skills will shell out to it automatically when present and enrich its findings with Shasta's compliance mappings; if Whitney isn't installed, those skills skip the source-code step and continue the cloud scan normally.
 
 ---
 

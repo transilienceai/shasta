@@ -240,29 +240,29 @@ def test_readme_intro_total_check_count() -> None:
     """The intro paragraph 'N automated checks' free-text claim must match grand total.
 
     This catches the failure mode where the headline at line 25 is integrity-tested
-    but the prose intro at line 5 drifts independently. The intro claim references
-    Shasta + Whitney combined ('Together, they cover ...'), so it should match the
-    grand total, not just the Shasta-only count.
+    but the prose intro drifts independently. The marker is the co-located
+    'compliance frameworks' phrase — every intro variant (with or without Whitney)
+    has used the same sentence shape: 'X compliance frameworks, Y automated checks'.
     """
     text = README.read_text(encoding="utf-8")
     pattern = re.compile(r"(\d+)\s+automated checks(?!\s+across AWS and Azure)")
     for lineno, line in enumerate(text.splitlines(), start=1):
         if "~~" in line:
             continue
-        if "Together, they cover" not in line:
+        if "compliance frameworks" not in line:
             continue
         m = pattern.search(line)
         if m:
             claimed = int(m.group(1))
             actual = total_check_count()
             assert claimed == actual, (
-                f"README.md:{lineno} 'Together, they cover ... {claimed} automated checks' "
-                f"is stale. Actual grand total = {actual} ({shasta_check_count()} cloud "
+                f"README.md:{lineno} '...{claimed} automated checks...' is stale. "
+                f"Actual grand total = {actual} ({shasta_check_count()} cloud "
                 f"+ {whitney_check_count()} AI). Update the line to {actual}."
             )
             return
     raise AssertionError(
-        "README intro 'Together, they cover ... N automated checks' line not found. "
+        "README intro 'X compliance frameworks, Y automated checks' line not found. "
         "Either the README was rewritten or this test needs updating."
     )
 
