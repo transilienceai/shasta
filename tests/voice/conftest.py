@@ -154,3 +154,15 @@ def store(seeded_db_path: Path):
     s = Store(db_path=seeded_db_path)
     yield s
     s.close()
+
+
+@pytest.fixture
+def client(seeded_db_path: Path):
+    """FastAPI TestClient bound to the seeded DB."""
+    import os
+    os.environ.setdefault("OPENAI_API_KEY", "test-key")
+    os.environ.setdefault("ALLOWED_ORIGINS", "http://localhost:8090")
+    from fastapi.testclient import TestClient
+    from shasta.voice.app import create_app
+    app = create_app(db_path=seeded_db_path, serve_static=False)
+    return TestClient(app)
