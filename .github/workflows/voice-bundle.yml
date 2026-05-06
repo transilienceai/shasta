@@ -1,0 +1,34 @@
+name: voice-bundle
+
+on:
+  pull_request:
+    paths:
+      - 'src/shasta/voice/web/src/**'
+      - 'src/shasta/voice/web/package.json'
+      - 'src/shasta/voice/web/package-lock.json'
+      - 'src/shasta/voice/web/vite.config.ts'
+
+jobs:
+  rebuild-and-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'src/shasta/voice/web/package-lock.json'
+      - name: Install
+        working-directory: src/shasta/voice/web
+        run: npm ci
+      - name: Build
+        working-directory: src/shasta/voice/web
+        run: npm run build
+      - name: Verify committed bundle is up to date
+        run: |
+          if ! git diff --quiet src/shasta/voice/web/dist/; then
+            echo "::error::The committed React bundle is out of date. Run 'npm run build' in src/shasta/voice/web/ and commit the result."
+            git status src/shasta/voice/web/dist/
+            git diff src/shasta/voice/web/dist/ | head -100
+            exit 1
+          fi

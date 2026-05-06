@@ -4,6 +4,40 @@ All notable changes to Shasta are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] — 2026-05-05 — Voice console (opt-in)
+
+### Added
+- **Voice-driven compliance console** — opt-in module at `src/shasta/voice/`
+  delivering a hands-free, conversational interface to your scan data.
+  Run `python -m shasta.voice` after a scan to open a browser-based
+  voice console at `localhost:8090` and talk to your compliance posture
+  across SOC 2, ISO 27001, HIPAA, ISO 42001, and EU AI Act.
+  - Browser-direct WebRTC to OpenAI Realtime API; FastAPI backend mints
+    ephemeral tokens and serves 14 tool endpoints. Backend never handles
+    audio.
+  - Voice-driven dashboard: dashboard cards (FindingsList, FindingDetail,
+    ComplianceScore, MultiFrameworkScore, ControlSummary, RiskList,
+    RiskDetail, ActionToast) mount in response to assistant tool calls.
+  - Read-only over `ShastaDB` for findings/scores/controls/scans, plus
+    light writes for risk-register operations (`add_risk_item`,
+    `update_risk`). Heavy ops (scans, reports, Terraform generation,
+    policy generation) remain in the Claude Code skills — voice
+    redirects to them.
+  - Pre-built React bundle ships in the wheel, so users do not need
+    Node.js installed at runtime.
+  - Install with `pip install shasta[voice]`. Requires `OPENAI_API_KEY`.
+  - 74 voice-specific tests (~85% coverage on `src/shasta/voice/`).
+  - CI workflow (`.github/workflows/voice-bundle.yml`) verifies the
+    committed React bundle stays in sync with `web/src/`.
+  - Spec: `docs/superpowers/specs/2026-05-05-shastavoice-design.md`.
+  - Plan: `docs/superpowers/plans/2026-05-05-shastavoice.md`.
+
+### Changed
+- `ShastaDB._conn` now opens its SQLite connection with
+  `check_same_thread=False` so the voice console's FastAPI app can share
+  the connection across the request worker pool. Behavior is unchanged
+  for the existing single-threaded dashboard. (`src/shasta/db/schema.py`)
+
 ## [1.6.1] — 2026-04-11 — Prod-scan bug sweep
 
 Five bugs surfaced during a live SOC 2 / ISO 27001 / HIPAA / Whitney scan

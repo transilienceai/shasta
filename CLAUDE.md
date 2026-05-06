@@ -1,7 +1,7 @@
 # Shasta — Multi-Cloud Compliance Automation
 
 ## What is this?
-Shasta is a Claude Code-native SOC 2 and ISO 27001 compliance platform. It scans AWS and Azure environments, maps findings to compliance controls, generates remediation guidance (with Terraform), and produces compliance policies and reports.
+Shasta is a Claude Code-native multi-cloud compliance platform. It scans AWS and Azure environments, maps findings to compliance controls (SOC 2, ISO 27001, HIPAA, ISO 42001, EU AI Act), generates remediation guidance (with Terraform), produces compliance policies and reports, and ships an optional voice-driven dashboard (`python -m shasta.voice`) for hands-free posture queries.
 
 ## Tech stack
 - Python 3.11+, boto3, azure-identity, azure-mgmt-*, msgraph-sdk, rich, pydantic, jinja2, weasyprint
@@ -15,15 +15,19 @@ Shasta is a Claude Code-native SOC 2 and ISO 27001 compliance platform. It scans
 - `src/shasta/compliance/ai/` — AI governance frameworks (ISO 42001, EU AI Act, NIST AI RMF)
 - `src/shasta/aws/ai_checks.py` — AWS AI service checks (Bedrock, SageMaker)
 - `src/shasta/azure/ai_checks.py` — Azure AI service checks (Azure OpenAI, Azure ML)
+- `src/shasta/dashboard/` — read-only HTML compliance dashboard (FastAPI + Jinja, port 8080)
+- `src/shasta/voice/` — opt-in voice console (FastAPI + React + OpenAI Realtime, port 8090); install with `pip install -e ".[voice]"`
 - `.claude/skills/` — Claude Code skill definitions
-- `tests/` — pytest test suite (uses moto for AWS mocking, unittest.mock for Azure)
+- `tests/` — pytest test suite (uses moto for AWS mocking, unittest.mock for Azure); voice-specific tests live under `tests/voice/`
 - `data/` — runtime data (gitignored)
 
 ## Commands
-- Install: `pip install -e ".[dev]"` (core) or `pip install -e ".[dev,azure]"` (with Azure)
-- Test: `pytest`
+- Install: `pip install -e ".[dev]"` (core), `pip install -e ".[dev,azure]"` (with Azure), or `pip install -e ".[dev,azure,voice]"` (with voice console)
+- Test: `pytest` (or `pytest tests/voice/` for voice-only)
 - Lint: `ruff check src/ tests/`
 - Format: `ruff format src/ tests/`
+- Run dashboard: `python -m shasta.dashboard` (HTML, port 8080)
+- Run voice console: `python -m shasta.voice` (requires `OPENAI_API_KEY` and a populated `data/shasta.db`; port 8090)
 
 ## Conventions
 - Use pydantic models for all data structures

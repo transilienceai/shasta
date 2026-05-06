@@ -296,6 +296,20 @@ See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for the complete setup guide incl
 
 > **You don't need to memorize slash commands.** Shasta and Whitney are AI-native — just describe what you need in plain English inside Claude Code. Say *"Connect to my AWS and run a full SOC 2 gap analysis with remediation Terraform"* and Claude orchestrates everything. See **[docs/CONVERSATIONS.md](./docs/CONVERSATIONS.md)** for 15 real conversation examples.
 
+### Voice Console (optional)
+
+Talk to your compliance posture instead of clicking through dashboards.
+
+```bash
+pip install shasta[voice]      # adds FastAPI + uvicorn + httpx
+export OPENAI_API_KEY=sk-...   # required for OpenAI Realtime API
+python -m shasta.voice         # opens browser at http://localhost:8090
+```
+
+Requires a recent scan in `data/shasta.db` (run `/scan` in Claude Code first). The voice assistant has read access to all your findings, compliance scores (SOC 2, ISO 27001, HIPAA, ISO 42001, EU AI Act), and risk register, plus light writes for adding/updating risk-register items. Heavy operations (scans, reports, Terraform generation) remain in the Claude Code skills — voice will redirect you to them.
+
+📹 **Demo:** [`docs/media/shasta-voice-demo.mp4`](./docs/media/shasta-voice-demo.mp4) — 60-second walkthrough showing posture queries, finding drilldowns, and risk-register writes against a real scan.
+
 ---
 
 ## Skills Reference
