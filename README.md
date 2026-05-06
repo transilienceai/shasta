@@ -308,6 +308,8 @@ python -m shasta.voice         # opens browser at http://localhost:8090
 
 Requires a recent scan in `data/shasta.db` (run `/scan` in Claude Code first). The voice assistant has read access to all your findings, compliance scores (SOC 2, ISO 27001, HIPAA, ISO 42001, EU AI Act), and risk register, plus light writes for adding/updating risk-register items. Heavy operations (scans, reports, Terraform generation) remain in the Claude Code skills — voice will redirect you to them.
 
+📹 **Demo:** [`docs/media/shasta-voice-demo.mp4`](./docs/media/shasta-voice-demo.mp4) — 60-second walkthrough showing posture queries, finding drilldowns, and risk-register writes against a real scan.
+
 ---
 
 ## Skills Reference
