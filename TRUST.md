@@ -23,7 +23,7 @@ Shasta and Whitney together ship the following, all integrity-tested:
 
 - **267 check functions** (267 cloud compliance + 0 AI governance — Whitney now ships as a separate repo at [github.com/transilienceai/whitney](https://github.com/transilienceai/whitney); install with `pip install whitney` for source-code scanning)
 - **132 Terraform remediation templates** (81 AWS + 31 Azure + 20 GCP)
-- **720 tests** that all pass on every commit
+- **814 tests** that all pass on every commit
 
 None of the claims in this README are written by hand and hoped-for —
 every numeric claim is AST-counted from source by an integrity test
