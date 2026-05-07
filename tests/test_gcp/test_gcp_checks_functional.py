@@ -175,6 +175,158 @@ class TestCheckNoAllUsersAccess:
         assert not fail_findings
 
 
+class TestCheckServiceAccountTokenCreator:
+    def _setup_iam_policy(self, client, bindings):
+        crm = MagicMock()
+        crm.projects.return_value.getIamPolicy.return_value.execute.return_value = {
+            "bindings": bindings
+        }
+        client.service.return_value = crm
+
+    def test_user_holder_at_project_scope_fails(self):
+        from shasta.gcp.iam import check_iam_service_account_token_creator
+
+        client = _make_client()
+        self._setup_iam_policy(client, [
+            {
+                "role": "roles/iam.serviceAccountTokenCreator",
+                "members": ["user:attacker@example.com"],
+            }
+        ])
+        findings = check_iam_service_account_token_creator(client, PROJECT_ID, "global")
+        fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
+        assert fail_findings
+
+    def test_sa_holder_at_project_scope_fails(self):
+        """SA holder at project scope has same blast radius as a user — must FAIL."""
+        from shasta.gcp.iam import check_iam_service_account_token_creator
+
+        client = _make_client()
+        self._setup_iam_policy(client, [
+            {
+                "role": "roles/iam.serviceAccountTokenCreator",
+                "members": ["serviceAccount:bad-sa@test-project.iam.gserviceaccount.com"],
+            }
+        ])
+        findings = check_iam_service_account_token_creator(client, PROJECT_ID, "global")
+        fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
+        assert fail_findings, "SA holder at project scope should FAIL — same blast radius as user"
+
+    def test_no_impersonation_roles_passes(self):
+        from shasta.gcp.iam import check_iam_service_account_token_creator
+
+        client = _make_client()
+        self._setup_iam_policy(client, [
+            {"role": "roles/storage.objectViewer", "members": ["user:alice@example.com"]}
+        ])
+        findings = check_iam_service_account_token_creator(client, PROJECT_ID, "global")
+        fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
+        assert not fail_findings
+
+    def test_service_account_user_role_also_fails(self):
+        from shasta.gcp.iam import check_iam_service_account_token_creator
+
+        client = _make_client()
+        self._setup_iam_policy(client, [
+            {
+                "role": "roles/iam.serviceAccountUser",
+                "members": ["group:devs@example.com"],
+            }
+        ])
+        findings = check_iam_service_account_token_creator(client, PROJECT_ID, "global")
+        fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
+        assert fail_findings
+
+    def test_api_error_not_assessed(self):
+        from shasta.gcp.iam import check_iam_service_account_token_creator
+
+        client = _make_client()
+        crm = MagicMock()
+        crm.projects.return_value.getIamPolicy.return_value.execute.side_effect = Exception(
+            "403 Permission denied"
+        )
+        client.service.return_value = crm
+        findings = check_iam_service_account_token_creator(client, PROJECT_ID, "global")
+        assert findings
+        assert all(f.status == ComplianceStatus.NOT_ASSESSED for f in findings)
+
+
+class TestCheckWorkloadIdentityPreferred:
+    def _setup_iam(self, client, accounts, keys_per_account=None):
+        """accounts: list of {"email": ..., "name": ...}
+        keys_per_account: dict of name → list of key dicts (default empty).
+        """
+        iam = MagicMock()
+        iam.projects.return_value.serviceAccounts.return_value.list.return_value.execute.return_value = {
+            "accounts": accounts
+        }
+        keys_per_account = keys_per_account or {}
+
+        def _keys_side_effect(name, keyTypes):
+            return MagicMock(
+                execute=MagicMock(return_value={"keys": keys_per_account.get(name, [])})
+            )
+
+        iam.projects.return_value.serviceAccounts.return_value.keys.return_value.list.side_effect = (
+            lambda name, keyTypes: MagicMock(
+                execute=MagicMock(return_value={"keys": keys_per_account.get(name, [])})
+            )
+        )
+        client.service.return_value = iam
+
+    def test_no_user_keys_passes(self):
+        from shasta.gcp.iam import check_iam_workload_identity_preferred
+
+        client = _make_client()
+        self._setup_iam(client, [
+            {"email": "sa@test-project.iam.gserviceaccount.com", "name": "projects/test-project/serviceAccounts/sa"}
+        ], {})  # No user-managed keys → PASS
+        findings = check_iam_workload_identity_preferred(client, PROJECT_ID, "global")
+        pass_findings = [f for f in findings if f.status == ComplianceStatus.PASS]
+        assert pass_findings
+
+    def test_with_user_managed_keys_partial(self):
+        from shasta.gcp.iam import check_iam_workload_identity_preferred
+
+        sa_name = "projects/test-project/serviceAccounts/sa"
+        client = _make_client()
+        self._setup_iam(
+            client,
+            [{"email": "sa@test-project.iam.gserviceaccount.com", "name": sa_name}],
+            {sa_name: [{"name": f"{sa_name}/keys/abc123"}]},
+        )
+        findings = check_iam_workload_identity_preferred(client, PROJECT_ID, "global")
+        partial_findings = [f for f in findings if f.status == ComplianceStatus.PARTIAL]
+        assert partial_findings
+
+    def test_no_service_accounts_passes(self):
+        from shasta.gcp.iam import check_iam_workload_identity_preferred
+
+        client = _make_client()
+        iam = MagicMock()
+        iam.projects.return_value.serviceAccounts.return_value.list.return_value.execute.return_value = {
+            "accounts": []
+        }
+        client.service.return_value = iam
+        findings = check_iam_workload_identity_preferred(client, PROJECT_ID, "global")
+        # No SAs → no keys → PASS
+        pass_findings = [f for f in findings if f.status == ComplianceStatus.PASS]
+        assert pass_findings
+
+    def test_api_error_not_assessed(self):
+        from shasta.gcp.iam import check_iam_workload_identity_preferred
+
+        client = _make_client()
+        iam = MagicMock()
+        iam.projects.return_value.serviceAccounts.return_value.list.return_value.execute.side_effect = Exception(
+            "403 Permission denied"
+        )
+        client.service.return_value = iam
+        findings = check_iam_workload_identity_preferred(client, PROJECT_ID, "global")
+        assert findings
+        assert all(f.status == ComplianceStatus.NOT_ASSESSED for f in findings)
+
+
 # ===========================================================================
 # Networking checks
 # ===========================================================================
@@ -287,56 +439,75 @@ class TestCheckFirewallNoRDP:
 
 
 class TestCheckSubnetFlowLogs:
+    def _setup(self, client, subnets):
+        compute = MagicMock()
+        compute.subnetworks.return_value.list.return_value.execute.return_value = (
+            {"items": subnets} if subnets is not None else {}
+        )
+        client.service.return_value = compute
+
     def test_subnet_without_flow_logs_fails(self):
         from shasta.gcp.networking import check_subnet_flow_logs_enabled
 
         client = _make_client()
-        compute = MagicMock()
-        compute.subnetworks.return_value.list.return_value.execute.return_value = {
-            "items": [
-                {
-                    "name": "default",
-                    "selfLink": "https://compute.googleapis.com/compute/v1/projects/test-project/regions/us-central1/subnetworks/default",
-                    # No logConfig → flow logs disabled
-                }
-            ]
-        }
-        client.service.return_value = compute
+        self._setup(client, [
+            {
+                "name": "default",
+                "selfLink": "https://compute.googleapis.com/compute/v1/projects/test-project/regions/us-central1/subnetworks/default",
+                # No logConfig → flow logs disabled
+            }
+        ])
         findings = check_subnet_flow_logs_enabled(client, PROJECT_ID, REGION)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert fail_findings
+        # resource_id should be the selfLink, not an aggregate path
+        assert "subnetworks/default" in fail_findings[0].resource_id
 
     def test_subnet_with_flow_logs_passes(self):
         from shasta.gcp.networking import check_subnet_flow_logs_enabled
 
         client = _make_client()
-        compute = MagicMock()
-        compute.subnetworks.return_value.list.return_value.execute.return_value = {
-            "items": [
-                {
-                    "name": "default",
-                    "selfLink": "...",
-                    "logConfig": {"enable": True},
-                }
-            ]
-        }
-        client.service.return_value = compute
+        self._setup(client, [
+            {
+                "name": "my-subnet",
+                "selfLink": "https://compute.googleapis.com/compute/v1/projects/test-project/regions/us-central1/subnetworks/my-subnet",
+                "logConfig": {"enable": True},
+            }
+        ])
         findings = check_subnet_flow_logs_enabled(client, PROJECT_ID, REGION)
-        fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
-        assert not fail_findings
+        assert all(f.status == ComplianceStatus.PASS for f in findings)
+
+    def test_mixed_subnets_emit_per_subnet_findings(self):
+        """Compliant subnets are PASS; non-compliant are FAIL — both visible."""
+        from shasta.gcp.networking import check_subnet_flow_logs_enabled
+
+        client = _make_client()
+        self._setup(client, [
+            {
+                "name": "compliant-subnet",
+                "selfLink": "https://example.com/subnetworks/compliant-subnet",
+                "logConfig": {"enable": True},
+            },
+            {
+                "name": "bad-subnet",
+                "selfLink": "https://example.com/subnetworks/bad-subnet",
+                # no logConfig
+            },
+        ])
+        findings = check_subnet_flow_logs_enabled(client, PROJECT_ID, REGION)
+        statuses = {f.status for f in findings}
+        assert ComplianceStatus.PASS in statuses
+        assert ComplianceStatus.FAIL in statuses
+        assert len(findings) == 2
 
     def test_no_subnets_returns_empty(self):
         from shasta.gcp.networking import check_subnet_flow_logs_enabled
 
         client = _make_client()
-        compute = MagicMock()
-        compute.subnetworks.return_value.list.return_value.execute.return_value = {}
-        client.service.return_value = compute
+        self._setup(client, None)
         findings = check_subnet_flow_logs_enabled(client, PROJECT_ID, REGION)
-        # Code returns [] (empty list) when no subnets — not NOT_APPLICABLE
         assert isinstance(findings, list)
-        fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
-        assert not fail_findings
+        assert not findings
 
 
 # ===========================================================================
@@ -444,37 +615,43 @@ class TestCheckBucketVersioning:
 # ===========================================================================
 
 
+def _setup_kms(client, key_rings, crypto_keys=None):
+    """Set up KMS mock with the two-step API shape:
+    1. locations().list() → {"locations": [{"locationId": ...}]}
+    2. locations().keyRings().list(parent=...) → {"keyRings": [...]}
+    3. locations().keyRings().cryptoKeys().list(parent=...) → {"cryptoKeys": [...]}
+    """
+    kms = MagicMock()
+    loc_chain = kms.projects.return_value.locations.return_value
+    # Step 1: enumerate locations
+    loc_chain.list.return_value.execute.return_value = {
+        "locations": [{"locationId": "global"}]
+    }
+    ring_chain = loc_chain.keyRings.return_value
+    # Step 2: list key rings per location
+    ring_chain.list.return_value.execute.return_value = {"keyRings": key_rings}
+    # Step 3: list crypto keys per ring
+    ring_chain.cryptoKeys.return_value.list.return_value.execute.return_value = {
+        "cryptoKeys": crypto_keys or []
+    }
+    client.service.return_value = kms
+    return kms
+
+
 class TestCheckKmsKeyRotation:
     def test_key_without_rotation_fails(self):
         from shasta.gcp.encryption import check_kms_key_rotation_period
 
         client = _make_client()
-
-        # The code calls:
-        # kms.projects().locations().keyRings().list(parent=parent).execute()
-        #   → returns {"keyRings": [...]}
-        # kms.projects().locations().keyRings().cryptoKeys().list(parent=ring_name).execute()
-        #   → returns {"cryptoKeys": [...]}
-        kms = MagicMock()
-        chain = kms.projects.return_value.locations.return_value.keyRings.return_value
-
-        # keyRings().list() → execute() returns keyRings list
-        chain.list.return_value.execute.return_value = {
-            "keyRings": [
-                {"name": "projects/test-project/locations/global/keyRings/my-ring"}
-            ]
-        }
-        # keyRings().cryptoKeys().list() → execute() returns cryptoKeys list
-        chain.cryptoKeys.return_value.list.return_value.execute.return_value = {
-            "cryptoKeys": [
-                {
-                    "name": "projects/test-project/locations/global/keyRings/my-ring/cryptoKeys/my-key",
-                    "purpose": "ENCRYPT_DECRYPT",
-                    # No rotationPeriod → non-compliant
-                }
-            ]
-        }
-        client.service.return_value = kms
+        _setup_kms(client, [
+            {"name": "projects/test-project/locations/global/keyRings/my-ring"}
+        ], [
+            {
+                "name": "projects/test-project/locations/global/keyRings/my-ring/cryptoKeys/my-key",
+                "purpose": "ENCRYPT_DECRYPT",
+                # No rotationPeriod → non-compliant
+            }
+        ])
 
         findings = check_kms_key_rotation_period(client, PROJECT_ID)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
@@ -484,24 +661,15 @@ class TestCheckKmsKeyRotation:
         from shasta.gcp.encryption import check_kms_key_rotation_period
 
         client = _make_client()
-
-        kms = MagicMock()
-        chain = kms.projects.return_value.locations.return_value.keyRings.return_value
-        chain.list.return_value.execute.return_value = {
-            "keyRings": [
-                {"name": "projects/test-project/locations/global/keyRings/my-ring"}
-            ]
-        }
-        chain.cryptoKeys.return_value.list.return_value.execute.return_value = {
-            "cryptoKeys": [
-                {
-                    "name": "projects/test-project/locations/global/keyRings/my-ring/cryptoKeys/my-key",
-                    "purpose": "ENCRYPT_DECRYPT",
-                    "rotationPeriod": "7776000s",  # 90 days exactly
-                }
-            ]
-        }
-        client.service.return_value = kms
+        _setup_kms(client, [
+            {"name": "projects/test-project/locations/global/keyRings/my-ring"}
+        ], [
+            {
+                "name": "projects/test-project/locations/global/keyRings/my-ring/cryptoKeys/my-key",
+                "purpose": "ENCRYPT_DECRYPT",
+                "rotationPeriod": "7776000s",  # 90 days exactly
+            }
+        ])
 
         findings = check_kms_key_rotation_period(client, PROJECT_ID)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
@@ -511,22 +679,15 @@ class TestCheckKmsKeyRotation:
         from shasta.gcp.encryption import check_kms_key_rotation_period
 
         client = _make_client()
-
-        kms = MagicMock()
-        chain = kms.projects.return_value.locations.return_value.keyRings.return_value
-        chain.list.return_value.execute.return_value = {
-            "keyRings": [{"name": "projects/test-project/locations/global/keyRings/my-ring"}]
-        }
-        chain.cryptoKeys.return_value.list.return_value.execute.return_value = {
-            "cryptoKeys": [
-                {
-                    "name": "projects/test-project/locations/global/keyRings/my-ring/cryptoKeys/my-key",
-                    "purpose": "ENCRYPT_DECRYPT",
-                    "rotationPeriod": "31536000s",  # 365 days — too long
-                }
-            ]
-        }
-        client.service.return_value = kms
+        _setup_kms(client, [
+            {"name": "projects/test-project/locations/global/keyRings/my-ring"}
+        ], [
+            {
+                "name": "projects/test-project/locations/global/keyRings/my-ring/cryptoKeys/my-key",
+                "purpose": "ENCRYPT_DECRYPT",
+                "rotationPeriod": "31536000s",  # 365 days — too long
+            }
+        ])
 
         findings = check_kms_key_rotation_period(client, PROJECT_ID)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
@@ -536,14 +697,47 @@ class TestCheckKmsKeyRotation:
         from shasta.gcp.encryption import check_kms_key_rotation_period
 
         client = _make_client()
+        _setup_kms(client, [], [])
 
+        findings = check_kms_key_rotation_period(client, PROJECT_ID)
+        assert findings
+        assert all(f.status == ComplianceStatus.NOT_APPLICABLE for f in findings)
+
+    def test_location_list_api_error_not_assessed(self):
+        from shasta.gcp.encryption import check_kms_key_rotation_period
+
+        client = _make_client()
         kms = MagicMock()
-        chain = kms.projects.return_value.locations.return_value.keyRings.return_value
-        chain.list.return_value.execute.return_value = {}  # No keyRings key
+        kms.projects.return_value.locations.return_value.list.return_value.execute.side_effect = Exception(
+            "403 Permission denied"
+        )
         client.service.return_value = kms
 
         findings = check_kms_key_rotation_period(client, PROJECT_ID)
         assert findings
+        assert all(f.status == ComplianceStatus.NOT_ASSESSED for f in findings)
+
+    def test_per_location_failure_continues(self):
+        """A keyRings.list failure for one location should not abort the whole check."""
+        from shasta.gcp.encryption import check_kms_key_rotation_period
+
+        client = _make_client()
+        kms = MagicMock()
+        loc_chain = kms.projects.return_value.locations.return_value
+        loc_chain.list.return_value.execute.return_value = {
+            "locations": [{"locationId": "us-central1"}, {"locationId": "global"}]
+        }
+        ring_chain = loc_chain.keyRings.return_value
+        # First call raises, second returns empty — should yield NOT_APPLICABLE (no keys)
+        ring_chain.list.return_value.execute.side_effect = [
+            Exception("location-specific error"),
+            {"keyRings": []},
+        ]
+        client.service.return_value = kms
+
+        findings = check_kms_key_rotation_period(client, PROJECT_ID)
+        assert isinstance(findings, list)
+        # No keys found across surviving locations → NOT_APPLICABLE
         assert all(f.status == ComplianceStatus.NOT_APPLICABLE for f in findings)
 
 

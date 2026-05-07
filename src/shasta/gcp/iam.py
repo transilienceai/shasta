@@ -473,10 +473,11 @@ def check_iam_service_account_token_creator(
 ) -> list[Finding]:
     """[CIS 1.6] Service Account Token Creator / Account User roles create impersonation chains.
 
-    Granting roles/iam.serviceAccountTokenCreator to a broad principal lets that
-    principal impersonate any service account in the project, effectively granting
-    the combined permissions of all SAs. The role should exist only in tightly
-    scoped resource-level bindings, not at the project level.
+    Granting roles/iam.serviceAccountTokenCreator to any principal at the project level
+    lets that principal impersonate any service account in the project, effectively granting
+    the combined permissions of all SAs. The role should exist only in tightly scoped
+    resource-level bindings, not at the project level — regardless of principal type.
+    A compromised service account holder has the same blast radius as a compromised user.
     """
     IMPERSONATION_ROLES = {
         "roles/iam.serviceAccountTokenCreator",
@@ -507,18 +508,17 @@ def check_iam_service_account_token_creator(
         if role not in IMPERSONATION_ROLES:
             continue
         members = binding.get("members", [])
-        non_sa = [m for m in members if not m.startswith("serviceAccount:")]
-        if non_sa:
-            offenders.append({"role": role, "members": non_sa})
+        if members:
+            offenders.append({"role": role, "members": members})
 
     if not offenders:
         return [
             Finding(
                 check_id="gcp-iam-sa-token-creator",
-                title="ServiceAccountTokenCreator/User not assigned to non-SA principals",
+                title="No project-level ServiceAccountTokenCreator/User bindings",
                 description=(
-                    "No user or group accounts hold ServiceAccountTokenCreator or "
-                    "ServiceAccountUser at the project level."
+                    "No principal — user, group, or service account — holds "
+                    "ServiceAccountTokenCreator or ServiceAccountUser at the project level."
                 ),
                 severity=Severity.INFO,
                 status=ComplianceStatus.PASS,
@@ -536,12 +536,13 @@ def check_iam_service_account_token_creator(
     return [
         Finding(
             check_id="gcp-iam-sa-token-creator",
-            title=f"{len(offenders)} broad ServiceAccountTokenCreator/User binding(s) at project level",
+            title=f"{len(offenders)} project-level ServiceAccountTokenCreator/User binding(s)",
             description=(
                 f"{len(offenders)} binding(s) grant ServiceAccountTokenCreator or "
-                "ServiceAccountUser to non-SA principals at the project level. Any of these "
-                "principals can generate tokens for — and impersonate — any service account "
-                "in the project."
+                "ServiceAccountUser at the project level. Any holder of these roles — "
+                "user, group, or service account — can generate tokens for, and "
+                "impersonate, any service account in the project. This produces the same "
+                "blast radius regardless of principal type."
             ),
             severity=Severity.HIGH,
             status=ComplianceStatus.FAIL,

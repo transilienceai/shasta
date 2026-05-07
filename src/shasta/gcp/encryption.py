@@ -52,10 +52,23 @@ def check_kms_key_rotation_period(
     region = "global"
     try:
         kms = client.service("cloudkms", "v1")
-        # List all key rings across all locations via the aggregated endpoint
-        parent = f"projects/{project_id}/locations/-"
-        key_rings_resp = kms.projects().locations().keyRings().list(parent=parent).execute()
-        key_rings = key_rings_resp.get("keyRings", [])
+        # KMS doesn't accept "-" as a wildcard location — enumerate supported
+        # locations first, then list key rings per location.
+        locations_resp = (
+            kms.projects().locations().list(name=f"projects/{project_id}").execute()
+        )
+        locations = [loc.get("locationId") for loc in locations_resp.get("locations", [])]
+        key_rings: list[dict[str, Any]] = []
+        for location in locations:
+            try:
+                parent = f"projects/{project_id}/locations/{location}"
+                resp = (
+                    kms.projects().locations().keyRings().list(parent=parent).execute()
+                )
+                key_rings.extend(resp.get("keyRings", []))
+            except Exception:
+                # A single failed location should not abort the whole check
+                continue
     except Exception as e:
         return [
             Finding.not_assessed(

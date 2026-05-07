@@ -401,60 +401,61 @@ def check_subnet_flow_logs_enabled(
     if not subnets:
         return []  # No subnets in this region — NOT_APPLICABLE at region level is noise
 
-    missing: list[str] = []
+    findings: list[Finding] = []
     for subnet in subnets:
         log_config = subnet.get("logConfig") or {}
-        if not log_config.get("enable", False):
-            missing.append(subnet.get("name", "unknown"))
+        enabled = log_config.get("enable", False)
+        subnet_name = subnet.get("name", "unknown")
+        resource_id = subnet.get("selfLink") or f"projects/{project_id}/regions/{region}/subnetworks/{subnet_name}"
 
-    if not missing:
-        return [
-            Finding(
-                check_id="gcp-subnet-flow-logs",
-                title=f"All {len(subnets)} subnet(s) in {region} have flow logs enabled",
-                description=f"VPC flow logs are enabled on all subnets in {region}.",
-                severity=Severity.INFO,
-                status=ComplianceStatus.PASS,
-                domain=CheckDomain.NETWORKING,
-                resource_type="GCP::Compute::Subnetwork",
-                resource_id=f"projects/{project_id}/regions/{region}/subnetworks",
-                region=region,
-                account_id=project_id,
-                cloud_provider=CloudProvider.GCP,
-                soc2_controls=["CC6.6", "CC7.1"],
-                cis_gcp_controls=["3.8"],
+        if enabled:
+            findings.append(
+                Finding(
+                    check_id="gcp-subnet-flow-logs",
+                    title=f"Subnet {subnet_name} ({region}) has flow logs enabled",
+                    description="VPC flow logs are enabled on this subnet.",
+                    severity=Severity.INFO,
+                    status=ComplianceStatus.PASS,
+                    domain=CheckDomain.NETWORKING,
+                    resource_type="GCP::Compute::Subnetwork",
+                    resource_id=resource_id,
+                    region=region,
+                    account_id=project_id,
+                    cloud_provider=CloudProvider.GCP,
+                    soc2_controls=["CC6.6", "CC7.1"],
+                    cis_gcp_controls=["3.8"],
+                )
             )
-        ]
+        else:
+            findings.append(
+                Finding(
+                    check_id="gcp-subnet-flow-logs",
+                    title=f"Subnet {subnet_name} ({region}) has flow logs disabled",
+                    description=(
+                        f"VPC flow logs are not enabled on subnet {subnet_name} in {region}. "
+                        "Without flow logs, you cannot investigate network security incidents, "
+                        "detect lateral movement, or audit traffic patterns."
+                    ),
+                    severity=Severity.MEDIUM,
+                    status=ComplianceStatus.FAIL,
+                    domain=CheckDomain.NETWORKING,
+                    resource_type="GCP::Compute::Subnetwork",
+                    resource_id=resource_id,
+                    region=region,
+                    account_id=project_id,
+                    cloud_provider=CloudProvider.GCP,
+                    remediation=(
+                        f"Enable flow logs: `gcloud compute networks subnets update {subnet_name} "
+                        f"--region={region} --enable-flow-logs --project={project_id}`. "
+                        "Set an appropriate aggregation interval and flow sampling rate (0.5 recommended)."
+                    ),
+                    soc2_controls=["CC6.6", "CC7.1"],
+                    cis_gcp_controls=["3.8"],
+                    iso27001_controls=["A.8.15"],
+                )
+            )
 
-    return [
-        Finding(
-            check_id="gcp-subnet-flow-logs",
-            title=f"{len(missing)} subnet(s) in {region} have flow logs disabled",
-            description=(
-                f"{len(missing)} subnet(s) in {region} do not have VPC flow logs enabled: "
-                f"{', '.join(missing[:10])}{'...' if len(missing) > 10 else ''}. "
-                "Without flow logs, you cannot investigate network security incidents, "
-                "detect lateral movement, or audit traffic patterns."
-            ),
-            severity=Severity.MEDIUM,
-            status=ComplianceStatus.FAIL,
-            domain=CheckDomain.NETWORKING,
-            resource_type="GCP::Compute::Subnetwork",
-            resource_id=f"projects/{project_id}/regions/{region}/subnetworks",
-            region=region,
-            account_id=project_id,
-            cloud_provider=CloudProvider.GCP,
-            remediation=(
-                f"Enable flow logs: `gcloud compute networks subnets update SUBNET_NAME "
-                f"--region={region} --enable-flow-logs --project={project_id}`. "
-                "Set an appropriate aggregation interval and flow sampling rate (0.5 recommended)."
-            ),
-            soc2_controls=["CC6.6", "CC7.1"],
-            cis_gcp_controls=["3.8"],
-            iso27001_controls=["A.8.15"],
-            details={"subnets_without_flow_logs": missing},
-        )
-    ]
+    return findings
 
 
 def check_private_google_access_enabled(
@@ -488,57 +489,58 @@ def check_private_google_access_enabled(
     if not subnets:
         return []
 
-    missing: list[str] = []
+    findings: list[Finding] = []
     for subnet in subnets:
-        if not subnet.get("privateIpGoogleAccess", False):
-            missing.append(subnet.get("name", "unknown"))
+        enabled = subnet.get("privateIpGoogleAccess", False)
+        subnet_name = subnet.get("name", "unknown")
+        resource_id = subnet.get("selfLink") or f"projects/{project_id}/regions/{region}/subnetworks/{subnet_name}"
 
-    if not missing:
-        return [
-            Finding(
-                check_id="gcp-subnet-private-google-access",
-                title=f"All {len(subnets)} subnet(s) in {region} have Private Google Access",
-                description=f"Private Google Access is enabled on all subnets in {region}.",
-                severity=Severity.INFO,
-                status=ComplianceStatus.PASS,
-                domain=CheckDomain.NETWORKING,
-                resource_type="GCP::Compute::Subnetwork",
-                resource_id=f"projects/{project_id}/regions/{region}/subnetworks",
-                region=region,
-                account_id=project_id,
-                cloud_provider=CloudProvider.GCP,
-                soc2_controls=["CC6.6"],
-                cis_gcp_controls=["3.9"],
+        if enabled:
+            findings.append(
+                Finding(
+                    check_id="gcp-subnet-private-google-access",
+                    title=f"Subnet {subnet_name} ({region}) has Private Google Access",
+                    description="Private Google Access is enabled on this subnet.",
+                    severity=Severity.INFO,
+                    status=ComplianceStatus.PASS,
+                    domain=CheckDomain.NETWORKING,
+                    resource_type="GCP::Compute::Subnetwork",
+                    resource_id=resource_id,
+                    region=region,
+                    account_id=project_id,
+                    cloud_provider=CloudProvider.GCP,
+                    soc2_controls=["CC6.6"],
+                    cis_gcp_controls=["3.9"],
+                )
             )
-        ]
+        else:
+            findings.append(
+                Finding(
+                    check_id="gcp-subnet-private-google-access",
+                    title=f"Subnet {subnet_name} ({region}) lacks Private Google Access",
+                    description=(
+                        f"Private Google Access is not enabled on subnet {subnet_name} in {region}. "
+                        "VMs in this subnet need public IPs to reach GCP APIs, expanding "
+                        "your network attack surface."
+                    ),
+                    severity=Severity.LOW,
+                    status=ComplianceStatus.FAIL,
+                    domain=CheckDomain.NETWORKING,
+                    resource_type="GCP::Compute::Subnetwork",
+                    resource_id=resource_id,
+                    region=region,
+                    account_id=project_id,
+                    cloud_provider=CloudProvider.GCP,
+                    remediation=(
+                        f"Enable Private Google Access: `gcloud compute networks subnets update {subnet_name} "
+                        f"--region={region} --enable-private-ip-google-access --project={project_id}`."
+                    ),
+                    soc2_controls=["CC6.6"],
+                    cis_gcp_controls=["3.9"],
+                )
+            )
 
-    return [
-        Finding(
-            check_id="gcp-subnet-private-google-access",
-            title=f"{len(missing)} subnet(s) in {region} lack Private Google Access",
-            description=(
-                f"{len(missing)} subnet(s) in {region} do not have Private Google Access "
-                f"enabled: {', '.join(missing[:10])}{'...' if len(missing) > 10 else ''}. "
-                "VMs in these subnets need public IPs to reach GCP APIs, expanding your "
-                "network attack surface."
-            ),
-            severity=Severity.LOW,
-            status=ComplianceStatus.FAIL,
-            domain=CheckDomain.NETWORKING,
-            resource_type="GCP::Compute::Subnetwork",
-            resource_id=f"projects/{project_id}/regions/{region}/subnetworks",
-            region=region,
-            account_id=project_id,
-            cloud_provider=CloudProvider.GCP,
-            remediation=(
-                f"Enable Private Google Access: `gcloud compute networks subnets update SUBNET_NAME "
-                f"--region={region} --enable-private-ip-google-access --project={project_id}`."
-            ),
-            soc2_controls=["CC6.6"],
-            cis_gcp_controls=["3.9"],
-            details={"subnets_without_pga": missing},
-        )
-    ]
+    return findings
 
 
 def check_dns_logging_enabled(
