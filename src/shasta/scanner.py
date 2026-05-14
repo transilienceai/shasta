@@ -1,6 +1,6 @@
 """Shasta compliance scanner — orchestrates all check modules.
 
-Supports multi-cloud scanning (AWS + Azure) with unified compliance
+Supports multi-cloud scanning (AWS + Azure + GCP) with unified compliance
 framework mapping and multi-region AWS scanning.
 """
 
@@ -26,6 +26,7 @@ def run_full_scan(
     client: Any = None,
     *,
     azure_client: Any = None,
+    gcp_client: Any = None,
     domains: list[CheckDomain] | None = None,
     regions: list[str] | None = None,
     framework: str = "soc2",  # informational only — enrichment always runs for all frameworks
@@ -73,6 +74,10 @@ def run_full_scan(
         )
         region = azure_client.account_info.region if azure_client.account_info else "unknown"
         cloud_provider = CloudProvider.AZURE
+    elif gcp_client is not None:
+        account_id = gcp_client.account_info.project_id if gcp_client.account_info else "unknown"
+        region = gcp_client.account_info.region if gcp_client.account_info else "unknown"
+        cloud_provider = CloudProvider.GCP
 
     scan = ScanResult(
         account_id=account_id,
@@ -99,6 +104,10 @@ def run_full_scan(
     if azure_client is not None:
         scan.findings.extend(_run_azure_checks(azure_client, domains))
 
+    # ----- GCP checks -----
+    if gcp_client is not None:
+        scan.findings.extend(_run_gcp_checks(gcp_client, domains))
+
     # ----- GitHub checks (cloud-agnostic) -----
     if include_github and github_token and github_repos:
         from shasta.integrations.github import run_github_checks
@@ -120,7 +129,7 @@ def run_full_scan(
     enrich_findings_with_iso27001(scan.findings)
     enrich_findings_with_hipaa(scan.findings)
 
-    # Store multi-cloud info in scan details if both providers scanned
+    # Store multi-cloud info in scan details if multiple providers scanned
     if client is not None and azure_client is not None:
         scan.cloud_provider = CloudProvider.AWS  # Primary
 
@@ -418,4 +427,110 @@ def run_azure_multi_subscription(
             findings.extend(_run_azure_checks(sib, domains))
         except Exception:
             continue
+    return findings
+
+
+def _run_gcp_checks(gcp_client: Any, domains: list[CheckDomain]) -> list[Finding]:
+    """Run GCP-specific checks across requested domains."""
+    from shasta.gcp.compute import run_all_gcp_compute_checks
+    from shasta.gcp.encryption import run_all_gcp_encryption_checks
+    from shasta.gcp.iam import run_all_gcp_iam_checks
+    from shasta.gcp.logging_checks import run_all_gcp_logging_checks
+    from shasta.gcp.networking import run_all_gcp_networking_checks
+    from shasta.gcp.storage import run_all_gcp_storage_checks
+
+    gcp_domain_runners: dict = {
+        CheckDomain.IAM: run_all_gcp_iam_checks,
+        CheckDomain.NETWORKING: run_all_gcp_networking_checks,
+        CheckDomain.STORAGE: run_all_gcp_storage_checks,
+        CheckDomain.ENCRYPTION: run_all_gcp_encryption_checks,
+        CheckDomain.MONITORING: run_all_gcp_logging_checks,
+        CheckDomain.COMPUTE: run_all_gcp_compute_checks,
+    }
+
+    findings: list[Finding] = []
+    for domain in domains:
+        runner = gcp_domain_runners.get(domain)
+        if runner:
+            try:
+                findings.extend(runner(gcp_client))
+            except Exception as e:
+                runner_name = getattr(runner, "__name__", f"{domain.value} runner")
+                findings.append(_gcp_not_assessed(gcp_client, domain, runner_name, e))
+
+    # Cloud Run (serverless compute + networking + encryption checks)
+    if CheckDomain.COMPUTE in domains or CheckDomain.NETWORKING in domains:
+        try:
+            from shasta.gcp.cloud_run import run_all_gcp_cloud_run_checks
+
+            findings.extend(run_all_gcp_cloud_run_checks(gcp_client))
+        except Exception as e:
+            findings.append(
+                _gcp_not_assessed(
+                    gcp_client,
+                    CheckDomain.COMPUTE,
+                    "run_all_gcp_cloud_run_checks",
+                    e,
+                )
+            )
+
+    return findings
+
+
+def _gcp_not_assessed(
+    gcp_client: Any,
+    domain: CheckDomain,
+    runner_name: str,
+    error: Exception,
+) -> Finding:
+    """Create a visible GCP scan failure instead of silently dropping a domain."""
+    account_info = getattr(gcp_client, "account_info", None)
+    project_id = getattr(account_info, "project_id", None) or getattr(
+        gcp_client, "_project_id", "unknown"
+    )
+    region = getattr(account_info, "region", "unknown")
+    return Finding.not_assessed(
+        check_id=f"gcp-{domain.value}-scan-error",
+        title=f"GCP {domain.value} checks could not be assessed",
+        description=f"{runner_name} failed before completing: {error}",
+        domain=domain,
+        resource_type="GCP::Project",
+        account_id=project_id,
+        region=region,
+        cloud_provider=CloudProvider.GCP,
+    )
+
+
+def run_gcp_multi_project(
+    gcp_client: Any,
+    domains: list[CheckDomain],
+    project_ids: list[str] | None = None,
+) -> list[Finding]:
+    """Run GCP checks across multiple projects, mirroring the Azure multi-subscription pattern.
+
+    If ``project_ids`` is None, every project the credential can see is scanned.
+    """
+    findings: list[Finding] = []
+    if project_ids is None:
+        projects = gcp_client.list_projects()
+        project_ids = [p["project_id"] for p in projects if p.get("project_id")]
+
+    for pid in project_ids:
+        try:
+            sib = gcp_client.for_project(pid)
+            sib.validate_credentials()
+            findings.extend(_run_gcp_checks(sib, domains))
+        except Exception as e:
+            findings.append(
+                Finding.not_assessed(
+                    check_id="gcp-project-scan-error",
+                    title=f"GCP project {pid} could not be assessed",
+                    description=f"Project-level scan failed before checks completed: {e}",
+                    domain=CheckDomain.IAM,
+                    resource_type="GCP::Project",
+                    account_id=pid,
+                    region="unknown",
+                    cloud_provider=CloudProvider.GCP,
+                )
+            )
     return findings

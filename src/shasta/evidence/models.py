@@ -35,6 +35,7 @@ class CloudProvider(str, Enum):
 
     AWS = "aws"
     AZURE = "azure"
+    GCP = "gcp"
 
 
 class CheckDomain(str, Enum):
@@ -106,6 +107,7 @@ class Finding(BaseModel):
     soc2_controls: list[str] = Field(default_factory=list)  # e.g., ["CC6.1", "CC6.2"]
     cis_aws_controls: list[str] = Field(default_factory=list)  # e.g., ["1.4", "3.1"]
     cis_azure_controls: list[str] = Field(default_factory=list)  # e.g., ["1.1.4", "5.2.1"]
+    cis_gcp_controls: list[str] = Field(default_factory=list)  # e.g., ["1.4", "3.6", "5.1"]
     mcsb_controls: list[str] = Field(default_factory=list)  # e.g., ["IM-6", "DP-5"]
     iso27001_controls: list[str] = Field(default_factory=list)  # e.g., ["A.8.5", "A.5.15"]
     hipaa_controls: list[str] = Field(default_factory=list)  # e.g., ["164.312(a)(1)", "164.312(e)(1)"]

@@ -15,7 +15,7 @@ import html as html_mod
 
 from shasta.compliance.mapper import get_control_summary
 from shasta.compliance.scorer import calculate_score
-from shasta.evidence.models import CloudProvider, Finding, ScanResult
+from shasta.evidence.models import CloudProvider, ScanResult
 
 # Provider-aware labels for reports and templates
 PROVIDER_LABELS: dict[str, dict[str, str]] = {
@@ -37,6 +37,15 @@ PROVIDER_LABELS: dict[str, dict[str, str]] = {
         "inspector_service": "Defender for Cloud",
         "product_tagline": "Cloud Compliance Automation",
     },
+    "gcp": {
+        "account_label": "GCP Project",
+        "console": "Google Cloud console",
+        "config_service": "Security Command Center",
+        "logging_service": "Cloud Audit Logs",
+        "threat_service": "Security Command Center",
+        "inspector_service": "Security Command Center",
+        "product_tagline": "Cloud Compliance Automation",
+    },
 }
 
 
@@ -44,11 +53,19 @@ def _provider_labels(provider: CloudProvider) -> dict[str, str]:
     """Return display labels for the given cloud provider."""
     return PROVIDER_LABELS.get(provider.value, PROVIDER_LABELS["aws"])
 
+
 # Keys in Finding.details that are framework mappings (already shown elsewhere)
-_FRAMEWORK_KEYS = frozenset({
-    "iso27001_controls", "hipaa_controls", "soc2_controls",
-    "cis_azure_controls", "mcsb_controls", "cis_aws_controls",
-})
+_FRAMEWORK_KEYS = frozenset(
+    {
+        "iso27001_controls",
+        "hipaa_controls",
+        "soc2_controls",
+        "cis_azure_controls",
+        "mcsb_controls",
+        "cis_aws_controls",
+        "cis_gcp_controls",
+    }
+)
 
 
 def _render_details_html(details: dict) -> str:
@@ -69,7 +86,9 @@ def _render_details_html(details: dict) -> str:
             if isinstance(value[0], dict):
                 # List of dicts → table
                 headers = list(value[0].keys())
-                header_row = "".join(f"<th>{esc(h.replace('_', ' ').title())}</th>" for h in headers)
+                header_row = "".join(
+                    f"<th>{esc(h.replace('_', ' ').title())}</th>" for h in headers
+                )
                 body_rows = []
                 for row in value:
                     cells = "".join(
@@ -111,6 +130,7 @@ def _render_details_html(details: dict) -> str:
     if not parts:
         return ""
     return f"<div class='finding-details'>{''.join(parts)}</div>"
+
 
 MARKDOWN_TEMPLATE = """\
 # SOC 2 Compliance Gap Analysis Report
@@ -171,6 +191,9 @@ MARKDOWN_TEMPLATE = """\
 
 - **Severity:** {{ f.severity.value | upper }}
 - **SOC 2 Control(s):** {{ f.soc2_controls | join(', ') }}
+{% if f.cis_gcp_controls -%}
+- **CIS GCP Control(s):** {{ f.cis_gcp_controls | join(', ') }}
+{% endif -%}
 - **Resource:** `{{ f.resource_id }}`
 - **Description:** {{ f.description }}
 {% if f.remediation -%}
@@ -191,6 +214,9 @@ No critical or high severity findings. Well done!
 ### {{ f.title }}
 
 - **SOC 2 Control(s):** {{ f.soc2_controls | join(', ') }}
+{% if f.cis_gcp_controls -%}
+- **CIS GCP Control(s):** {{ f.cis_gcp_controls | join(', ') }}
+{% endif -%}
 - **Resource:** `{{ f.resource_id }}`
 - **Description:** {{ f.description }}
 {% if f.remediation -%}
@@ -342,7 +368,7 @@ HTML_TEMPLATE = """\
     <span class="tag tag-{{ f.severity.value }}">{{ f.severity.value }}</span>
     {{ f.title }}
   </div>
-  <div class="finding-meta">SOC 2: {{ f.soc2_controls | join(', ') }} &nbsp;|&nbsp; Resource: <code>{{ f.resource_id }}</code></div>
+  <div class="finding-meta">SOC 2: {{ f.soc2_controls | join(', ') }}{% if f.cis_gcp_controls %} &nbsp;|&nbsp; CIS GCP: {{ f.cis_gcp_controls | join(', ') }}{% endif %} &nbsp;|&nbsp; Resource: <code>{{ f.resource_id }}</code></div>
   <div class="finding-desc">{{ f.description }}</div>
   {% if f.remediation %}
   <div class="finding-remediation"><strong>Fix:</strong> {{ f.remediation }}</div>
@@ -361,7 +387,7 @@ HTML_TEMPLATE = """\
     <span class="tag tag-medium">medium</span>
     {{ f.title }}
   </div>
-  <div class="finding-meta">SOC 2: {{ f.soc2_controls | join(', ') }} &nbsp;|&nbsp; Resource: <code>{{ f.resource_id }}</code></div>
+  <div class="finding-meta">SOC 2: {{ f.soc2_controls | join(', ') }}{% if f.cis_gcp_controls %} &nbsp;|&nbsp; CIS GCP: {{ f.cis_gcp_controls | join(', ') }}{% endif %} &nbsp;|&nbsp; Resource: <code>{{ f.resource_id }}</code></div>
   <div class="finding-desc">{{ f.description }}</div>
   {% if f.remediation %}
   <div class="finding-remediation"><strong>Fix:</strong> {{ f.remediation }}</div>
