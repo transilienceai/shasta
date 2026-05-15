@@ -39,6 +39,9 @@ Thumbs.db
 .env
 .env.local
 
+# Local CLI binaries (uv, uvx, etc.) — installed per-developer
+.bin/
+
 # User-specific config (template is shasta.config.template.json)
 shasta.config.json
 
