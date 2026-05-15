@@ -8,13 +8,15 @@ check_id values for both compliant and non-compliant scenarios.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
 
 import boto3
-import pytest
 from moto import mock_aws
 
 from shasta.aws.client import AWSClient
+from shasta.aws.encryption import (
+    check_ebs_volumes,
+    check_rds_encryption,
+)
 from shasta.aws.iam import (
     check_access_key_rotation,
     check_password_policy,
@@ -22,23 +24,18 @@ from shasta.aws.iam import (
     check_user_direct_policies,
     check_user_mfa,
 )
+from shasta.aws.networking import (
+    check_default_security_groups,
+    check_security_groups,
+    check_vpc_flow_logs,
+)
 from shasta.aws.storage import (
     check_s3_encryption,
     check_s3_public_access_block,
     check_s3_ssl_only,
     check_s3_versioning,
 )
-from shasta.aws.encryption import (
-    check_ebs_volumes,
-    check_rds_encryption,
-)
-from shasta.aws.networking import (
-    check_default_security_groups,
-    check_security_groups,
-    check_vpc_flow_logs,
-)
 from shasta.evidence.models import ComplianceStatus
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -257,10 +254,12 @@ class TestUserDirectPolicies:
         # Create a custom policy (moto doesn't ship AWS managed policies)
         policy_resp = iam.create_policy(
             PolicyName="TestReadOnly",
-            PolicyDocument=json.dumps({
-                "Version": "2012-10-17",
-                "Statement": [{"Effect": "Allow", "Action": "s3:GetObject", "Resource": "*"}],
-            }),
+            PolicyDocument=json.dumps(
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [{"Effect": "Allow", "Action": "s3:GetObject", "Resource": "*"}],
+                }
+            ),
         )
         iam.attach_user_policy(
             UserName="policy-user",
@@ -304,9 +303,7 @@ class TestS3Encryption:
         s3.put_bucket_encryption(
             Bucket="encrypted-bucket",
             ServerSideEncryptionConfiguration={
-                "Rules": [
-                    {"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}
-                ]
+                "Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]
             },
         )
 

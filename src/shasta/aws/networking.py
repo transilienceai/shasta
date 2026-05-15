@@ -74,15 +74,17 @@ def check_elb_listeners(client: AWSClient, account_id: str, region: str) -> list
         elbv2 = client.client("elbv2")
         lbs = elbv2.describe_load_balancers().get("LoadBalancers", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="elb-listener-tls",
-            title="Unable to check ELB listener TLS",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.NETWORKING,
-            resource_type="AWS::ElasticLoadBalancingV2::LoadBalancer",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="elb-listener-tls",
+                title="Unable to check ELB listener TLS",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.NETWORKING,
+                resource_type="AWS::ElasticLoadBalancingV2::LoadBalancer",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     for lb in lbs:
         arn = lb.get("LoadBalancerArn", "")
@@ -171,15 +173,17 @@ def check_elb_access_logs(client: AWSClient, account_id: str, region: str) -> li
         elbv2 = client.client("elbv2")
         lbs = elbv2.describe_load_balancers().get("LoadBalancers", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="elb-access-logs",
-            title="Unable to check ELB access logs",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.NETWORKING,
-            resource_type="AWS::ElasticLoadBalancingV2::LoadBalancer",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="elb-access-logs",
+                title="Unable to check ELB access logs",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.NETWORKING,
+                resource_type="AWS::ElasticLoadBalancingV2::LoadBalancer",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     for lb in lbs:
         arn = lb.get("LoadBalancerArn", "")
@@ -251,15 +255,17 @@ def check_elb_drop_invalid_headers(
         elbv2 = client.client("elbv2")
         lbs = elbv2.describe_load_balancers().get("LoadBalancers", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="elb-drop-invalid-headers",
-            title="Unable to check ELB invalid header handling",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.NETWORKING,
-            resource_type="AWS::ElasticLoadBalancingV2::LoadBalancer",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="elb-drop-invalid-headers",
+                title="Unable to check ELB invalid header handling",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.NETWORKING,
+                resource_type="AWS::ElasticLoadBalancingV2::LoadBalancer",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     for lb in lbs:
         if lb.get("Type") != "application":
@@ -506,7 +512,6 @@ def check_default_security_groups(ec2: Any, account_id: str, region: str) -> lis
             vpc_id = sg.get("VpcId", "N/A")
 
             has_ingress = len(sg.get("IpPermissions", [])) > 0
-            has_egress_beyond_default = False
             for rule in sg.get("IpPermissionsEgress", []):
                 # Default SG has one egress rule allowing all outbound — that's the AWS default
                 # We flag if ingress rules exist (should be empty)

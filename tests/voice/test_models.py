@@ -75,7 +75,18 @@ def test_compliance_score_view():
 def test_multi_framework_score_view():
     m = MultiFrameworkScoreView(
         frameworks=[
-            ComplianceScoreView(framework="soc2", score_percentage=82.5, grade="B", total_controls=40, passing=30, failing=8, partial=2, not_assessed=0, total_findings=120, findings_failed=15),
+            ComplianceScoreView(
+                framework="soc2",
+                score_percentage=82.5,
+                grade="B",
+                total_controls=40,
+                passing=30,
+                failing=8,
+                partial=2,
+                not_assessed=0,
+                total_findings=120,
+                findings_failed=15,
+            ),
         ],
         not_enabled=["hipaa"],
     )

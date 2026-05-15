@@ -16,7 +16,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from shasta.gcp.client import GCPClient
 from shasta.evidence.models import (
     CheckDomain,
     CloudProvider,
@@ -24,6 +23,7 @@ from shasta.evidence.models import (
     Finding,
     Severity,
 )
+from shasta.gcp.client import GCPClient
 
 IS_GLOBAL = False  # Cloud Run services are regional
 
@@ -50,8 +50,12 @@ def run_all_gcp_cloud_run_checks(client: GCPClient) -> list[Finding]:
     findings: list[Finding] = []
     for region in client.get_enabled_regions():
         regional_client = client.for_region(region)
-        findings.extend(check_cloud_run_no_unauthenticated_access(regional_client, project_id, region))
-        findings.extend(check_cloud_run_no_default_service_account(regional_client, project_id, region))
+        findings.extend(
+            check_cloud_run_no_unauthenticated_access(regional_client, project_id, region)
+        )
+        findings.extend(
+            check_cloud_run_no_default_service_account(regional_client, project_id, region)
+        )
         findings.extend(check_cloud_run_ingress_restricted(regional_client, project_id, region))
         findings.extend(check_cloud_run_binary_authorization(regional_client, project_id, region))
         findings.extend(check_cloud_run_no_plaintext_secrets(regional_client, project_id, region))
@@ -59,7 +63,9 @@ def run_all_gcp_cloud_run_checks(client: GCPClient) -> list[Finding]:
     return findings
 
 
-def _list_cloud_run_services(client: GCPClient, project_id: str, region: str) -> list[dict[str, Any]]:
+def _list_cloud_run_services(
+    client: GCPClient, project_id: str, region: str
+) -> list[dict[str, Any]]:
     """Return all Cloud Run v2 services in the given region."""
     run = client.service("run", "v2")
     parent = f"projects/{project_id}/locations/{region}"
@@ -70,11 +76,7 @@ def _list_cloud_run_services(client: GCPClient, project_id: str, region: str) ->
     next_page = response.get("nextPageToken")
     while next_page:
         response = (
-            run.projects()
-            .locations()
-            .services()
-            .list(parent=parent, pageToken=next_page)
-            .execute()
+            run.projects().locations().services().list(parent=parent, pageToken=next_page).execute()
         )
         services.extend(response.get("services", []))
         next_page = response.get("nextPageToken")
@@ -118,13 +120,7 @@ def check_cloud_run_no_unauthenticated_access(
     for svc in services:
         svc_name = svc.get("name", "")
         try:
-            policy = (
-                run.projects()
-                .locations()
-                .services()
-                .getIamPolicy(resource=svc_name)
-                .execute()
-            )
+            policy = run.projects().locations().services().getIamPolicy(resource=svc_name).execute()
             for binding in policy.get("bindings", []):
                 members = binding.get("members", [])
                 if "allUsers" in members or "allAuthenticatedUsers" in members:

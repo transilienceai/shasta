@@ -1030,16 +1030,18 @@ def check_classic_administrators(
                     ["1.22"],
                 )
             ]
-        return [Finding.not_assessed(
-            check_id="azure-classic-admins",
-            title="Unable to check classic administrators",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.IAM,
-            resource_type="Azure::Authorization::ClassicAdmin",
-            account_id=subscription_id,
-            region=region,
-            cloud_provider=CloudProvider.AZURE,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="azure-classic-admins",
+                title="Unable to check classic administrators",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.IAM,
+                resource_type="Azure::Authorization::ClassicAdmin",
+                account_id=subscription_id,
+                region=region,
+                cloud_provider=CloudProvider.AZURE,
+            )
+        ]
 
     if not classic:
         return [

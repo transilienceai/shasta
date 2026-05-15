@@ -768,9 +768,7 @@ def check_sagemaker_endpoint_encryption(
             ep_config_name = detail.get("EndpointConfigName")
             if ep_config_name:
                 try:
-                    config_detail = sm.describe_endpoint_config(
-                        EndpointConfigName=ep_config_name
-                    )
+                    config_detail = sm.describe_endpoint_config(EndpointConfigName=ep_config_name)
                     kms_key = config_detail.get("KmsKeyId")
                 except ClientError:
                     pass
@@ -1698,7 +1696,7 @@ def check_cloudtrail_ai_events(client: AWSClient, account_id: str, region: str) 
     trails_with_ai_events: list[str] = []
 
     for trail in trails:
-        trail_arn = trail.get("TrailARN", "")
+        trail.get("TrailARN", "")
         trail_name = trail.get("Name", "unknown")
         try:
             # Check event selectors (basic)

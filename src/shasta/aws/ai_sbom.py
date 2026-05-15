@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -30,9 +30,18 @@ MAX_FILE_SIZE_BYTES = 1_000_000
 
 EXCLUDED_PATH_SEGMENTS: frozenset[str] = frozenset(
     {
-        "node_modules", ".git", "__pycache__", ".venv", "venv",
-        ".tox", ".mypy_cache", ".pytest_cache", "dist", "build",
-        ".egg-info", ".eggs",
+        "node_modules",
+        ".git",
+        "__pycache__",
+        ".venv",
+        "venv",
+        ".tox",
+        ".mypy_cache",
+        ".pytest_cache",
+        "dist",
+        "build",
+        ".egg-info",
+        ".eggs",
     }
 )
 
@@ -41,8 +50,7 @@ SOURCE_CODE_EXTENSIONS: frozenset[str] = frozenset(
 )
 
 ALL_SCANNABLE_EXTENSIONS: frozenset[str] = SOURCE_CODE_EXTENSIONS | frozenset(
-    {".yaml", ".yml", ".json", ".toml", ".cfg", ".ini",
-     ".txt", ".md", ".env", ".sh", ".bash"}
+    {".yaml", ".yml", ".json", ".toml", ".cfg", ".ini", ".txt", ".md", ".env", ".sh", ".bash"}
 )
 
 # Vulnerable SDK versions for SBOM vulnerability checks.
@@ -82,9 +90,7 @@ GENERIC_MODEL_NAMES: list[re.Pattern[str]] = [
 ]
 
 # Models with date suffixes (gpt-4-0613, claude-3-5-sonnet-20240620) are pinned.
-PINNED_MODEL_PATTERN: re.Pattern[str] = re.compile(
-    r"""model\s*=\s*["'][a-z0-9-]+-\d{4,8}["']"""
-)
+PINNED_MODEL_PATTERN: re.Pattern[str] = re.compile(r"""model\s*=\s*["'][a-z0-9-]+-\d{4,8}["']""")
 
 
 def _iter_files(
@@ -136,9 +142,7 @@ def _parse_requirements_txt(content: str) -> dict[str, str]:
         for sep in ("==", ">=", "<=", "~=", "!="):
             if sep in line:
                 name, version = line.split(sep, 1)
-                deps[name.strip().lower()] = (
-                    version.strip().split(",")[0].split(";")[0].strip()
-                )
+                deps[name.strip().lower()] = version.strip().split(",")[0].split(";")[0].strip()
                 break
     return deps
 
@@ -146,9 +150,7 @@ def _parse_requirements_txt(content: str) -> dict[str, str]:
 def _parse_pyproject_toml(content: str) -> dict[str, str]:
     """Best-effort extraction of dependencies from pyproject.toml."""
     deps: dict[str, str] = {}
-    for m in re.finditer(
-        r'"([a-zA-Z0-9_-]+)\s*([><=!~]+)\s*([0-9][0-9a-zA-Z.]*)"', content
-    ):
+    for m in re.finditer(r'"([a-zA-Z0-9_-]+)\s*([><=!~]+)\s*([0-9][0-9a-zA-Z.]*)"', content):
         deps[m.group(1).lower()] = m.group(3)
     return deps
 
@@ -191,6 +193,7 @@ def _version_matches_constraint(version_str: str, constraint: str) -> bool:
         return _version_tuple(version_str) < _version_tuple(threshold)
     except (ValueError, TypeError):
         return False
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -248,7 +251,7 @@ MODEL_ASSIGNMENT_PATTERN: re.Pattern[str] = re.compile(
 # ---------------------------------------------------------------------------
 
 
-class AIComponentType(str, Enum):
+class AIComponentType(StrEnum):
     """Type of AI component in the inventory."""
 
     SDK = "sdk"
@@ -481,7 +484,7 @@ def scan_azure_for_ai_components(client: object) -> list[AIComponent]:
     # Azure OpenAI deployments
     for dep in inventory.get("azure_openai", {}).get("deployments", []):
         name = dep.get("name", "")
-        model = dep.get("model", "")
+        dep.get("model", "")
         if name:
             components.append(
                 AIComponent(
@@ -580,7 +583,7 @@ def generate_ai_sbom(
     Returns a dict matching the CycloneDX 1.5 specification, with
     Whitney-specific properties on each component.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     timestamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # Map component types to CycloneDX types

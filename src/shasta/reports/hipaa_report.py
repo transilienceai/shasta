@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from shasta.compliance.hipaa_mapper import get_hipaa_control_summary
@@ -39,7 +39,7 @@ def save_hipaa_report(scan: ScanResult, output_path: Path | str = "data/reports"
     lines = [
         "# HIPAA Security Rule Gap Analysis Report",
         "",
-        f"**Generated:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
+        f"**Generated:** {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}",
         f"**{labels['account_label']}:** {scan.account_id}",
         f"**Region:** {scan.region}",
         "",

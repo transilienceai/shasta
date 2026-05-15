@@ -1,14 +1,12 @@
 """Tests for SOC 2 compliance scorer."""
 
-import pytest
-
-from shasta.compliance.scorer import calculate_score, ComplianceScore
+from shasta.compliance.scorer import ComplianceScore, calculate_score
 from shasta.evidence.models import (
-    Finding,
     CheckDomain,
-    ComplianceStatus,
-    Severity,
     CloudProvider,
+    ComplianceStatus,
+    Finding,
+    Severity,
 )
 
 

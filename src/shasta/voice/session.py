@@ -1,4 +1,5 @@
 """Ephemeral OpenAI Realtime token endpoint."""
+
 import os
 
 import httpx
@@ -27,7 +28,10 @@ def mint_session_token() -> dict:
         raise HTTPException(status_code=502, detail=f"OpenAI request failed: {e}") from e
 
     if response.status_code != 200:
-        raise HTTPException(status_code=502, detail=f"OpenAI session creation failed ({response.status_code}): {response.text[:200]}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"OpenAI session creation failed ({response.status_code}): {response.text[:200]}",
+        )
 
     body = response.json()
     return {

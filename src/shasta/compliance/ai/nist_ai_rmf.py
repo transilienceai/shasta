@@ -91,10 +91,7 @@ NIST_AI_RMF_CATEGORIES: dict[str, NISTAIRMFCategory] = {
         ),
         requires_policy=True,
         soc2_equivalent=["CC1.1", "CC2.1"],
-        guidance=(
-            "Foster risk-aware culture through training and the AI "
-            "Acceptable Use Policy."
-        ),
+        guidance=("Foster risk-aware culture through training and the AI Acceptable Use Policy."),
     ),
     "GOVERN-5": NISTAIRMFCategory(
         id="GOVERN-5",
@@ -340,8 +337,7 @@ NIST_AI_RMF_CATEGORIES: dict[str, NISTAIRMFCategory] = {
         function="MANAGE",
         title="Third-Party Risk Management",
         description=(
-            "AI risks from third-party resources and tools are managed "
-            "throughout the lifecycle."
+            "AI risks from third-party resources and tools are managed throughout the lifecycle."
         ),
         check_ids=[
             "code-outdated-ai-sdk",

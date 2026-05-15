@@ -3,9 +3,9 @@
 from shasta.compliance.ai.iso42001 import (
     ISO42001_CONTROLS,
     ISO42001Control,
+    get_automated_iso42001_controls,
     get_iso42001_control,
     get_iso42001_controls_for_check,
-    get_automated_iso42001_controls,
     get_policy_required_iso42001_controls,
 )
 

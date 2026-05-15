@@ -8,14 +8,22 @@ import pytest
 
 from shasta.policies.ai_policies import (
     POLICIES,
-    generate_policy,
     generate_all_policies,
+    generate_policy,
     list_policies,
 )
 
-
 # All controls/obligations that require policy documents
-REQUIRES_POLICY_IDS = {"AI-5.2", "AI-6.1", "AI-8.2", "AI-A.2", "EUAI-9", "EUAI-11", "EUAI-14", "EUAI-52"}
+REQUIRES_POLICY_IDS = {
+    "AI-5.2",
+    "AI-6.1",
+    "AI-8.2",
+    "AI-A.2",
+    "EUAI-9",
+    "EUAI-11",
+    "EUAI-14",
+    "EUAI-52",
+}
 
 
 class TestPoliciesDict:

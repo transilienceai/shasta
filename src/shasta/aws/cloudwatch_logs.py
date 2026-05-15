@@ -17,7 +17,6 @@ from shasta.evidence.models import (
     Severity,
 )
 
-
 # Log groups that don't need a retention policy (e.g. ephemeral / lambda streams)
 RETENTION_EXEMPT_PREFIXES = ()
 
@@ -52,15 +51,17 @@ def _check_region_log_groups(client: AWSClient, account_id: str, region: str) ->
         for page in paginator.paginate():
             groups.extend(page.get("logGroups", []))
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="cwl-kms-encryption",
-            title="Unable to check CloudWatch log groups",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.ENCRYPTION,
-            resource_type="AWS::Logs::LogGroup",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="cwl-kms-encryption",
+                title="Unable to check CloudWatch log groups",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.ENCRYPTION,
+                resource_type="AWS::Logs::LogGroup",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     if not groups:
         return []

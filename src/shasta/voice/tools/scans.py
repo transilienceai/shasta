@@ -1,4 +1,5 @@
 """Tool functions for scan queries."""
+
 from typing import Any
 
 from shasta.voice.store import Store

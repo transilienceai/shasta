@@ -91,16 +91,18 @@ def check_rsv_exists(client: AzureClient, subscription_id: str, region: str) -> 
     try:
         vaults = list(client.mgmt_client(_rs_class()).vaults.list_by_subscription_id())
     except Exception as e:
-        return [Finding.not_assessed(
-            check_id="azure-rsv-exists",
-            title="Unable to check Recovery Services Vaults",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.LOGGING,
-            resource_type="Azure::RecoveryServices::Vault",
-            account_id=subscription_id,
-            region=region,
-            cloud_provider=CloudProvider.AZURE,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="azure-rsv-exists",
+                title="Unable to check Recovery Services Vaults",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.LOGGING,
+                resource_type="Azure::RecoveryServices::Vault",
+                account_id=subscription_id,
+                region=region,
+                cloud_provider=CloudProvider.AZURE,
+            )
+        ]
     if vaults:
         return [
             Finding(
@@ -188,16 +190,18 @@ def check_rsv_soft_delete(client: AzureClient, subscription_id: str, region: str
                 )
             )
     except Exception as e:
-        return [Finding.not_assessed(
-            check_id="azure-rsv-soft-delete",
-            title="Unable to check RSV soft delete",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.LOGGING,
-            resource_type="Azure::RecoveryServices::Vault",
-            account_id=subscription_id,
-            region=region,
-            cloud_provider=CloudProvider.AZURE,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="azure-rsv-soft-delete",
+                title="Unable to check RSV soft delete",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.LOGGING,
+                resource_type="Azure::RecoveryServices::Vault",
+                account_id=subscription_id,
+                region=region,
+                cloud_provider=CloudProvider.AZURE,
+            )
+        ]
     return findings
 
 
@@ -242,16 +246,18 @@ def check_rsv_immutability(client: AzureClient, subscription_id: str, region: st
                 )
             )
     except Exception as e:
-        return [Finding.not_assessed(
-            check_id="azure-rsv-immutability",
-            title="Unable to check RSV immutability",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.LOGGING,
-            resource_type="Azure::RecoveryServices::Vault",
-            account_id=subscription_id,
-            region=region,
-            cloud_provider=CloudProvider.AZURE,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="azure-rsv-immutability",
+                title="Unable to check RSV immutability",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.LOGGING,
+                resource_type="Azure::RecoveryServices::Vault",
+                account_id=subscription_id,
+                region=region,
+                cloud_provider=CloudProvider.AZURE,
+            )
+        ]
     return findings
 
 
@@ -291,16 +297,18 @@ def check_rsv_cross_region_restore(
                 )
             )
     except Exception as e:
-        return [Finding.not_assessed(
-            check_id="azure-rsv-crr",
-            title="Unable to check RSV cross-region restore",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.LOGGING,
-            resource_type="Azure::RecoveryServices::Vault",
-            account_id=subscription_id,
-            region=region,
-            cloud_provider=CloudProvider.AZURE,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="azure-rsv-crr",
+                title="Unable to check RSV cross-region restore",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.LOGGING,
+                resource_type="Azure::RecoveryServices::Vault",
+                account_id=subscription_id,
+                region=region,
+                cloud_provider=CloudProvider.AZURE,
+            )
+        ]
     return findings
 
 
@@ -338,16 +346,18 @@ def check_rsv_redundancy(client: AzureClient, subscription_id: str, region: str)
                 )
             )
     except Exception as e:
-        return [Finding.not_assessed(
-            check_id="azure-rsv-redundancy",
-            title="Unable to check RSV storage redundancy",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.LOGGING,
-            resource_type="Azure::RecoveryServices::Vault",
-            account_id=subscription_id,
-            region=region,
-            cloud_provider=CloudProvider.AZURE,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="azure-rsv-redundancy",
+                title="Unable to check RSV storage redundancy",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.LOGGING,
+                resource_type="Azure::RecoveryServices::Vault",
+                account_id=subscription_id,
+                region=region,
+                cloud_provider=CloudProvider.AZURE,
+            )
+        ]
     return findings
 
 
@@ -381,16 +391,18 @@ def check_rsv_cmk(client: AzureClient, subscription_id: str, region: str) -> lis
                 )
             )
     except Exception as e:
-        return [Finding.not_assessed(
-            check_id="azure-rsv-cmk",
-            title="Unable to check RSV CMK encryption",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.LOGGING,
-            resource_type="Azure::RecoveryServices::Vault",
-            account_id=subscription_id,
-            region=region,
-            cloud_provider=CloudProvider.AZURE,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="azure-rsv-cmk",
+                title="Unable to check RSV CMK encryption",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.LOGGING,
+                resource_type="Azure::RecoveryServices::Vault",
+                account_id=subscription_id,
+                region=region,
+                cloud_provider=CloudProvider.AZURE,
+            )
+        ]
     return findings
 
 
@@ -424,16 +436,18 @@ def check_rsv_mua(client: AzureClient, subscription_id: str, region: str) -> lis
                 )
             )
     except Exception as e:
-        return [Finding.not_assessed(
-            check_id="azure-rsv-mua",
-            title="Unable to check RSV multi-user authorization",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.LOGGING,
-            resource_type="Azure::RecoveryServices::Vault",
-            account_id=subscription_id,
-            region=region,
-            cloud_provider=CloudProvider.AZURE,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="azure-rsv-mua",
+                title="Unable to check RSV multi-user authorization",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.LOGGING,
+                resource_type="Azure::RecoveryServices::Vault",
+                account_id=subscription_id,
+                region=region,
+                cloud_provider=CloudProvider.AZURE,
+            )
+        ]
     return findings
 
 
@@ -468,14 +482,16 @@ def check_rsv_public_access(
                 )
             )
     except Exception as e:
-        return [Finding.not_assessed(
-            check_id="azure-rsv-public-access",
-            title="Unable to check RSV public access",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.LOGGING,
-            resource_type="Azure::RecoveryServices::Vault",
-            account_id=subscription_id,
-            region=region,
-            cloud_provider=CloudProvider.AZURE,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="azure-rsv-public-access",
+                title="Unable to check RSV public access",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.LOGGING,
+                resource_type="Azure::RecoveryServices::Vault",
+                account_id=subscription_id,
+                region=region,
+                cloud_provider=CloudProvider.AZURE,
+            )
+        ]
     return findings

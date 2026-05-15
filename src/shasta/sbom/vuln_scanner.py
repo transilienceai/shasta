@@ -10,10 +10,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
-from urllib import request, error
+from urllib import error, request
 
 from shasta.sbom.discovery import Dependency, SBOMReport
 
@@ -65,7 +64,7 @@ OSV_ECOSYSTEMS = {
 def scan_sbom_vulnerabilities(sbom: SBOMReport) -> VulnScanResult:
     """Scan all SBOM dependencies against vulnerability databases."""
     result = VulnScanResult(
-        scanned_at=datetime.now(timezone.utc).isoformat(),
+        scanned_at=datetime.now(UTC).isoformat(),
         total_dependencies=sbom.total_dependencies,
     )
 
@@ -171,7 +170,7 @@ def _query_osv_batch(dependencies: list[Dependency]) -> list[VulnerabilityMatch]
                         )
                     )
 
-        except (error.URLError, json.JSONDecodeError) as e:
+        except (error.URLError, json.JSONDecodeError):
             # OSV is optional — don't fail the whole scan
             pass
 

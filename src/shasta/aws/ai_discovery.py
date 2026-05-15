@@ -51,7 +51,13 @@ def discover_aws_ai_services(client: AWSClient) -> dict[str, Any]:
         regions = [default_region]
 
     results: dict[str, Any] = {
-        "sagemaker": {"available": False, "endpoints": [], "training_jobs": [], "models": [], "total_resources": 0},
+        "sagemaker": {
+            "available": False,
+            "endpoints": [],
+            "training_jobs": [],
+            "models": [],
+            "total_resources": 0,
+        },
         "bedrock": {"available": False, "models": [], "total_resources": 0},
         "comprehend": {"available": False, "endpoints": [], "total_resources": 0},
         "lambda_ai": {"available": False, "functions": [], "total_resources": 0},

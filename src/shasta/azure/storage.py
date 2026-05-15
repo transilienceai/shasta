@@ -105,7 +105,6 @@ def run_all_azure_storage_checks(client: AzureClient) -> list[Finding]:
 def _check_storage_encryption(account, name, acct_id, rg, sub_id, region) -> list[Finding]:
     """[CC6.7] Check storage account encryption at rest."""
     # Azure enforces SSE by default, but check TLS version
-    encryption = account.encryption
     min_tls = account.minimum_tls_version or "TLS1_0"
 
     if min_tls in ("TLS1_2", "TLS1_3"):
@@ -316,16 +315,18 @@ def _check_storage_soft_delete(
             ]
 
     except Exception as e:
-        return [Finding.not_assessed(
-            check_id="azure-storage-soft-delete",
-            title="Unable to check storage soft delete",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.STORAGE,
-            resource_type="Azure::Storage::StorageAccount",
-            account_id=sub_id,
-            region=region,
-            cloud_provider=CloudProvider.AZURE,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="azure-storage-soft-delete",
+                title="Unable to check storage soft delete",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.STORAGE,
+                resource_type="Azure::Storage::StorageAccount",
+                account_id=sub_id,
+                region=region,
+                cloud_provider=CloudProvider.AZURE,
+            )
+        ]
 
 
 def _check_shared_key_access(account, name, acct_id, rg, sub_id, region) -> list[Finding]:

@@ -21,11 +21,20 @@ def test_system_prompt_mentions_redirects():
 def test_tool_schemas_cover_all_14_tools():
     names = {t["name"] for t in TOOL_SCHEMAS}
     assert names == {
-        "list_findings", "get_finding", "list_top_blockers", "get_resource_findings",
-        "get_compliance_score", "get_multi_framework_score", "get_score_trend",
+        "list_findings",
+        "get_finding",
+        "list_top_blockers",
+        "get_resource_findings",
+        "get_compliance_score",
+        "get_multi_framework_score",
+        "get_score_trend",
         "get_control_summary",
-        "list_scans", "get_latest_scan",
-        "list_risk_items", "get_risk_item", "add_risk_item", "update_risk",
+        "list_scans",
+        "get_latest_scan",
+        "list_risk_items",
+        "get_risk_item",
+        "add_risk_item",
+        "update_risk",
     }
 
 

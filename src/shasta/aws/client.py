@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -204,7 +203,7 @@ class AWSClient:
         except ClientError:
             return [self._region]
 
-    def for_region(self, region: str) -> "AWSClient":
+    def for_region(self, region: str) -> AWSClient:
         """Create a new AWSClient for a different region, reusing the same profile."""
         return AWSClient(profile_name=self._profile_name, region=region)
 

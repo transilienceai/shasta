@@ -12,7 +12,6 @@ finding details.
 from __future__ import annotations
 
 import json
-from typing import Any
 
 from botocore.exceptions import ClientError
 
@@ -23,7 +22,6 @@ from shasta.evidence.models import (
     Finding,
     Severity,
 )
-
 
 # This module iterates regions per Engineering Principle #3.
 IS_GLOBAL = False
@@ -82,28 +80,27 @@ def _list_customer_keys(client: AWSClient) -> list[dict]:
     return out
 
 
-def check_kms_key_rotation(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_kms_key_rotation(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """[CIS AWS 3.8] Customer-managed KMS keys should have annual rotation enabled.
 
     Without rotation, the same key material protects data forever. NIST SP
     800-57 recommends annual rotation for symmetric keys protecting bulk data.
     AWS KMS auto-rotation is one boolean — there's no excuse to leave it off.
     """
-    findings: list[Finding] = []
     try:
         kms = client.client("kms")
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="kms-key-rotation",
-            title="Unable to check KMS key rotation",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.ENCRYPTION,
-            resource_type="AWS::KMS::Key",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="kms-key-rotation",
+                title="Unable to check KMS key rotation",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.ENCRYPTION,
+                resource_type="AWS::KMS::Key",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     keys = _list_customer_keys(client)
     if not keys:
@@ -198,7 +195,6 @@ def check_kms_key_policy_wildcards(
     equivalent of a public S3 bucket: anyone in any AWS account can encrypt,
     decrypt, schedule deletion, or take ownership of the key.
     """
-    findings: list[Finding] = []
     keys = _list_customer_keys(client)
     if not keys:
         return []
@@ -265,7 +261,7 @@ def check_kms_key_policy_wildcards(
             check_id="kms-key-policy-wildcards",
             title=f"{len(offenders)} CMK(s) with wildcard Principal+Action key policies",
             description=(
-                "These keys grant `kms:*` (or `*`) to `Principal: \"*\"` with no Condition. "
+                'These keys grant `kms:*` (or `*`) to `Principal: "*"` with no Condition. '
                 "Anyone in any AWS account can encrypt, decrypt, take ownership, or schedule "
                 "deletion. This is the KMS equivalent of a public S3 bucket — and unlike S3 "
                 "Public Access Block, there's no account-wide guardrail that prevents it."
@@ -290,9 +286,7 @@ def check_kms_key_policy_wildcards(
     ]
 
 
-def check_kms_scheduled_deletion(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_kms_scheduled_deletion(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """KMS keys in PendingDeletion state should be flagged immediately.
 
     A key in PendingDeletion will be permanently destroyed in 7-30 days,
@@ -374,7 +368,6 @@ def check_kms_no_unrestricted_principal(
     grants without a Condition narrowing the source. Cross-account access is
     legitimate but should always carry a SourceArn / SourceAccount condition.
     """
-    findings: list[Finding] = []
     keys = _list_customer_keys(client)
     if not keys:
         return []
@@ -398,10 +391,7 @@ def check_kms_no_unrestricted_principal(
             cross_acct_principals = [
                 p
                 for p in aws_principals
-                if isinstance(p, str)
-                and p != own_account_root
-                and p != "*"
-                and ":root" in p
+                if isinstance(p, str) and p != own_account_root and p != "*" and ":root" in p
             ]
             if cross_acct_principals and not stmt.get("Condition"):
                 cross_account.append(

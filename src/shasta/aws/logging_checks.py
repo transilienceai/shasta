@@ -165,15 +165,17 @@ def check_cloudtrail_kms_encryption(
         ct = client.client("cloudtrail")
         trails = ct.describe_trails().get("trailList", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="cloudtrail-kms-encryption",
-            title="Unable to check CloudTrail KMS encryption",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.MONITORING,
-            resource_type="AWS::CloudTrail::Trail",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="cloudtrail-kms-encryption",
+                title="Unable to check CloudTrail KMS encryption",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.MONITORING,
+                resource_type="AWS::CloudTrail::Trail",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     for trail in trails:
         name = trail.get("Name", "unknown")
@@ -237,15 +239,17 @@ def check_cloudtrail_log_validation(
         ct = client.client("cloudtrail")
         trails = ct.describe_trails().get("trailList", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="cloudtrail-log-validation",
-            title="Unable to check CloudTrail log validation",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.MONITORING,
-            resource_type="AWS::CloudTrail::Trail",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="cloudtrail-log-validation",
+                title="Unable to check CloudTrail log validation",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.MONITORING,
+                resource_type="AWS::CloudTrail::Trail",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     for trail in trails:
         name = trail.get("Name", "unknown")
@@ -308,15 +312,17 @@ def check_cloudtrail_s3_object_lock(
         s3 = client.client("s3")
         trails = ct.describe_trails().get("trailList", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="cloudtrail-s3-object-lock",
-            title="Unable to check CloudTrail S3 Object Lock",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.MONITORING,
-            resource_type="AWS::S3::Bucket",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="cloudtrail-s3-object-lock",
+                title="Unable to check CloudTrail S3 Object Lock",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.MONITORING,
+                resource_type="AWS::S3::Bucket",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     seen_buckets: set[str] = set()
     for trail in trails:
@@ -385,7 +391,6 @@ def check_cloudtrail_s3_object_lock(
 
 def check_security_hub(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """[CIS AWS 4.16] AWS Security Hub should be enabled in every region."""
-    findings: list[Finding] = []
     try:
         regions = client.get_enabled_regions()
     except ClientError:
@@ -470,7 +475,6 @@ def check_security_hub(client: AWSClient, account_id: str, region: str) -> list[
 
 def check_iam_access_analyzer(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """[CIS AWS 1.20] IAM Access Analyzer should be enabled in every region."""
-    findings: list[Finding] = []
     try:
         regions = client.get_enabled_regions()
     except ClientError:
@@ -1131,9 +1135,7 @@ def check_cloudwatch_alarms_cis_4_x(
         filters_resp = logs.describe_metric_filters(logGroupName=log_group_name)
         metric_filters = filters_resp.get("metricFilters", [])
         alarms_resp = cw.describe_alarms()
-        alarm_metric_names = {
-            a.get("MetricName") for a in alarms_resp.get("MetricAlarms", [])
-        }
+        alarm_metric_names = {a.get("MetricName") for a in alarms_resp.get("MetricAlarms", [])}
     except ClientError as e:
         code = e.response.get("Error", {}).get("Code", "")
         return [

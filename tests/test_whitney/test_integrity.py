@@ -17,7 +17,6 @@ from pathlib import Path
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Module existence and non-emptiness
 # ---------------------------------------------------------------------------
@@ -64,8 +63,7 @@ class TestModulesExistAndHaveCode:
         public_members = [
             name
             for name, obj in inspect.getmembers(mod)
-            if not name.startswith("_")
-            and not inspect.ismodule(obj)
+            if not name.startswith("_") and not inspect.ismodule(obj)
         ]
         assert len(public_members) >= 1, (
             f"{module_path} imports but has no public members — is it a stub?"
@@ -88,15 +86,11 @@ class TestNoEmptyStubDirectories:
     def test_subdir_has_real_code(self, rel_dir):
         d = Path(rel_dir)
         py_files = [f for f in d.glob("*.py") if f.name != "__init__.py"]
-        assert len(py_files) >= 1, (
-            f"{rel_dir}/ has no .py files besides __init__.py — empty stub"
-        )
+        assert len(py_files) >= 1, f"{rel_dir}/ has no .py files besides __init__.py — empty stub"
         for py_file in py_files:
             content = py_file.read_text(encoding="utf-8")
             has_code = "def " in content or "class " in content or " = " in content
-            assert has_code, (
-                f"{py_file} has no functions, classes, or data — empty stub"
-            )
+            assert has_code, f"{py_file} has no functions, classes, or data — empty stub"
 
 
 # ---------------------------------------------------------------------------
@@ -153,13 +147,11 @@ class TestPolicyCounts:
         assert len(POLICIES) == 7
 
     def test_all_policies_render(self):
-        from shasta.policies.ai_policies import generate_policy, POLICIES
+        from shasta.policies.ai_policies import POLICIES, generate_policy
 
         for policy_id in POLICIES:
             result = generate_policy(policy_id, company_name="IntegrityTest")
-            assert "IntegrityTest" in result, (
-                f"Policy {policy_id} didn't render with company name"
-            )
+            assert "IntegrityTest" in result, f"Policy {policy_id} didn't render with company name"
             assert len(result) > 100, (
                 f"Policy {policy_id} rendered but is suspiciously short ({len(result)} chars)"
             )
@@ -169,8 +161,8 @@ class TestSBOMProducesOutput:
     """AI SBOM must produce valid CycloneDX output, not empty stubs."""
 
     def test_code_scan_produces_cyclonedx(self, tmp_path):
-        from tests.test_whitney.conftest import write_file
         from shasta.aws.ai_sbom import scan_ai_sbom_code_only
+        from tests.test_whitney.conftest import write_file
 
         write_file(tmp_path, "requirements.txt", "openai==1.3.0\n")
         result = scan_ai_sbom_code_only(tmp_path)
@@ -224,14 +216,11 @@ class TestMapperEnrichesAllFrameworks:
     """The mapper must add all 6 framework cross-references to findings."""
 
     def test_enrichment_adds_all_framework_keys(self):
-        from shasta.evidence.models import ComplianceStatus
-
-        from tests.test_whitney.conftest import _make_finding
         from shasta.compliance.ai.mapper import enrich_findings_with_ai_controls
+        from shasta.evidence.models import ComplianceStatus
+        from tests.test_whitney.conftest import _make_finding
 
-        findings = [
-            _make_finding("code-prompt-injection-risk", ComplianceStatus.FAIL)
-        ]
+        findings = [_make_finding("code-prompt-injection-risk", ComplianceStatus.FAIL)]
         enrich_findings_with_ai_controls(findings)
 
         details = findings[0].details

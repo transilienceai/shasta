@@ -11,7 +11,7 @@ import csv
 import io
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -55,7 +55,7 @@ def run_access_review(client: AWSClient) -> AccessReviewReport:
     """Run a comprehensive IAM access review."""
     iam = client.client("iam")
     account_id = client.account_info.account_id if client.account_info else "unknown"
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Generate credential report
     for _ in range(10):

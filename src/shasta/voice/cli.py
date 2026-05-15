@@ -1,4 +1,5 @@
 """`python -m shasta.voice` entrypoint."""
+
 import argparse
 import os
 import sys
@@ -13,7 +14,9 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=8090)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--no-open", action="store_true", help="don't auto-launch browser")
-    parser.add_argument("--db", type=Path, default=None, help="path to shasta.db (default: data/shasta.db)")
+    parser.add_argument(
+        "--db", type=Path, default=None, help="path to shasta.db (default: data/shasta.db)"
+    )
     args = parser.parse_args()
 
     api_key = os.environ.get("OPENAI_API_KEY")
@@ -30,6 +33,7 @@ def main() -> int:
 
     # Verify the DB has at least one scan
     from shasta.voice.store import Store
+
     s = Store(db_path=db_path)
     if not s.has_data():
         print(f"✗ {db_path} exists but contains no scan data", file=sys.stderr)
@@ -51,6 +55,7 @@ def main() -> int:
             pass
 
     import uvicorn
+
     app = create_app(db_path=db_path)
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
     return 0

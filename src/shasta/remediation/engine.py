@@ -9,7 +9,7 @@ For each failing finding, produces:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from shasta.evidence.models import ComplianceStatus, Finding, Severity
@@ -397,7 +397,7 @@ resource "aws_s3_bucket_versioning" "{safe}_v2" {{
 
 @_tf("security-hub-enabled")
 def _tf_aws_security_hub(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_securityhub_account" "main" {
   enable_default_standards = true
 }
@@ -410,16 +410,16 @@ resource "aws_securityhub_standards_subscription" "cis_aws" {
 resource "aws_securityhub_standards_subscription" "fsbp" {
   standards_arn = "arn:aws:securityhub:::standards/aws-foundational-security-best-practices/v/1.0.0"
   depends_on    = [aws_securityhub_account.main]
-}'''
+}"""
 
 
 @_tf("iam-access-analyzer")
 def _tf_aws_access_analyzer(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_accessanalyzer_analyzer" "default" {
   analyzer_name = "default"
   type          = "ACCOUNT"  # Use ORGANIZATION if AWS Organizations is in use
-}'''
+}"""
 
 
 # ----- Encryption: EFS / SNS / SQS / Secrets Manager / ACM -----
@@ -444,28 +444,28 @@ resource "aws_kms_key" "efs" {{
 
 @_tf("sns-encryption")
 def _tf_aws_sns_encryption(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_sns_topic" "encrypted_topic" {
   name              = "TOPIC_NAME"
   kms_master_key_id = "alias/aws/sns"  # or a customer-managed key alias
-}'''
+}"""
 
 
 @_tf("sqs-encryption")
 def _tf_aws_sqs_encryption(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_sqs_queue" "encrypted_queue" {
   name                              = "QUEUE_NAME"
   sqs_managed_sse_enabled           = true  # SQS-managed SSE (no KMS cost)
   # OR for KMS:
   # kms_master_key_id                 = "alias/aws/sqs"
   # kms_data_key_reuse_period_seconds = 300
-}'''
+}"""
 
 
 @_tf("secrets-manager-rotation")
 def _tf_aws_sm_rotation(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_secretsmanager_secret" "db_password" {
   name = "db_password"
 }
@@ -477,12 +477,12 @@ resource "aws_secretsmanager_secret_rotation" "db_password" {
   rotation_rules {
     automatically_after_days = 30
   }
-}'''
+}"""
 
 
 @_tf("acm-expiring-certs")
 def _tf_aws_acm_renewal(f: Finding) -> str:
-    return '''\
+    return """\
 # Use DNS validation so ACM auto-renews ~60 days before expiry.
 # For email-validated or imported certs, switch to DNS-validated:
 resource "aws_acm_certificate" "main" {
@@ -507,7 +507,7 @@ resource "aws_route53_record" "cert_validation" {
   records = [each.value.record]
   type    = each.value.type
   ttl     = 60
-}'''
+}"""
 
 
 # ----- Networking: ELB v2 -----
@@ -515,7 +515,7 @@ resource "aws_route53_record" "cert_validation" {
 
 @_tf("elb-listener-tls")
 def _tf_aws_elb_tls(f: Finding) -> str:
-    return '''\
+    return """\
 # Use a modern TLS policy and redirect HTTP -> HTTPS
 resource "aws_lb_listener" "https" {
   load_balancer_arn = aws_lb.main.arn
@@ -543,12 +543,12 @@ resource "aws_lb_listener" "http_redirect" {
       status_code = "HTTP_301"
     }
   }
-}'''
+}"""
 
 
 @_tf("elb-access-logs")
 def _tf_aws_elb_access_logs(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_lb" "main" {
   name = "main"
   # ... existing config ...
@@ -558,18 +558,18 @@ resource "aws_lb" "main" {
     prefix  = "alb-logs"
     enabled = true
   }
-}'''
+}"""
 
 
 @_tf("elb-drop-invalid-headers")
 def _tf_aws_elb_drop_headers(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_lb" "main" {
   name = "main"
   # ... existing config ...
 
   drop_invalid_header_fields = true  # CIS AWS
-}'''
+}"""
 
 
 # ----- Stage 2: Databases -----
@@ -629,7 +629,7 @@ resource "aws_db_instance" "{_aws_safe(db_id)}" {{
 
 @_tf("dynamodb-pitr")
 def _tf_aws_ddb_pitr(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_dynamodb_table" "main" {
   name = "TABLE_NAME"
   # ... existing config ...
@@ -637,12 +637,12 @@ resource "aws_dynamodb_table" "main" {
   point_in_time_recovery {
     enabled = true
   }
-}'''
+}"""
 
 
 @_tf("dynamodb-kms")
 def _tf_aws_ddb_kms(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_dynamodb_table" "main" {
   name = "TABLE_NAME"
   # ... existing config ...
@@ -656,7 +656,7 @@ resource "aws_dynamodb_table" "main" {
 resource "aws_kms_key" "dynamodb" {
   description         = "DynamoDB CMK"
   enable_key_rotation = true
-}'''
+}"""
 
 
 # ----- Stage 2: Serverless -----
@@ -665,19 +665,21 @@ resource "aws_kms_key" "dynamodb" {
 @_tf("lambda-runtime-eol")
 def _tf_aws_lambda_runtime(f: Finding) -> str:
     deprecated = f.details.get("deprecated", [])
-    examples = ", ".join(d.get("name", "") if isinstance(d, dict) else str(d) for d in deprecated[:3])
-    return f'''\
+    examples = ", ".join(
+        d.get("name", "") if isinstance(d, dict) else str(d) for d in deprecated[:3]
+    )
+    return f"""\
 # Bump deprecated Lambda runtimes ({examples}) to a current version.
 resource "aws_lambda_function" "example" {{
   function_name = "FUNCTION_NAME"
   runtime       = "python3.12"  # or nodejs20.x / java21 / dotnet8
   # ... existing config ...
-}}'''
+}}"""
 
 
 @_tf("lambda-env-kms")
 def _tf_aws_lambda_env_kms(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_kms_key" "lambda_env" {
   description         = "Lambda environment variable encryption"
   enable_key_rotation = true
@@ -687,12 +689,12 @@ resource "aws_lambda_function" "example" {
   function_name = "FUNCTION_NAME"
   kms_key_arn   = aws_kms_key.lambda_env.arn
   # ... existing config ...
-}'''
+}"""
 
 
 @_tf("lambda-dlq")
 def _tf_aws_lambda_dlq(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_sqs_queue" "lambda_dlq" {
   name                       = "lambda-dlq"
   message_retention_seconds  = 1209600  # 14 days
@@ -705,12 +707,12 @@ resource "aws_lambda_function" "example" {
   dead_letter_config {
     target_arn = aws_sqs_queue.lambda_dlq.arn
   }
-}'''
+}"""
 
 
 @_tf("apigw-logging")
 def _tf_aws_apigw_logging(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_api_gateway_method_settings" "all" {
   rest_api_id = aws_api_gateway_rest_api.main.id
   stage_name  = aws_api_gateway_stage.prod.stage_name
@@ -720,12 +722,12 @@ resource "aws_api_gateway_method_settings" "all" {
     metrics_enabled = true
     logging_level   = "INFO"
   }
-}'''
+}"""
 
 
 @_tf("apigw-waf")
 def _tf_aws_apigw_waf(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_wafv2_web_acl" "apigw" {
   name        = "apigw-waf"
   scope       = "REGIONAL"
@@ -758,12 +760,12 @@ resource "aws_wafv2_web_acl" "apigw" {
 resource "aws_wafv2_web_acl_association" "apigw" {
   resource_arn = aws_api_gateway_stage.prod.arn
   web_acl_arn  = aws_wafv2_web_acl.apigw.arn
-}'''
+}"""
 
 
 @_tf("sfn-logging")
 def _tf_aws_sfn_logging(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_cloudwatch_log_group" "sfn" {
   name              = "/aws/states/STATE_MACHINE_NAME"
   retention_in_days = 90
@@ -778,7 +780,7 @@ resource "aws_sfn_state_machine" "main" {
     include_execution_data = true
     level                  = "ALL"
   }
-}'''
+}"""
 
 
 # ----- Stage 2: Backup -----
@@ -808,7 +810,7 @@ resource "aws_kms_key" "backup" {{
 
 @_tf("aws-backup-plans")
 def _tf_aws_backup_plans(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_backup_plan" "daily_35day" {
   name = "daily-35day"
 
@@ -833,7 +835,7 @@ resource "aws_backup_selection" "all_resources" {
     key   = "backup"
     value = "true"
   }
-}'''
+}"""
 
 
 # ----- Stage 3: Cross-cutting -----
@@ -841,7 +843,7 @@ resource "aws_backup_selection" "all_resources" {
 
 @_tf("aws-vpc-endpoints")
 def _tf_aws_vpc_endpoints(f: Finding) -> str:
-    return '''\
+    return """\
 # Gateway endpoints (free)
 resource "aws_vpc_endpoint" "s3" {
   vpc_id            = aws_vpc.main.id
@@ -873,12 +875,12 @@ resource "aws_vpc_endpoint" "interface" {
   subnet_ids          = aws_subnet.private[*].id
   security_group_ids  = [aws_security_group.endpoints.id]
   private_dns_enabled = true
-}'''
+}"""
 
 
 @_tf("cwl-kms-encryption")
 def _tf_aws_cwl_kms(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_kms_key" "logs" {
   description         = "CloudWatch Logs encryption"
   enable_key_rotation = true
@@ -900,12 +902,12 @@ resource "aws_cloudwatch_log_group" "app" {
   name              = "/app/main"
   retention_in_days = 90
   kms_key_id        = aws_kms_key.logs.arn
-}'''
+}"""
 
 
 @_tf("cwl-retention")
 def _tf_aws_cwl_retention(f: Finding) -> str:
-    return '''\
+    return """\
 # Apply a retention policy to existing log groups via for_each
 data "aws_cloudwatch_log_groups" "all" {}
 
@@ -913,12 +915,12 @@ resource "aws_cloudwatch_log_group" "retention_patch" {
   for_each          = toset(data.aws_cloudwatch_log_groups.all.log_group_names)
   name              = each.value
   retention_in_days = 90  # or 180/365 for compliance-critical
-}'''
+}"""
 
 
 @_tf("aws-org-scps")
 def _tf_aws_scps(f: Finding) -> str:
-    return '''\
+    return """\
 # Deny CloudTrail disable / delete across all member accounts
 resource "aws_organizations_policy" "deny_cloudtrail_disable" {
   name = "deny-cloudtrail-disable"
@@ -943,12 +945,12 @@ resource "aws_organizations_policy" "deny_cloudtrail_disable" {
 resource "aws_organizations_policy_attachment" "deny_ct" {
   policy_id = aws_organizations_policy.deny_cloudtrail_disable.id
   target_id = "ou-XXXX-XXXXXXXX"  # OU or account ID
-}'''
+}"""
 
 
 @_tf("aws-tag-policy")
 def _tf_aws_tag_policy(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_organizations_policy" "require_owner_tag" {
   name = "require-owner-tag"
   type = "TAG_POLICY"
@@ -966,7 +968,7 @@ resource "aws_organizations_policy" "require_owner_tag" {
       }
     }
   })
-}'''
+}"""
 
 
 # ---------------------------------------------------------------------------
@@ -976,7 +978,7 @@ resource "aws_organizations_policy" "require_owner_tag" {
 
 @_tf("ec2-imdsv2-enforced")
 def _tf_aws_imdsv2(f: Finding) -> str:
-    return '''\
+    return """\
 # Enforce IMDSv2 on every existing instance
 resource "aws_ec2_instance_metadata_defaults" "account_default" {
   http_tokens                 = "required"
@@ -995,12 +997,12 @@ resource "aws_ec2_instance_metadata_defaults" "account_default" {
 
 # To remediate existing instances via CLI:
 #   aws ec2 modify-instance-metadata-options --instance-id i-xxx \\
-#       --http-tokens required --http-endpoint enabled --http-put-response-hop-limit 1'''
+#       --http-tokens required --http-endpoint enabled --http-put-response-hop-limit 1"""
 
 
 @_tf("ec2-instance-profile")
 def _tf_aws_ec2_instance_profile(f: Finding) -> str:
-    return '''\
+    return """\
 # Minimal IAM role for an EC2 instance with no AWS access (extend as needed)
 resource "aws_iam_role" "ec2_baseline" {
   name = "ec2-baseline"
@@ -1027,7 +1029,7 @@ resource "aws_iam_instance_profile" "ec2_baseline" {
 
 # Then attach to existing instances:
 #   aws ec2 associate-iam-instance-profile --instance-id i-xxx \\
-#       --iam-instance-profile Name=ec2-baseline'''
+#       --iam-instance-profile Name=ec2-baseline"""
 
 
 @_tf("eks-private-endpoint")
@@ -1098,7 +1100,7 @@ resource "aws_eks_cluster" "{_aws_safe(cluster)}" {{
 
 @_tf("ecs-task-privileged")
 def _tf_aws_ecs_no_privileged(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_ecs_task_definition" "app" {
   family = "app"
   # ... existing config ...
@@ -1111,12 +1113,12 @@ resource "aws_ecs_task_definition" "app" {
     readonlyRootFilesystem = true
     # ... rest of definition ...
   }])
-}'''
+}"""
 
 
 @_tf("ecs-task-root-user")
 def _tf_aws_ecs_no_root(f: Finding) -> str:
-    return '''\
+    return """\
 # In the Dockerfile of the container image:
 #   FROM python:3.12-slim
 #   RUN useradd -u 1000 -m app
@@ -1133,12 +1135,12 @@ resource "aws_ecs_task_definition" "app" {
     user  = "1000"  # Non-root uid matching the Dockerfile
     # ... rest of definition ...
   }])
-}'''
+}"""
 
 
 @_tf("kms-key-rotation")
 def _tf_aws_kms_rotation(f: Finding) -> str:
-    return '''\
+    return """\
 # Enable rotation on every existing customer-managed CMK:
 #
 # for key_id in $(aws kms list-keys --query "Keys[].KeyId" --output text); do
@@ -1154,12 +1156,12 @@ resource "aws_kms_key" "example" {
   description             = "..."
   enable_key_rotation     = true
   deletion_window_in_days = 30
-}'''
+}"""
 
 
 @_tf("kms-key-policy-wildcards")
 def _tf_aws_kms_policy(f: Finding) -> str:
-    return '''\
+    return """\
 # Replace wildcard key policies with scoped principals
 resource "aws_kms_key" "example" {
   description             = "..."
@@ -1186,14 +1188,14 @@ resource "aws_kms_key" "example" {
       }
     ]
   })
-}'''
+}"""
 
 
 @_tf("iam-policy-wildcards")
 def _tf_aws_iam_no_wildcards(f: Finding) -> str:
     policies = f.details.get("wildcard_policies", [])
     names = ", ".join(p.get("policy_name", "") for p in policies[:3]) or "<policy-name>"
-    return f'''\
+    return f"""\
 # Replace wildcard policies ({names}) with scoped equivalents.
 # Use IAM Access Analyzer policy generation to derive a policy from
 # CloudTrail data:
@@ -1218,12 +1220,12 @@ resource "aws_iam_policy" "scoped_replacement" {{
       Resource = "arn:aws:s3:::specific-bucket/specific-prefix/*"
     }}]
   }})
-}}'''
+}}"""
 
 
 @_tf("iam-role-trust-external")
 def _tf_aws_iam_external_id(f: Finding) -> str:
-    return '''\
+    return """\
 # Add an ExternalId condition to every cross-account role trust policy
 resource "aws_iam_role" "third_party_integration" {
   name = "third-party-integration"
@@ -1242,12 +1244,12 @@ resource "aws_iam_role" "third_party_integration" {
       }
     }]
   })
-}'''
+}"""
 
 
 @_tf("cloudwatch-alarms-cis-4")
 def _tf_aws_cwl_cis_4(f: Finding) -> str:
-    return '''\
+    return """\
 # CloudTrail metric filters + alarms for CIS AWS 4.1-4.15
 # This is a representative sample — the full set is 15 filter+alarm pairs.
 # Run them in the home region of the multi-region trail.
@@ -1286,12 +1288,12 @@ resource "aws_cloudwatch_metric_alarm" "cis_4_5" {
 }
 
 # Repeat the metric_filter + metric_alarm pair for each of CIS 4.1-4.15.
-# CIS Foundations Benchmark v3.0 spec lists the exact filter pattern for each.'''
+# CIS Foundations Benchmark v3.0 spec lists the exact filter pattern for each."""
 
 
 @_tf("aws-config-conformance-packs")
 def _tf_aws_conformance_pack(f: Finding) -> str:
-    return '''\
+    return """\
 # Deploy the CIS AWS Foundations Benchmark v3.0 conformance pack
 resource "aws_config_conformance_pack" "cis_aws_v3" {
   name = "cis-aws-foundations-v3"
@@ -1301,7 +1303,7 @@ resource "aws_config_conformance_pack" "cis_aws_v3" {
 
 # Or use AWS-managed conformance pack templates directly via the console:
 # Config > Conformance packs > Deploy conformance pack > Use sample template
-# > select "Operational Best Practices for CIS AWS v3.0".'''
+# > select "Operational Best Practices for CIS AWS v3.0"."""
 
 
 # ---------------------------------------------------------------------------
@@ -1312,7 +1314,7 @@ resource "aws_config_conformance_pack" "cis_aws_v3" {
 
 @_tf("cloudfront-https-only")
 def _tf_aws_cf_https(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_cloudfront_distribution" "main" {
   # ... existing config ...
 
@@ -1327,12 +1329,12 @@ resource "aws_cloudfront_distribution" "main" {
     viewer_protocol_policy = "redirect-to-https"
     # ... rest of behavior ...
   }
-}'''
+}"""
 
 
 @_tf("cloudfront-min-tls")
 def _tf_aws_cf_tls(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_cloudfront_distribution" "main" {
   # ... existing config ...
 
@@ -1348,12 +1350,12 @@ resource "aws_acm_certificate" "main" {
   provider          = aws.us_east_1
   domain_name       = "example.com"
   validation_method = "DNS"
-}'''
+}"""
 
 
 @_tf("cloudfront-waf")
 def _tf_aws_cf_waf(f: Finding) -> str:
-    return '''\
+    return """\
 # Web ACL must be in us-east-1 for CloudFront
 resource "aws_wafv2_web_acl" "cloudfront" {
   provider = aws.us_east_1
@@ -1388,12 +1390,12 @@ resource "aws_wafv2_web_acl" "cloudfront" {
 resource "aws_cloudfront_distribution" "main" {
   web_acl_id = aws_wafv2_web_acl.cloudfront.arn
   # ... existing config ...
-}'''
+}"""
 
 
 @_tf("cloudfront-oac")
 def _tf_aws_cf_oac(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_cloudfront_origin_access_control" "s3" {
   name                              = "s3-oac"
   description                       = "OAC for S3 origin"
@@ -1428,12 +1430,12 @@ resource "aws_s3_bucket_policy" "content" {
       }
     }]
   })
-}'''
+}"""
 
 
 @_tf("redshift-encryption")
 def _tf_aws_redshift_encrypt(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_kms_key" "redshift" {
   description             = "Redshift cluster encryption"
   enable_key_rotation     = true
@@ -1445,12 +1447,12 @@ resource "aws_redshift_cluster" "main" {
   encrypted          = true
   kms_key_id         = aws_kms_key.redshift.arn
   # ... existing config ...
-}'''
+}"""
 
 
 @_tf("redshift-public-access")
 def _tf_aws_redshift_private(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_redshift_cluster" "main" {
   cluster_identifier  = "main"
   publicly_accessible = false
@@ -1458,12 +1460,12 @@ resource "aws_redshift_cluster" "main" {
   cluster_subnet_group_name = aws_redshift_subnet_group.private.name
   vpc_security_group_ids    = [aws_security_group.redshift.id]
   # ... existing config ...
-}'''
+}"""
 
 
 @_tf("redshift-audit-logging")
 def _tf_aws_redshift_logging(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_s3_bucket" "redshift_logs" {
   bucket = "company-redshift-audit-logs"
 }
@@ -1477,12 +1479,12 @@ resource "aws_redshift_cluster" "main" {
     bucket_name   = aws_s3_bucket.redshift_logs.id
     s3_key_prefix = "redshift-audit/"
   }
-}'''
+}"""
 
 
 @_tf("redshift-require-ssl")
 def _tf_aws_redshift_ssl(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_redshift_parameter_group" "secure" {
   family = "redshift-1.0"
   name   = "redshift-secure"
@@ -1497,12 +1499,12 @@ resource "aws_redshift_cluster" "main" {
   cluster_identifier        = "main"
   cluster_parameter_group_name = aws_redshift_parameter_group.secure.name
   # ... existing config ...
-}'''
+}"""
 
 
 @_tf("elasticache-transit-encryption")
 def _tf_aws_ec_transit(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_elasticache_replication_group" "main" {
   replication_group_id       = "main"
   description                = "Redis with TLS"
@@ -1510,12 +1512,12 @@ resource "aws_elasticache_replication_group" "main" {
   at_rest_encryption_enabled = true
   auth_token                 = "REDIS_AUTH_TOKEN"
   # ... existing config ...
-}'''
+}"""
 
 
 @_tf("elasticache-at-rest-encryption")
 def _tf_aws_ec_at_rest(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_kms_key" "elasticache" {
   description         = "ElastiCache encryption"
   enable_key_rotation = true
@@ -1527,12 +1529,12 @@ resource "aws_elasticache_replication_group" "main" {
   at_rest_encryption_enabled = true
   kms_key_id                 = aws_kms_key.elasticache.arn
   # ... existing config ...
-}'''
+}"""
 
 
 @_tf("elasticache-auth-token")
 def _tf_aws_ec_auth(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_elasticache_replication_group" "main" {
   replication_group_id       = "main"
   description                = "Redis with AUTH"
@@ -1544,12 +1546,12 @@ resource "aws_elasticache_replication_group" "main" {
 # Store the auth token in Secrets Manager
 data "aws_secretsmanager_secret_version" "redis_auth" {
   secret_id = "redis-auth-token"
-}'''
+}"""
 
 
 @_tf("neptune-encryption")
 def _tf_aws_neptune_encrypt(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_kms_key" "neptune" {
   description         = "Neptune cluster encryption"
   enable_key_rotation = true
@@ -1560,7 +1562,7 @@ resource "aws_neptune_cluster" "main" {
   storage_encrypted   = true
   kms_key_arn         = aws_kms_key.neptune.arn
   # ... existing config ...
-}'''
+}"""
 
 
 @_tf("rds-force-ssl")
@@ -1592,7 +1594,7 @@ resource "aws_db_instance" "main" {{
 
 @_tf("rds-postgres-log-settings")
 def _tf_aws_rds_pg_logs(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_db_parameter_group" "postgres_audit" {
   name   = "postgres-audit"
   family = "postgres15"  # adjust to your version
@@ -1619,12 +1621,12 @@ resource "aws_db_instance" "main" {
   parameter_group_name = aws_db_parameter_group.postgres_audit.name
   enabled_cloudwatch_logs_exports = ["postgresql"]
   # ... existing config ...
-}'''
+}"""
 
 
 @_tf("rds-min-tls")
 def _tf_aws_rds_min_tls(f: Finding) -> str:
-    return '''\
+    return """\
 # SQL Server RDS only
 resource "aws_db_parameter_group" "sqlserver_tls" {
   name   = "sqlserver-tls"
@@ -1635,21 +1637,21 @@ resource "aws_db_parameter_group" "sqlserver_tls" {
     value        = "1.2"
     apply_method = "pending-reboot"
   }
-}'''
+}"""
 
 
 @_tf("lambda-function-url-auth")
 def _tf_aws_lambda_url_auth(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_lambda_function_url" "secured" {
   function_name      = aws_lambda_function.example.function_name
   authorization_type = "AWS_IAM"  # never NONE for production endpoints
-}'''
+}"""
 
 
 @_tf("lambda-layer-origin")
 def _tf_aws_lambda_layer(f: Finding) -> str:
-    return '''\
+    return """\
 # Re-publish foreign-account layers in your own account so you control updates
 resource "aws_lambda_layer_version" "vendored" {
   layer_name          = "vendored-third-party"
@@ -1662,12 +1664,12 @@ resource "aws_lambda_function" "example" {
   function_name = "example"
   layers        = [aws_lambda_layer_version.vendored.arn]
   # ... existing config ...
-}'''
+}"""
 
 
 @_tf("apigw-client-cert")
 def _tf_aws_apigw_client_cert(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_api_gateway_client_certificate" "main" {
   description = "Client cert for backend integration auth"
 }
@@ -1677,24 +1679,24 @@ resource "aws_api_gateway_stage" "prod" {
   stage_name            = "prod"
   client_certificate_id = aws_api_gateway_client_certificate.main.id
   # ... existing config ...
-}'''
+}"""
 
 
 @_tf("apigw-authorizer")
 def _tf_aws_apigw_authorizer(f: Finding) -> str:
-    return '''\
+    return """\
 # IAM auth on every method (replace AWS_IAM with COGNITO_USER_POOLS or CUSTOM as needed)
 resource "aws_api_gateway_method" "secured_get" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.example.id
   http_method   = "GET"
   authorization = "AWS_IAM"  # or COGNITO_USER_POOLS / CUSTOM
-}'''
+}"""
 
 
 @_tf("apigw-throttling")
 def _tf_aws_apigw_throttle(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_api_gateway_method_settings" "throttle" {
   rest_api_id = aws_api_gateway_rest_api.main.id
   stage_name  = aws_api_gateway_stage.prod.stage_name
@@ -1704,12 +1706,12 @@ resource "aws_api_gateway_method_settings" "throttle" {
     throttling_burst_limit = 200
     throttling_rate_limit  = 100
   }
-}'''
+}"""
 
 
 @_tf("apigw-request-validation")
 def _tf_aws_apigw_validate(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_api_gateway_request_validator" "body_and_params" {
   name                        = "body-and-params"
   rest_api_id                 = aws_api_gateway_rest_api.main.id
@@ -1723,24 +1725,24 @@ resource "aws_api_gateway_method" "validated" {
   http_method          = "POST"
   authorization        = "AWS_IAM"
   request_validator_id = aws_api_gateway_request_validator.body_and_params.id
-}'''
+}"""
 
 
 @_tf("s3-object-ownership")
 def _tf_aws_s3_oo(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_s3_bucket_ownership_controls" "enforce" {
   bucket = aws_s3_bucket.main.id
 
   rule {
     object_ownership = "BucketOwnerEnforced"  # disables ACLs entirely
   }
-}'''
+}"""
 
 
 @_tf("s3-access-logging")
 def _tf_aws_s3_logging(f: Finding) -> str:
-    return '''\
+    return """\
 # A dedicated log destination bucket with Object Lock + lifecycle
 resource "aws_s3_bucket" "logs" {
   bucket              = "company-s3-access-logs"
@@ -1751,12 +1753,12 @@ resource "aws_s3_bucket_logging" "main" {
   bucket        = aws_s3_bucket.main.id
   target_bucket = aws_s3_bucket.logs.id
   target_prefix = "main/"
-}'''
+}"""
 
 
 @_tf("s3-kms-cmk")
 def _tf_aws_s3_kms_cmk(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_kms_key" "s3" {
   description         = "S3 bucket encryption"
   enable_key_rotation = true
@@ -1772,12 +1774,12 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "main" {
     }
     bucket_key_enabled = true  # Reduces KMS API costs
   }
-}'''
+}"""
 
 
 @_tf("aws-backup-cross-region-copy")
 def _tf_aws_backup_crr(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_backup_vault" "secondary" {
   provider    = aws.us_west_2  # destination region
   name        = "secondary"
@@ -1804,12 +1806,12 @@ resource "aws_backup_plan" "with_copy" {
       }
     }
   }
-}'''
+}"""
 
 
 @_tf("aws-backup-vault-access-policy")
 def _tf_aws_backup_access_policy(f: Finding) -> str:
-    return '''\
+    return """\
 resource "aws_backup_vault_policy" "deny_destructive" {
   backup_vault_name = aws_backup_vault.primary.name
 
@@ -1830,7 +1832,7 @@ resource "aws_backup_vault_policy" "deny_destructive" {
       Resource = "*"
     }]
   })
-}'''
+}"""
 
 
 # ---------------------------------------------------------------------------
@@ -2278,7 +2280,7 @@ resource "azurerm_recovery_services_vault" "{_safe(name)}" {{
 
 @_tf("azure-vnet-flow-logs-modern")
 def _tf_az_vnet_flow_logs(f: Finding) -> str:
-    return '''\
+    return """\
 # VNet flow logs — successor to NSG flow logs (CIS 6.4)
 resource "azurerm_network_watcher_flow_log" "vnet_flow" {
   network_watcher_name = "NetworkWatcher_LOCATION"
@@ -2301,7 +2303,7 @@ resource "azurerm_network_watcher_flow_log" "vnet_flow" {
     workspace_resource_id = azurerm_log_analytics_workspace.main.id
     interval_in_minutes   = 10
   }
-}'''
+}"""
 
 
 @_tf("azure-network-watcher-coverage")
@@ -2339,7 +2341,7 @@ def _tf_az_defender_per_plan(f: Finding) -> str:
 
 @_tf("azure-activity-log-alerts")
 def _tf_az_activity_alerts(f: Finding) -> str:
-    return '''\
+    return """\
 # CIS 5.2.x — alert on critical control-plane changes
 locals {
   critical_operations = [
@@ -2381,7 +2383,7 @@ resource "azurerm_monitor_activity_log_alert" "critical_changes" {
   action {
     action_group_id = azurerm_monitor_action_group.secops.id
   }
-}'''
+}"""
 
 
 # ----- Governance -----
@@ -2401,7 +2403,7 @@ resource "azurerm_management_lock" "{_safe(rg)}_protect" {{
 
 @_tf("azure-required-tags")
 def _tf_az_required_tags(f: Finding) -> str:
-    return '''\
+    return """\
 # Built-in policy: 'Require a tag and its value on resource groups'
 data "azurerm_policy_definition" "require_tag" {
   display_name = "Require a tag and its value on resource groups"
@@ -2427,12 +2429,12 @@ resource "azurerm_subscription_policy_assignment" "require_env_tag" {
     tagName  = { value = "environment" }
     tagValue = { value = "production" }
   })
-}'''
+}"""
 
 
 @_tf("azure-security-initiative")
 def _tf_az_security_initiative(f: Finding) -> str:
-    return '''\
+    return """\
 # Assign the Microsoft Cloud Security Benchmark initiative (CIS 2.x)
 data "azurerm_policy_set_definition" "mcsb" {
   display_name = "Microsoft cloud security benchmark"
@@ -2444,7 +2446,7 @@ resource "azurerm_subscription_policy_assignment" "mcsb" {
   policy_definition_id = data.azurerm_policy_set_definition.mcsb.id
   display_name         = "Microsoft Cloud Security Benchmark"
   description          = "Continuous compliance against the MCSB."
-}'''
+}"""
 
 
 # ---------------------------------------------------------------------------
@@ -2490,7 +2492,11 @@ resource "google_project_iam_binding" "remove_editor" {{
 def _tf_gcp_sa_not_admin(f: Finding) -> str:
     project = f.account_id or "PROJECT_ID"
     offenders = f.details.get("offenders", [])
-    sa_email = offenders[0]["member"].replace("serviceAccount:", "") if offenders else "SA_EMAIL@PROJECT.iam.gserviceaccount.com"
+    sa_email = (
+        offenders[0]["member"].replace("serviceAccount:", "")
+        if offenders
+        else "SA_EMAIL@PROJECT.iam.gserviceaccount.com"
+    )
     role = offenders[0].get("role", "roles/editor") if offenders else "roles/editor"
     return f'''\
 # Remove admin role from service account and replace with scoped role.
@@ -2631,7 +2637,7 @@ resource "google_compute_subnetwork" "{subnet.replace("-", "_")}_flow_logs" {{
 }}
 
 # For all subnets without flow logs, use gcloud:
-#   for subnet in {' '.join(missing[:5])}; do
+#   for subnet in {" ".join(missing[:5])}; do
 #     gcloud compute networks subnets update $subnet \\
 #       --region={region} --enable-flow-logs \\
 #       --logging-aggregation-interval=interval-5-sec \\
@@ -2644,8 +2650,16 @@ def _tf_gcp_kms_rotation(f: Finding) -> str:
     project = f.account_id or "PROJECT_ID"
     keys_info = f.details.get("keys_with_issues", [])
     key_name = keys_info[0]["key"].split("/")[-1] if keys_info else "my-key"
-    keyring = keys_info[0]["key"].split("/keyRings/")[1].split("/")[0] if keys_info and "/keyRings/" in keys_info[0].get("key", "") else "my-keyring"
-    location = keys_info[0]["key"].split("/locations/")[1].split("/")[0] if keys_info and "/locations/" in keys_info[0].get("key", "") else "global"
+    keyring = (
+        keys_info[0]["key"].split("/keyRings/")[1].split("/")[0]
+        if keys_info and "/keyRings/" in keys_info[0].get("key", "")
+        else "my-keyring"
+    )
+    location = (
+        keys_info[0]["key"].split("/locations/")[1].split("/")[0]
+        if keys_info and "/locations/" in keys_info[0].get("key", "")
+        else "global"
+    )
     return f'''\
 # Configure KMS key rotation period to ≤90 days (7,776,000 seconds).
 
@@ -3114,7 +3128,9 @@ resource "google_cloud_run_v2_service" "{svc_name.replace("-", "_")}" {{
 def _tf_gcp_cloudrun_secrets(f: Finding) -> str:
     project = f.account_id or "PROJECT_ID"
     region = f.region or "us-central1"
-    suspicious = f.details.get("suspicious_env_vars", [{"service": "my-service", "env_var": "API_KEY"}])
+    suspicious = f.details.get(
+        "suspicious_env_vars", [{"service": "my-service", "env_var": "API_KEY"}]
+    )
     svc_name = suspicious[0].get("service", "my-service") if suspicious else "my-service"
     env_var = suspicious[0].get("env_var", "API_KEY") if suspicious else "API_KEY"
     secret_id = env_var.lower().replace("_", "-")
@@ -3704,7 +3720,7 @@ EXPLANATIONS: dict[str, dict] = {
     "eks-audit-logging": {
         "explanation": "Without EKS audit + authenticator logs, you cannot reconstruct who issued kubectl commands during a security incident. EKS lets you enable api / audit / authenticator / controllerManager / scheduler — all five are recommended for SOC 2.",
         "steps": [
-            "aws eks update-cluster-config --name <cluster> --logging '{\"clusterLogging\":[{\"types\":[\"api\",\"audit\",\"authenticator\",\"controllerManager\",\"scheduler\"],\"enabled\":true}]}'",
+            'aws eks update-cluster-config --name <cluster> --logging \'{"clusterLogging":[{"types":["api","audit","authenticator","controllerManager","scheduler"],"enabled":true}]}\'',
             "Set retention on the /aws/eks/<cluster>/cluster log group to 90+ days",
         ],
         "effort": "quick",

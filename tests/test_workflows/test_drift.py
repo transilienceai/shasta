@@ -1,16 +1,14 @@
 """Tests for compliance drift detection."""
 
-import pytest
-
-from shasta.workflows.drift import detect_drift, DriftReport
 from shasta.evidence.models import (
+    CheckDomain,
+    CloudProvider,
+    ComplianceStatus,
     Finding,
     ScanResult,
-    CheckDomain,
-    ComplianceStatus,
     Severity,
-    CloudProvider,
 )
+from shasta.workflows.drift import DriftReport, detect_drift
 
 
 def _make_finding(

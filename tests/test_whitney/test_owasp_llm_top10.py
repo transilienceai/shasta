@@ -3,9 +3,9 @@
 from shasta.compliance.ai.owasp_llm_top10 import (
     OWASP_LLM_TOP10,
     OWASPLLMRisk,
+    get_automated_owasp_llm_risks,
     get_owasp_llm_risk,
     get_owasp_llm_risks_for_check,
-    get_automated_owasp_llm_risks,
 )
 
 

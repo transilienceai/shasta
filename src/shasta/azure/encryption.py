@@ -623,16 +623,18 @@ def check_sql_entra_admin(client: AzureClient, subscription_id: str, region: str
                     )
                 )
     except Exception as e:
-        return [Finding.not_assessed(
-            check_id="azure-sql-entra-admin",
-            title="Unable to check SQL Server Entra ID admin",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.ENCRYPTION,
-            resource_type="Azure::Sql::Server",
-            account_id=subscription_id,
-            region=region,
-            cloud_provider=CloudProvider.AZURE,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="azure-sql-entra-admin",
+                title="Unable to check SQL Server Entra ID admin",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.ENCRYPTION,
+                resource_type="Azure::Sql::Server",
+                account_id=subscription_id,
+                region=region,
+                cloud_provider=CloudProvider.AZURE,
+            )
+        ]
     return findings
 
 
@@ -688,16 +690,18 @@ def check_sql_min_tls(client: AzureClient, subscription_id: str, region: str) ->
                     )
                 )
     except Exception as e:
-        return [Finding.not_assessed(
-            check_id="azure-sql-min-tls",
-            title="Unable to check SQL Server minimum TLS version",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.ENCRYPTION,
-            resource_type="Azure::Sql::Server",
-            account_id=subscription_id,
-            region=region,
-            cloud_provider=CloudProvider.AZURE,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="azure-sql-min-tls",
+                title="Unable to check SQL Server minimum TLS version",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.ENCRYPTION,
+                resource_type="Azure::Sql::Server",
+                account_id=subscription_id,
+                region=region,
+                cloud_provider=CloudProvider.AZURE,
+            )
+        ]
     return findings
 
 
@@ -768,16 +772,18 @@ def check_keyvault_rbac_mode(
                     )
                 )
     except Exception as e:
-        return [Finding.not_assessed(
-            check_id="azure-keyvault-rbac-mode",
-            title="Unable to check Key Vault RBAC mode",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.ENCRYPTION,
-            resource_type="Azure::KeyVault::Vault",
-            account_id=subscription_id,
-            region=region,
-            cloud_provider=CloudProvider.AZURE,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="azure-keyvault-rbac-mode",
+                title="Unable to check Key Vault RBAC mode",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.ENCRYPTION,
+                resource_type="Azure::KeyVault::Vault",
+                account_id=subscription_id,
+                region=region,
+                cloud_provider=CloudProvider.AZURE,
+            )
+        ]
     return findings
 
 
@@ -843,16 +849,18 @@ def check_keyvault_public_access(
                     )
                 )
     except Exception as e:
-        return [Finding.not_assessed(
-            check_id="azure-keyvault-public-access",
-            title="Unable to check Key Vault public access",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.ENCRYPTION,
-            resource_type="Azure::KeyVault::Vault",
-            account_id=subscription_id,
-            region=region,
-            cloud_provider=CloudProvider.AZURE,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="azure-keyvault-public-access",
+                title="Unable to check Key Vault public access",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.ENCRYPTION,
+                resource_type="Azure::KeyVault::Vault",
+                account_id=subscription_id,
+                region=region,
+                cloud_provider=CloudProvider.AZURE,
+            )
+        ]
     return findings
 
 
@@ -943,14 +951,16 @@ def check_keyvault_key_expiry(
                     )
                 )
     except Exception as e:
-        return [Finding.not_assessed(
-            check_id="azure-keyvault-key-expiry",
-            title="Unable to check Key Vault key/secret expiry",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.ENCRYPTION,
-            resource_type="Azure::KeyVault::Vault",
-            account_id=subscription_id,
-            region=region,
-            cloud_provider=CloudProvider.AZURE,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="azure-keyvault-key-expiry",
+                title="Unable to check Key Vault key/secret expiry",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.ENCRYPTION,
+                resource_type="Azure::KeyVault::Vault",
+                account_id=subscription_id,
+                region=region,
+                cloud_provider=CloudProvider.AZURE,
+            )
+        ]
     return findings

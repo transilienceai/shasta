@@ -6,12 +6,11 @@ sharing with auditors, investors, or internal stakeholders.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import html as html_mod
+from datetime import UTC, datetime
 from pathlib import Path
 
-from jinja2 import Environment, BaseLoader
-
-import html as html_mod
+from jinja2 import BaseLoader, Environment
 
 from shasta.compliance.mapper import get_control_summary
 from shasta.compliance.scorer import calculate_score
@@ -470,7 +469,7 @@ def _build_context(scan: ScanResult) -> dict:
     labels = _provider_labels(scan.cloud_provider)
 
     return {
-        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        "generated_at": datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"),
         "account_id": scan.account_id,
         "account_label": labels["account_label"],
         "region": scan.region,

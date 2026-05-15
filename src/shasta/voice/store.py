@@ -3,6 +3,7 @@
 The only place in the voice module that touches Shasta core. Replace the body
 of any read method to swap data sources without touching tool code.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -80,7 +81,9 @@ def _finding_to_detail(f: Finding) -> FindingDetailView:
         region=f.region,
         account_id=f.account_id,
         details=dict(f.details),
-        timestamp=f.timestamp if isinstance(f.timestamp, datetime) else datetime.fromisoformat(f.timestamp),
+        timestamp=f.timestamp
+        if isinstance(f.timestamp, datetime)
+        else datetime.fromisoformat(f.timestamp),
     )
 
 
@@ -127,8 +130,12 @@ class Store:
         return ScanSummaryView(
             scan_id=scan.id,
             account_id=scan.account_id,
-            cloud_provider=scan.cloud_provider.value if hasattr(scan.cloud_provider, "value") else scan.cloud_provider,
-            completed_at=scan.completed_at if isinstance(scan.completed_at, datetime) else (datetime.fromisoformat(scan.completed_at) if scan.completed_at else None),
+            cloud_provider=scan.cloud_provider.value
+            if hasattr(scan.cloud_provider, "value")
+            else scan.cloud_provider,
+            completed_at=scan.completed_at
+            if isinstance(scan.completed_at, datetime)
+            else (datetime.fromisoformat(scan.completed_at) if scan.completed_at else None),
             total_findings=summary.total_findings if summary else len(scan.findings),
             critical_count=summary.critical_count if summary else 0,
             high_count=summary.high_count if summary else 0,
@@ -143,24 +150,29 @@ class Store:
         out: list[ScanSummaryView] = []
         for row in history:
             import json as _json
+
             summary_blob = row.get("summary")
             if summary_blob:
                 s = _json.loads(summary_blob)
             else:
                 s = {}
-            out.append(ScanSummaryView(
-                scan_id=row["id"],
-                account_id=row["account_id"],
-                cloud_provider="aws",  # history rows don't carry cloud_provider in this query
-                completed_at=datetime.fromisoformat(row["completed_at"]) if row.get("completed_at") else None,
-                total_findings=s.get("total_findings", 0),
-                critical_count=s.get("critical_count", 0),
-                high_count=s.get("high_count", 0),
-                medium_count=s.get("medium_count", 0),
-                low_count=s.get("low_count", 0),
-                passed=s.get("passed", 0),
-                failed=s.get("failed", 0),
-            ))
+            out.append(
+                ScanSummaryView(
+                    scan_id=row["id"],
+                    account_id=row["account_id"],
+                    cloud_provider="aws",  # history rows don't carry cloud_provider in this query
+                    completed_at=datetime.fromisoformat(row["completed_at"])
+                    if row.get("completed_at")
+                    else None,
+                    total_findings=s.get("total_findings", 0),
+                    critical_count=s.get("critical_count", 0),
+                    high_count=s.get("high_count", 0),
+                    medium_count=s.get("medium_count", 0),
+                    low_count=s.get("low_count", 0),
+                    passed=s.get("passed", 0),
+                    failed=s.get("failed", 0),
+                )
+            )
         return out
 
     # ---- Findings ----
@@ -188,14 +200,27 @@ class Store:
         if cloud:
             results = [f for f in results if f.cloud_provider.value == cloud]
         if framework:
-            attr = {"soc2": "soc2_controls", "iso27001": "iso27001_controls", "hipaa": "hipaa_controls"}.get(framework)
+            attr = {
+                "soc2": "soc2_controls",
+                "iso27001": "iso27001_controls",
+                "hipaa": "hipaa_controls",
+            }.get(framework)
             if attr:
                 results = [f for f in results if getattr(f, attr)]
         if control_id and framework:
-            attr = {"soc2": "soc2_controls", "iso27001": "iso27001_controls", "hipaa": "hipaa_controls"}.get(framework)
+            attr = {
+                "soc2": "soc2_controls",
+                "iso27001": "iso27001_controls",
+                "hipaa": "hipaa_controls",
+            }.get(framework)
             if attr:
                 results = [f for f in results if control_id in getattr(f, attr)]
-        results.sort(key=lambda f: (_SEVERITY_RANK.get(f.severity.value, 99), 0 if f.status.value == "fail" else 1))
+        results.sort(
+            key=lambda f: (
+                _SEVERITY_RANK.get(f.severity.value, 99),
+                0 if f.status.value == "fail" else 1,
+            )
+        )
         if limit:
             results = results[:limit]
         return [_finding_to_summary(f) for f in results]
@@ -245,6 +270,7 @@ class Store:
             # iso42001 / eu_ai_act / ai_governance — treat as AI governance for now
             try:
                 from shasta.compliance.ai.scorer import calculate_ai_governance_score
+
                 ai_findings = [f for f in scan.findings if f.domain.value == "ai_governance"]
                 if not ai_findings:
                     return None
@@ -287,19 +313,27 @@ class Store:
             _enrich_all(full)
             if scorer is not None:
                 s = scorer(full)
-                points.append({
-                    "scan_id": tmp_scan_id,
-                    "completed_at": row.get("completed_at"),
-                    "score_percentage": getattr(s, "score_percentage", 0.0),
-                })
+                points.append(
+                    {
+                        "scan_id": tmp_scan_id,
+                        "completed_at": row.get("completed_at"),
+                        "score_percentage": getattr(s, "score_percentage", 0.0),
+                    }
+                )
         # Oldest first for delta math
         points.sort(key=lambda p: p["completed_at"] or "")
-        delta = (points[-1]["score_percentage"] - points[0]["score_percentage"]) if len(points) >= 2 else 0.0
+        delta = (
+            (points[-1]["score_percentage"] - points[0]["score_percentage"])
+            if len(points) >= 2
+            else 0.0
+        )
         return ScoreTrendView(framework=framework, points=points, delta=round(delta, 1))
 
     # ---- Controls ----
 
-    def get_control_summary(self, framework: Framework, control_id: str | None = None) -> list[ControlSummaryView]:
+    def get_control_summary(
+        self, framework: Framework, control_id: str | None = None
+    ) -> list[ControlSummaryView]:
         scan = self._latest_scan()
         if scan is None:
             return []
@@ -311,22 +345,25 @@ class Store:
         for cid, data in summary.items():
             if control_id and cid != control_id:
                 continue
-            out.append(ControlSummaryView(
-                framework=framework,
-                control_id=cid,
-                title=data.get("title", cid),
-                overall_status=data.get("overall_status", "not_assessed"),
-                pass_count=data.get("pass_count", 0),
-                fail_count=data.get("fail_count", 0),
-                partial_count=data.get("partial_count", 0),
-                finding_ids=[f.id for f in data.get("findings", [])],
-            ))
+            out.append(
+                ControlSummaryView(
+                    framework=framework,
+                    control_id=cid,
+                    title=data.get("title", cid),
+                    overall_status=data.get("overall_status", "not_assessed"),
+                    pass_count=data.get("pass_count", 0),
+                    fail_count=data.get("fail_count", 0),
+                    partial_count=data.get("partial_count", 0),
+                    finding_ids=[f.id for f in data.get("findings", [])],
+                )
+            )
         return out
 
     # ---- Risks ----
 
     def _risk_row_to_view(self, row: dict) -> RiskItemView:
         import json as _json
+
         return RiskItemView(
             risk_id=row["risk_id"],
             title=row["title"],
@@ -343,7 +380,9 @@ class Store:
             related_finding=row.get("related_finding"),
         )
 
-    def list_risk_items(self, account_id: str, status: str | None = None, level: str | None = None) -> list[RiskItemView]:
+    def list_risk_items(
+        self, account_id: str, status: str | None = None, level: str | None = None
+    ) -> list[RiskItemView]:
         rows = self._db.get_risk_items(account_id)
         if status:
             rows = [r for r in rows if r.get("status") == status]
@@ -374,6 +413,7 @@ class Store:
     ) -> ActionResult:
         from datetime import datetime
         from uuid import uuid4
+
         risk_id = f"R-{uuid4().hex[:8].upper()}"
         # Score: simple LxI matrix on a 1-3 scale → 1-9
         scale = {"low": 1, "medium": 2, "high": 3}
@@ -386,6 +426,7 @@ class Store:
         # Build a record matching the columns expected by save_risk_items
         # save_risk_items expects an object with attributes — wrap in a SimpleNamespace
         from types import SimpleNamespace
+
         item = SimpleNamespace(
             risk_id=risk_id,
             title=title,
@@ -426,6 +467,7 @@ class Store:
             return ActionResult(success=False, message=f"Risk {risk_id} not found")
         from datetime import datetime
         from types import SimpleNamespace
+
         # Recreate the row with overrides — save_risk_items uses INSERT OR REPLACE
         scale = {"low": 1, "medium": 2, "high": 3}
         likelihood_score = scale.get(existing.likelihood.lower(), 2)
@@ -443,11 +485,15 @@ class Store:
             risk_level=level,
             owner=None,
             treatment=treatment if treatment is not None else existing.treatment,
-            treatment_plan=treatment_plan if treatment_plan is not None else existing.treatment_plan,
+            treatment_plan=treatment_plan
+            if treatment_plan is not None
+            else existing.treatment_plan,
             status=status if status is not None else existing.status,
             soc2_controls=existing.soc2_controls,
             related_finding=existing.related_finding,
-            created_date=datetime.now(UTC).isoformat(),  # save_risk_items doesn't preserve this on REPLACE
+            created_date=datetime.now(
+                UTC
+            ).isoformat(),  # save_risk_items doesn't preserve this on REPLACE
             last_reviewed=datetime.now(UTC).isoformat(),
             review_notes=review_notes if review_notes is not None else None,
         )

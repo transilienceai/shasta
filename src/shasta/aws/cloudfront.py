@@ -10,8 +10,6 @@ assertion.
 
 from __future__ import annotations
 
-from typing import Any
-
 from botocore.exceptions import ClientError
 
 from shasta.aws.client import AWSClient
@@ -21,7 +19,6 @@ from shasta.evidence.models import (
     Finding,
     Severity,
 )
-
 
 # CloudFront is global. The structural smoke test honors this marker and
 # skips the multi-region iteration assertion. See ENGINEERING_PRINCIPLES.md #3.
@@ -70,9 +67,7 @@ def _list_distributions(client: AWSClient) -> list[dict]:
         return []
 
 
-def check_cloudfront_https_only(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_cloudfront_https_only(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """[CIS AWS] CloudFront distributions must enforce HTTPS for viewer requests.
 
     The default cache behavior + every additional behavior must use either
@@ -95,9 +90,7 @@ def check_cloudfront_https_only(
         cache_behaviors = (dist.get("CacheBehaviors", {}) or {}).get("Items", []) or []
         weak_behaviors: list[dict] = []
         if viewer_protocol == "allow-all":
-            weak_behaviors.append(
-                {"path": "default", "policy": viewer_protocol}
-            )
+            weak_behaviors.append({"path": "default", "policy": viewer_protocol})
         for cb in cache_behaviors:
             if cb.get("ViewerProtocolPolicy") == "allow-all":
                 weak_behaviors.append(
@@ -249,9 +242,7 @@ def check_cloudfront_min_tls_version(
     return findings
 
 
-def check_cloudfront_waf_attached(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_cloudfront_waf_attached(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """[CIS AWS] Public-facing CloudFront distributions should have a WAF Web ACL attached."""
     distributions = _list_distributions(client)
     if not distributions:
@@ -339,7 +330,9 @@ def check_cloudfront_geo_restrictions(
                     "requirements, consider using geo restrictions to enforce them at the edge."
                 ),
                 severity=Severity.INFO,
-                status=ComplianceStatus.PASS if restriction_type != "none" else ComplianceStatus.PARTIAL,
+                status=ComplianceStatus.PASS
+                if restriction_type != "none"
+                else ComplianceStatus.PARTIAL,
                 domain=CheckDomain.NETWORKING,
                 resource_type="AWS::CloudFront::Distribution",
                 resource_id=dist_arn,

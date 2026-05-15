@@ -1,4 +1,3 @@
-
 from shasta.voice.store import Store
 
 

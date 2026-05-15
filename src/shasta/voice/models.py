@@ -1,4 +1,5 @@
 """Pydantic I/O models for voice tools — JSON-serializable views over Shasta core models."""
+
 from __future__ import annotations
 
 from datetime import datetime

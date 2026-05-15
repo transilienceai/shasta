@@ -1,14 +1,13 @@
 """Tests for Whitney finding-to-control mapping and enrichment."""
 
-from shasta.evidence.models import ComplianceStatus, Severity
-
+from shasta.compliance.ai.eu_ai_act import EU_AI_ACT_OBLIGATIONS
+from shasta.compliance.ai.iso42001 import ISO42001_CONTROLS
 from shasta.compliance.ai.mapper import (
     enrich_findings_with_ai_controls,
-    get_iso42001_control_summary,
     get_eu_ai_act_obligation_summary,
+    get_iso42001_control_summary,
 )
-from shasta.compliance.ai.iso42001 import ISO42001_CONTROLS
-from shasta.compliance.ai.eu_ai_act import EU_AI_ACT_OBLIGATIONS
+from shasta.evidence.models import ComplianceStatus
 from tests.test_whitney.conftest import _make_finding
 
 

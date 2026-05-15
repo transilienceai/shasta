@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from shasta.gcp.client import GCPClient
 from shasta.evidence.models import (
     CheckDomain,
     CloudProvider,
@@ -18,6 +17,7 @@ from shasta.evidence.models import (
     Finding,
     Severity,
 )
+from shasta.gcp.client import GCPClient
 
 IS_GLOBAL = True  # GCS buckets are listed project-wide (not per-region)
 

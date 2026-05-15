@@ -1,4 +1,5 @@
 """Tool functions for finding queries."""
+
 from typing import Any
 
 from shasta.voice.store import Store
@@ -16,8 +17,13 @@ def list_findings(
     limit: int | None = None,
 ) -> list[dict[str, Any]]:
     items = store.list_findings(
-        severity=severity, status=status, domain=domain, cloud=cloud,
-        framework=framework, control_id=control_id, limit=limit,
+        severity=severity,
+        status=status,
+        domain=domain,
+        cloud=cloud,
+        framework=framework,
+        control_id=control_id,
+        limit=limit,
     )
     return [i.model_dump(mode="json") for i in items]
 

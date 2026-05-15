@@ -20,7 +20,6 @@ from shasta.evidence.models import (
     Severity,
 )
 
-
 NEW_AWS_MODULES = [
     "shasta.aws.databases",
     "shasta.aws.serverless",

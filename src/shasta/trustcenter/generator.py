@@ -10,7 +10,7 @@ Engineering Principle #11: pure Jinja2, zero LLM calls.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -45,7 +45,7 @@ def build_trust_center_context(
     """
     context: dict[str, Any] = {
         "config": config,
-        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        "generated_at": datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"),
         "has_scan_data": False,
         "soc2_score": None,
         "iso_score": None,
@@ -106,13 +106,9 @@ def build_trust_center_context(
         context["domain_breakdown"] = scan.summary.by_domain
 
     # Data protection pass rates
-    context["encryption_pass_rate"] = _domain_pass_rate(
-        context["domain_breakdown"], "encryption"
-    )
+    context["encryption_pass_rate"] = _domain_pass_rate(context["domain_breakdown"], "encryption")
     context["iam_pass_rate"] = _domain_pass_rate(context["domain_breakdown"], "iam")
-    context["monitoring_pass_rate"] = _domain_pass_rate(
-        context["domain_breakdown"], "monitoring"
-    )
+    context["monitoring_pass_rate"] = _domain_pass_rate(context["domain_breakdown"], "monitoring")
 
     # Infrastructure info
     cloud_providers = set()
@@ -122,7 +118,9 @@ def build_trust_center_context(
             cloud_providers.add(cp.value.upper() if hasattr(cp, "value") else str(cp).upper())
     context["cloud_providers"] = sorted(cloud_providers)
 
-    context["domains_scanned"] = [d.value for d in scan.domains_scanned] if scan.domains_scanned else []
+    context["domains_scanned"] = (
+        [d.value for d in scan.domains_scanned] if scan.domains_scanned else []
+    )
     context["scan_date"] = (
         scan.completed_at.strftime("%Y-%m-%d") if scan.completed_at else "In progress"
     )

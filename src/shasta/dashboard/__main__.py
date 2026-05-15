@@ -51,9 +51,7 @@ def main() -> int:
         )
         return 2
 
-    console.print(
-        f"Shasta Dashboard starting at [cyan]http://{args.host}:{args.port}[/cyan]"
-    )
+    console.print(f"Shasta Dashboard starting at [cyan]http://{args.host}:{args.port}[/cyan]")
     uvicorn.run(app, host=args.host, port=args.port)
     return 0
 

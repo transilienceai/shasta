@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-
-from shasta.evidence.models import CheckDomain, CloudProvider
 
 
 @pytest.fixture()

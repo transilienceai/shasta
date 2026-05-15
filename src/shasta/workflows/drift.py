@@ -10,9 +10,9 @@ Surfaces:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 
-from shasta.compliance.scorer import calculate_score, ComplianceScore
+from shasta.compliance.scorer import ComplianceScore, calculate_score
 from shasta.evidence.models import ComplianceStatus, Finding, ScanResult
 
 
@@ -174,8 +174,8 @@ def format_drift_summary(report: DriftReport) -> str:
         "",
         "## Score Change",
         "",
-        f"| Metric | Previous | Current | Delta |",
-        f"|--------|----------|---------|-------|",
+        "| Metric | Previous | Current | Delta |",
+        "|--------|----------|---------|-------|",
         f"| Score | {report.previous_score.score_percentage}% | {report.current_score.score_percentage}% | {'+' if report.score_delta >= 0 else ''}{report.score_delta}% |",
         f"| Grade | {report.previous_score.grade} | {report.current_score.grade} | {'improved' if report.score_delta > 0 else 'declined' if report.score_delta < 0 else 'unchanged'} |",
         f"| Failed findings | {report.previous_score.findings_failed} | {report.current_score.findings_failed} | {'+' if report.current_score.findings_failed > report.previous_score.findings_failed else ''}{report.current_score.findings_failed - report.previous_score.findings_failed} |",

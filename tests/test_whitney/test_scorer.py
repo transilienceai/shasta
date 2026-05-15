@@ -3,17 +3,13 @@
 Mirrors the structure of tests/test_compliance/test_scorer.py.
 """
 
-import pytest
-
 from shasta.compliance.ai.scorer import (
     AIGovernanceScore,
-    calculate_ai_governance_score,
     _score_to_grade,
+    calculate_ai_governance_score,
 )
-from shasta.evidence.models import ComplianceStatus, Severity
-
+from shasta.evidence.models import ComplianceStatus
 from tests.test_whitney.conftest import _make_finding
-
 
 # ---------------------------------------------------------------------------
 # Check IDs that map to ISO 42001 and/or EU AI Act controls

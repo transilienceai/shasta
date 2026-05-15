@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from shasta.gcp.client import GCPClient
 from shasta.evidence.models import (
     CheckDomain,
     CloudProvider,
@@ -20,6 +19,7 @@ from shasta.evidence.models import (
     Finding,
     Severity,
 )
+from shasta.gcp.client import GCPClient
 
 IS_GLOBAL = False  # Subnet flow-log and Private Google Access checks are per-region
 
@@ -68,9 +68,7 @@ def run_all_gcp_networking_checks(client: GCPClient) -> list[Finding]:
     return findings
 
 
-def check_default_network_not_created(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_default_network_not_created(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 3.1] The default VPC network should be deleted from all projects.
 
     The default network comes pre-configured with permissive firewall rules (allow SSH, RDP,
@@ -130,7 +128,9 @@ def check_default_network_not_created(
             status=ComplianceStatus.FAIL,
             domain=CheckDomain.NETWORKING,
             resource_type="GCP::Compute::Network",
-            resource_id=default_net.get("selfLink", f"projects/{project_id}/global/networks/default"),
+            resource_id=default_net.get(
+                "selfLink", f"projects/{project_id}/global/networks/default"
+            ),
             region=region,
             account_id=project_id,
             cloud_provider=CloudProvider.GCP,
@@ -145,18 +145,18 @@ def check_default_network_not_created(
     ]
 
 
-def check_firewall_no_unrestricted_ssh(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_firewall_no_unrestricted_ssh(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 3.6] No firewall rule should allow SSH (port 22) from 0.0.0.0/0 or ::/0."""
-    return _check_unrestricted_port(client, project_id, "22", "SSH", "gcp-firewall-unrestricted-ssh", "3.6")
+    return _check_unrestricted_port(
+        client, project_id, "22", "SSH", "gcp-firewall-unrestricted-ssh", "3.6"
+    )
 
 
-def check_firewall_no_unrestricted_rdp(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_firewall_no_unrestricted_rdp(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 3.7] No firewall rule should allow RDP (port 3389) from 0.0.0.0/0 or ::/0."""
-    return _check_unrestricted_port(client, project_id, "3389", "RDP", "gcp-firewall-unrestricted-rdp", "3.7")
+    return _check_unrestricted_port(
+        client, project_id, "3389", "RDP", "gcp-firewall-unrestricted-rdp", "3.7"
+    )
 
 
 def _check_unrestricted_port(
@@ -200,10 +200,14 @@ def _check_unrestricted_port(
             proto = allowed.get("IPProtocol", "")
             ports = allowed.get("ports", [])
             if proto in ("all", "tcp"):
-                if not ports or port in ports or any(
-                    "-" in p and int(p.split("-")[0]) <= int(port) <= int(p.split("-")[1])
-                    for p in ports
-                    if "-" in p
+                if (
+                    not ports
+                    or port in ports
+                    or any(
+                        "-" in p and int(p.split("-")[0]) <= int(port) <= int(p.split("-")[1])
+                        for p in ports
+                        if "-" in p
+                    )
                 ):
                     offenders.append(
                         {
@@ -263,9 +267,7 @@ def _check_unrestricted_port(
     ]
 
 
-def check_firewall_no_unrestricted_admin_ports(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_firewall_no_unrestricted_admin_ports(client: GCPClient, project_id: str) -> list[Finding]:
     """No firewall rule should allow common database/admin ports from 0.0.0.0/0.
 
     Beyond SSH and RDP, exposing database ports (MySQL 3306, PostgreSQL 5432,
@@ -308,10 +310,15 @@ def check_firewall_no_unrestricted_admin_ports(
             for danger_port, service in DANGEROUS_PORTS.items():
                 if danger_port in ("22", "3389"):
                     continue  # Covered by dedicated checks above
-                if not ports or danger_port in ports or any(
-                    "-" in p and int(p.split("-")[0]) <= int(danger_port) <= int(p.split("-")[1])
-                    for p in ports
-                    if "-" in p
+                if (
+                    not ports
+                    or danger_port in ports
+                    or any(
+                        "-" in p
+                        and int(p.split("-")[0]) <= int(danger_port) <= int(p.split("-")[1])
+                        for p in ports
+                        if "-" in p
+                    )
                 ):
                     offenders.append(
                         {
@@ -347,7 +354,7 @@ def check_firewall_no_unrestricted_admin_ports(
             title=f"{len(offenders)} firewall rule(s) expose admin/database ports to internet",
             description=(
                 f"{len(offenders)} rule(s) expose admin or database ports to 0.0.0.0/0. "
-                "Exposed services: " + ", ".join({o['service'] for o in offenders}) + ". "
+                "Exposed services: " + ", ".join({o["service"] for o in offenders}) + ". "
                 "These ports should be behind VPN or Cloud IAP, not exposed to the internet."
             ),
             severity=Severity.CRITICAL,
@@ -406,7 +413,10 @@ def check_subnet_flow_logs_enabled(
         log_config = subnet.get("logConfig") or {}
         enabled = log_config.get("enable", False)
         subnet_name = subnet.get("name", "unknown")
-        resource_id = subnet.get("selfLink") or f"projects/{project_id}/regions/{region}/subnetworks/{subnet_name}"
+        resource_id = (
+            subnet.get("selfLink")
+            or f"projects/{project_id}/regions/{region}/subnetworks/{subnet_name}"
+        )
 
         if enabled:
             findings.append(
@@ -493,7 +503,10 @@ def check_private_google_access_enabled(
     for subnet in subnets:
         enabled = subnet.get("privateIpGoogleAccess", False)
         subnet_name = subnet.get("name", "unknown")
-        resource_id = subnet.get("selfLink") or f"projects/{project_id}/regions/{region}/subnetworks/{subnet_name}"
+        resource_id = (
+            subnet.get("selfLink")
+            or f"projects/{project_id}/regions/{region}/subnetworks/{subnet_name}"
+        )
 
         if enabled:
             findings.append(
@@ -543,9 +556,7 @@ def check_private_google_access_enabled(
     return findings
 
 
-def check_dns_logging_enabled(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_dns_logging_enabled(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 3.10] Cloud DNS logging should be enabled for all managed zones.
 
     DNS query logs reveal which domains workloads resolve, enabling detection

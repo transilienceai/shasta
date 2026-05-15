@@ -28,7 +28,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -85,8 +84,7 @@ def aws_terraform_template_count() -> int:
     from shasta.remediation.engine import TERRAFORM_TEMPLATES
 
     return sum(
-        1 for k in TERRAFORM_TEMPLATES
-        if not k.startswith("azure-") and not k.startswith("gcp-")
+        1 for k in TERRAFORM_TEMPLATES if not k.startswith("azure-") and not k.startswith("gcp-")
     )
 
 
@@ -152,9 +150,7 @@ def whitney_collected_count() -> int:
     )
     m = re.search(r"(\d+)\s+tests?\s+collected", result.stdout)
     if not m:
-        raise RuntimeError(
-            f"Could not parse Whitney test collection:\n{result.stdout[-500:]}"
-        )
+        raise RuntimeError(f"Could not parse Whitney test collection:\n{result.stdout[-500:]}")
     return int(m.group(1))
 
 
@@ -256,9 +252,7 @@ def test_readme_intro_total_check_count() -> None:
     has used the same sentence shape: 'X compliance frameworks, Y automated checks'.
     """
     text = README.read_text(encoding="utf-8")
-    pattern = re.compile(
-        r"(\d+)\s+automated checks(?!\s+across AWS, Azure, and GCP)"
-    )
+    pattern = re.compile(r"(\d+)\s+automated checks(?!\s+across AWS, Azure, and GCP)")
     for lineno, line in enumerate(text.splitlines(), start=1):
         if "~~" in line:
             continue

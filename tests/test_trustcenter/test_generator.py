@@ -7,10 +7,7 @@ controls (no sensitive data exposure).
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from pathlib import Path
-
-import pytest
 
 from shasta.evidence.models import (
     CheckDomain,

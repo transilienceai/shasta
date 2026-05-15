@@ -1,4 +1,5 @@
 """Tests for Store write methods — risk register operations."""
+
 from shasta.voice.store import Store
 
 
@@ -30,8 +31,13 @@ def test_add_risk_item_then_list(store: Store):
 
 def test_get_risk_item_by_id(store: Store):
     res = store.add_risk_item(
-        account_id="123456789012", title="t", description="d", category="iam",
-        likelihood="low", impact="medium", treatment="accept",
+        account_id="123456789012",
+        title="t",
+        description="d",
+        category="iam",
+        likelihood="low",
+        impact="medium",
+        treatment="accept",
     )
     r = store.get_risk_item(res.record_id)
     assert r is not None
@@ -40,8 +46,13 @@ def test_get_risk_item_by_id(store: Store):
 
 def test_update_risk_status(store: Store):
     res = store.add_risk_item(
-        account_id="123456789012", title="t", description="d", category="iam",
-        likelihood="low", impact="medium", treatment="accept",
+        account_id="123456789012",
+        title="t",
+        description="d",
+        category="iam",
+        likelihood="low",
+        impact="medium",
+        treatment="accept",
     )
     upd = store.update_risk(risk_id=res.record_id, status="resolved", review_notes="closed")
     assert upd.success is True
@@ -51,8 +62,13 @@ def test_update_risk_status(store: Store):
 
 def test_update_risk_treatment(store: Store):
     res = store.add_risk_item(
-        account_id="123456789012", title="t", description="d", category="iam",
-        likelihood="low", impact="medium", treatment="accept",
+        account_id="123456789012",
+        title="t",
+        description="d",
+        category="iam",
+        likelihood="low",
+        impact="medium",
+        treatment="accept",
     )
     upd = store.update_risk(risk_id=res.record_id, treatment="mitigate", treatment_plan="new plan")
     assert upd.success is True

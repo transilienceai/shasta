@@ -2,20 +2,19 @@
 
 import pytest
 
+from shasta.evidence.models import (
+    CheckDomain,
+    CloudProvider,
+    ComplianceStatus,
+    Finding,
+    Severity,
+)
 from shasta.workflows.risk_register import (
-    calculate_risk,
+    FINDING_TO_RISK,
+    RiskItem,
     auto_seed_from_findings,
     build_register,
-    RiskItem,
-    RiskRegister,
-    FINDING_TO_RISK,
-)
-from shasta.evidence.models import (
-    Finding,
-    CheckDomain,
-    ComplianceStatus,
-    Severity,
-    CloudProvider,
+    calculate_risk,
 )
 
 

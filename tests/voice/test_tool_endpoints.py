@@ -42,11 +42,18 @@ def test_get_multi_framework_score_endpoint(client):
 
 
 def test_add_and_get_risk_endpoint(client):
-    add = client.post("/tools/add_risk_item", json={
-        "account_id": "123456789012",
-        "title": "x", "description": "y", "category": "iam",
-        "likelihood": "low", "impact": "low", "treatment": "accept",
-    })
+    add = client.post(
+        "/tools/add_risk_item",
+        json={
+            "account_id": "123456789012",
+            "title": "x",
+            "description": "y",
+            "category": "iam",
+            "likelihood": "low",
+            "impact": "low",
+            "treatment": "accept",
+        },
+    )
     assert add.status_code == 200
     rid = add.json()["record_id"]
 

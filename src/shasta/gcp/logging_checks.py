@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from shasta.gcp.client import GCPClient
 from shasta.evidence.models import (
     CheckDomain,
     CloudProvider,
@@ -19,6 +18,7 @@ from shasta.evidence.models import (
     Finding,
     Severity,
 )
+from shasta.gcp.client import GCPClient
 
 IS_GLOBAL = True  # Audit log configuration is project-wide
 
@@ -26,12 +26,24 @@ IS_GLOBAL = True  # Audit log configuration is project-wide
 # Each tuple: (filter_fragment, human_description, cis_id)
 _CIS_LOG_METRICS: list[tuple[str, str, str]] = [
     ("protoPayload.methodName:SetIamPolicy", "IAM policy changes", "2.2"),
-    ("resource.type=audited_resource AND protoPayload.serviceName=cloudresourcemanager", "project ownership changes", "2.4"),
+    (
+        "resource.type=audited_resource AND protoPayload.serviceName=cloudresourcemanager",
+        "project ownership changes",
+        "2.4",
+    ),
     ("resource.type=gce_firewall_rule", "VPC firewall rule changes", "2.10"),
     ("resource.type=gce_network", "VPC network changes", "2.9"),
     ("resource.type=gce_route", "VPC route changes", "2.8"),
-    ("resource.type=iam_role AND protoPayload.methodName:(roles.create OR roles.update OR roles.delete)", "custom IAM role changes", "2.3"),
-    ("protoPayload.methodName=google.logging.v2.ConfigServiceV2.UpdateSink", "audit logging sink changes", "2.5"),
+    (
+        "resource.type=iam_role AND protoPayload.methodName:(roles.create OR roles.update OR roles.delete)",
+        "custom IAM role changes",
+        "2.3",
+    ),
+    (
+        "protoPayload.methodName=google.logging.v2.ConfigServiceV2.UpdateSink",
+        "audit logging sink changes",
+        "2.5",
+    ),
     ("resource.type=bigquery_dataset", "BigQuery IAM changes", "2.13"),
 ]
 
@@ -53,9 +65,7 @@ def run_all_gcp_logging_checks(client: GCPClient) -> list[Finding]:
     return findings
 
 
-def check_audit_config_data_access(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_audit_config_data_access(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 2.1] Data Access audit logs should be configured for all services.
 
     By default, GCP only writes Admin Activity logs. Data Access logs (DATA_READ,
@@ -144,14 +154,15 @@ def check_audit_config_data_access(
             cis_gcp_controls=["2.1"],
             iso27001_controls=["A.8.15"],
             hipaa_controls=["164.312(b)"],
-            details={"missing_log_types": sorted(missing_types), "current_audit_configs": list(all_services_types)},
+            details={
+                "missing_log_types": sorted(missing_types),
+                "current_audit_configs": list(all_services_types),
+            },
         )
     ]
 
 
-def check_log_sink_configured(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_log_sink_configured(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 2.2] At least one log sink should export project logs to an external destination.
 
     Log sinks export Cloud Logging entries to Cloud Storage, BigQuery, or Pub/Sub.
@@ -180,7 +191,8 @@ def check_log_sink_configured(
 
     # Filter to non-_Default sinks that have a real destination
     active_export_sinks = [
-        s for s in sinks
+        s
+        for s in sinks
         if s.get("name", "").split("/")[-1] not in ("_Default", "_Required")
         and s.get("destination")
     ]
@@ -239,9 +251,7 @@ def check_log_sink_configured(
     ]
 
 
-def check_log_metrics_and_alerts(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_log_metrics_and_alerts(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 2.2–2.13] Log-based metrics and alert policies should exist for key audit events.
 
     CIS GCP requires log-based metrics + Alerting policies for IAM changes, custom role
@@ -253,19 +263,11 @@ def check_log_metrics_and_alerts(
         logging = client.service("logging", "v2")
         monitoring = client.service("monitoring", "v3")
 
-        metrics_resp = (
-            logging.projects()
-            .metrics()
-            .list(parent=f"projects/{project_id}")
-            .execute()
-        )
+        metrics_resp = logging.projects().metrics().list(parent=f"projects/{project_id}").execute()
         metrics = metrics_resp.get("metrics", [])
 
         policies_resp = (
-            monitoring.projects()
-            .alertPolicies()
-            .list(name=f"projects/{project_id}")
-            .execute()
+            monitoring.projects().alertPolicies().list(name=f"projects/{project_id}").execute()
         )
         policies = policies_resp.get("alertPolicies", [])
     except Exception as e:
@@ -333,7 +335,7 @@ def check_log_metrics_and_alerts(
             description=(
                 f"{len(missing)} CIS-required log-based metrics do not exist. Missing: "
                 + "; ".join(f"CIS {m['cis_id']} ({m['description']})" for m in missing[:5])
-                + (f" and {len(missing)-5} more" if len(missing) > 5 else "")
+                + (f" and {len(missing) - 5} more" if len(missing) > 5 else "")
                 + ". Without these metrics, security events like IAM changes and firewall "
                 "modifications go undetected in real time."
             ),
@@ -358,9 +360,7 @@ def check_log_metrics_and_alerts(
     ]
 
 
-def check_log_retention_period(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_log_retention_period(client: GCPClient, project_id: str) -> list[Finding]:
     """Log buckets should retain logs for at least 365 days.
 
     Cloud Logging default retention is 30 days for most log types. For SOC 2 and
@@ -368,7 +368,7 @@ def check_log_retention_period(
     _Default and _Required log buckets have sufficient retention configured.
     """
     region = "global"
-    MIN_RETENTION_DAYS = 365
+    min_retention_days = 365
 
     try:
         logging = client.service("logging", "v2")
@@ -401,12 +401,12 @@ def check_log_retention_period(
     for bucket in buckets:
         bucket_name = bucket.get("name", "").split("/")[-1]
         retention_days = bucket.get("retentionDays", 30)
-        if retention_days < MIN_RETENTION_DAYS:
+        if retention_days < min_retention_days:
             insufficient.append(
                 {
                     "bucket": bucket_name,
                     "retention_days": retention_days,
-                    "required_days": MIN_RETENTION_DAYS,
+                    "required_days": min_retention_days,
                 }
             )
 
@@ -414,8 +414,8 @@ def check_log_retention_period(
         return [
             Finding(
                 check_id="gcp-log-retention",
-                title=f"All Cloud Logging buckets retain logs ≥{MIN_RETENTION_DAYS} days",
-                description=f"All Cloud Logging buckets have retention ≥{MIN_RETENTION_DAYS} days configured.",
+                title=f"All Cloud Logging buckets retain logs ≥{min_retention_days} days",
+                description=f"All Cloud Logging buckets have retention ≥{min_retention_days} days configured.",
                 severity=Severity.INFO,
                 status=ComplianceStatus.PASS,
                 domain=CheckDomain.MONITORING,
@@ -432,9 +432,9 @@ def check_log_retention_period(
     return [
         Finding(
             check_id="gcp-log-retention",
-            title=f"{len(insufficient)} Cloud Logging bucket(s) retain logs <{MIN_RETENTION_DAYS} days",
+            title=f"{len(insufficient)} Cloud Logging bucket(s) retain logs <{min_retention_days} days",
             description=(
-                f"{len(insufficient)} logging bucket(s) have retention below {MIN_RETENTION_DAYS} "
+                f"{len(insufficient)} logging bucket(s) have retention below {min_retention_days} "
                 "days. SOC 2 and HIPAA require at least 1 year of audit log retention."
             ),
             severity=Severity.MEDIUM,
@@ -447,7 +447,7 @@ def check_log_retention_period(
             cloud_provider=CloudProvider.GCP,
             remediation=(
                 "Update retention: `gcloud logging buckets update BUCKET_NAME "
-                f"--location=LOCATION --retention-days={MIN_RETENTION_DAYS} "
+                f"--location=LOCATION --retention-days={min_retention_days} "
                 f"--project={project_id}`."
             ),
             soc2_controls=["CC7.1"],
@@ -459,9 +459,7 @@ def check_log_retention_period(
     ]
 
 
-def check_log_metric_vpc_network_changes(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_log_metric_vpc_network_changes(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 2.9] A log-based metric should exist for VPC network configuration changes.
 
     VPC network changes (creating/deleting networks, routes, peering) are significant
@@ -477,9 +475,7 @@ def check_log_metric_vpc_network_changes(
     )
 
 
-def check_log_metric_firewall_changes(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_log_metric_firewall_changes(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 2.10] A log-based metric should exist for VPC firewall rule changes.
 
     Unauthorized firewall changes can open the network perimeter. Real-time
@@ -495,9 +491,7 @@ def check_log_metric_firewall_changes(
     )
 
 
-def check_log_metric_custom_role_changes(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_log_metric_custom_role_changes(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 2.3] A log-based metric should exist for custom IAM role changes.
 
     Custom role mutations (adding permissions, creating new roles) are a common
@@ -513,9 +507,7 @@ def check_log_metric_custom_role_changes(
     )
 
 
-def check_log_metric_project_ownership(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_log_metric_project_ownership(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 2.4] A log-based metric should exist for project ownership (IAM policy) changes.
 
     Changes to project-level IAM policy are the most impactful security events —
@@ -543,12 +535,7 @@ def _check_single_log_metric(
     region = "global"
     try:
         logging = client.service("logging", "v2")
-        response = (
-            logging.projects()
-            .metrics()
-            .list(parent=f"projects/{project_id}")
-            .execute()
-        )
+        response = logging.projects().metrics().list(parent=f"projects/{project_id}").execute()
         metrics = response.get("metrics", [])
     except Exception as e:
         return [

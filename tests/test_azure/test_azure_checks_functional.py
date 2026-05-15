@@ -10,10 +10,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from shasta.evidence.models import ComplianceStatus, Severity
-
 from tests.test_azure.conftest import (
     make_mock_azure_client,
     make_mock_disk,
@@ -23,7 +20,6 @@ from tests.test_azure.conftest import (
     make_mock_storage_account,
     make_nsg_rule,
 )
-
 
 # ---------------------------------------------------------------------------
 # Storage checks

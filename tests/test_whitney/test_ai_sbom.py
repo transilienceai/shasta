@@ -4,24 +4,19 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-import pytest
-
 from shasta.aws.ai_sbom import (
     AIComponent,
     AIComponentType,
-    AISBOMReport,
-    KNOWN_AI_PACKAGES,
+    _infer_model_provider,
+    _make_purl,
     check_ai_component_vulnerabilities,
     generate_ai_sbom,
     scan_ai_sbom_code_only,
     scan_aws_for_ai_components,
     scan_azure_for_ai_components,
     scan_code_for_ai_components,
-    _infer_model_provider,
-    _make_purl,
 )
 from tests.test_whitney.conftest import write_file
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -134,7 +129,9 @@ class TestScanCodeForModels:
         assert models[0].provider == "openai"
 
     def test_detects_pinned_model(self, tmp_path):
-        write_file(tmp_path, "app.py", 'response = client.chat(model="gpt-4-20240125", messages=[])\n')
+        write_file(
+            tmp_path, "app.py", 'response = client.chat(model="gpt-4-20240125", messages=[])\n'
+        )
         components = scan_code_for_ai_components(tmp_path)
         models = [c for c in components if c.component_type == AIComponentType.MODEL]
         assert len(models) == 1
@@ -362,9 +359,7 @@ class TestScanAzureComponents:
     @patch("shasta.azure.ai_discovery.discover_azure_ai_services")
     def test_openai_deployments(self, mock_discover):
         mock_discover.return_value = {
-            "azure_openai": {
-                "deployments": [{"name": "gpt4-deployment", "model": "gpt-4"}]
-            },
+            "azure_openai": {"deployments": [{"name": "gpt4-deployment", "model": "gpt-4"}]},
             "azure_ml": {"workspaces": []},
             "cognitive_services": {"services": []},
         }

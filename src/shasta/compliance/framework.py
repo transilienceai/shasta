@@ -7,10 +7,10 @@ checks map to each control.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 
-class ControlCategory(str, Enum):
+class ControlCategory(StrEnum):
     """SOC 2 Trust Service Categories."""
 
     SECURITY = "Security"

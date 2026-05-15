@@ -14,7 +14,6 @@ from unittest.mock import MagicMock
 
 from shasta.evidence.models import ComplianceStatus
 
-
 PROJECT_ID = "test-project"
 REGION = "us-central1"
 
@@ -53,9 +52,9 @@ class TestCheckPrimitiveRoles:
         from shasta.gcp.iam import check_primitive_roles_not_used
 
         client = _make_client()
-        self._setup_iam_policy(client, [
-            {"role": "roles/compute.instanceAdmin", "members": ["user:alice@example.com"]}
-        ])
+        self._setup_iam_policy(
+            client, [{"role": "roles/compute.instanceAdmin", "members": ["user:alice@example.com"]}]
+        )
         findings = check_primitive_roles_not_used(client, PROJECT_ID, "global")
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert not fail_findings
@@ -64,9 +63,9 @@ class TestCheckPrimitiveRoles:
         from shasta.gcp.iam import check_primitive_roles_not_used
 
         client = _make_client()
-        self._setup_iam_policy(client, [
-            {"role": "roles/owner", "members": ["user:alice@example.com"]}
-        ])
+        self._setup_iam_policy(
+            client, [{"role": "roles/owner", "members": ["user:alice@example.com"]}]
+        )
         findings = check_primitive_roles_not_used(client, PROJECT_ID, "global")
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert fail_findings, "Should flag owner binding as FAIL"
@@ -75,9 +74,9 @@ class TestCheckPrimitiveRoles:
         from shasta.gcp.iam import check_primitive_roles_not_used
 
         client = _make_client()
-        self._setup_iam_policy(client, [
-            {"role": "roles/editor", "members": ["user:bob@example.com"]}
-        ])
+        self._setup_iam_policy(
+            client, [{"role": "roles/editor", "members": ["user:bob@example.com"]}]
+        )
         findings = check_primitive_roles_not_used(client, PROJECT_ID, "global")
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert fail_findings
@@ -108,12 +107,15 @@ class TestCheckServiceAccountAdmin:
         from shasta.gcp.iam import check_service_account_not_admin
 
         client = _make_client()
-        self._setup_iam_policy(client, [
-            {
-                "role": "roles/editor",
-                "members": ["serviceAccount:my-sa@test-project.iam.gserviceaccount.com"],
-            }
-        ])
+        self._setup_iam_policy(
+            client,
+            [
+                {
+                    "role": "roles/editor",
+                    "members": ["serviceAccount:my-sa@test-project.iam.gserviceaccount.com"],
+                }
+            ],
+        )
         findings = check_service_account_not_admin(client, PROJECT_ID, "global")
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert fail_findings
@@ -122,12 +124,15 @@ class TestCheckServiceAccountAdmin:
         from shasta.gcp.iam import check_service_account_not_admin
 
         client = _make_client()
-        self._setup_iam_policy(client, [
-            {
-                "role": "roles/storage.objectViewer",
-                "members": ["serviceAccount:my-sa@test-project.iam.gserviceaccount.com"],
-            }
-        ])
+        self._setup_iam_policy(
+            client,
+            [
+                {
+                    "role": "roles/storage.objectViewer",
+                    "members": ["serviceAccount:my-sa@test-project.iam.gserviceaccount.com"],
+                }
+            ],
+        )
         findings = check_service_account_not_admin(client, PROJECT_ID, "global")
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert not fail_findings
@@ -145,9 +150,7 @@ class TestCheckNoAllUsersAccess:
         from shasta.gcp.iam import check_iam_no_allusers_access
 
         client = _make_client()
-        self._setup_iam_policy(client, [
-            {"role": "roles/viewer", "members": ["allUsers"]}
-        ])
+        self._setup_iam_policy(client, [{"role": "roles/viewer", "members": ["allUsers"]}])
         findings = check_iam_no_allusers_access(client, PROJECT_ID, "global")
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert fail_findings
@@ -156,9 +159,9 @@ class TestCheckNoAllUsersAccess:
         from shasta.gcp.iam import check_iam_no_allusers_access
 
         client = _make_client()
-        self._setup_iam_policy(client, [
-            {"role": "roles/viewer", "members": ["allAuthenticatedUsers"]}
-        ])
+        self._setup_iam_policy(
+            client, [{"role": "roles/viewer", "members": ["allAuthenticatedUsers"]}]
+        )
         findings = check_iam_no_allusers_access(client, PROJECT_ID, "global")
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert fail_findings
@@ -167,9 +170,9 @@ class TestCheckNoAllUsersAccess:
         from shasta.gcp.iam import check_iam_no_allusers_access
 
         client = _make_client()
-        self._setup_iam_policy(client, [
-            {"role": "roles/viewer", "members": ["user:alice@example.com"]}
-        ])
+        self._setup_iam_policy(
+            client, [{"role": "roles/viewer", "members": ["user:alice@example.com"]}]
+        )
         findings = check_iam_no_allusers_access(client, PROJECT_ID, "global")
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert not fail_findings
@@ -187,12 +190,15 @@ class TestCheckServiceAccountTokenCreator:
         from shasta.gcp.iam import check_iam_service_account_token_creator
 
         client = _make_client()
-        self._setup_iam_policy(client, [
-            {
-                "role": "roles/iam.serviceAccountTokenCreator",
-                "members": ["user:attacker@example.com"],
-            }
-        ])
+        self._setup_iam_policy(
+            client,
+            [
+                {
+                    "role": "roles/iam.serviceAccountTokenCreator",
+                    "members": ["user:attacker@example.com"],
+                }
+            ],
+        )
         findings = check_iam_service_account_token_creator(client, PROJECT_ID, "global")
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert fail_findings
@@ -202,12 +208,15 @@ class TestCheckServiceAccountTokenCreator:
         from shasta.gcp.iam import check_iam_service_account_token_creator
 
         client = _make_client()
-        self._setup_iam_policy(client, [
-            {
-                "role": "roles/iam.serviceAccountTokenCreator",
-                "members": ["serviceAccount:bad-sa@test-project.iam.gserviceaccount.com"],
-            }
-        ])
+        self._setup_iam_policy(
+            client,
+            [
+                {
+                    "role": "roles/iam.serviceAccountTokenCreator",
+                    "members": ["serviceAccount:bad-sa@test-project.iam.gserviceaccount.com"],
+                }
+            ],
+        )
         findings = check_iam_service_account_token_creator(client, PROJECT_ID, "global")
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert fail_findings, "SA holder at project scope should FAIL — same blast radius as user"
@@ -216,9 +225,9 @@ class TestCheckServiceAccountTokenCreator:
         from shasta.gcp.iam import check_iam_service_account_token_creator
 
         client = _make_client()
-        self._setup_iam_policy(client, [
-            {"role": "roles/storage.objectViewer", "members": ["user:alice@example.com"]}
-        ])
+        self._setup_iam_policy(
+            client, [{"role": "roles/storage.objectViewer", "members": ["user:alice@example.com"]}]
+        )
         findings = check_iam_service_account_token_creator(client, PROJECT_ID, "global")
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert not fail_findings
@@ -227,12 +236,15 @@ class TestCheckServiceAccountTokenCreator:
         from shasta.gcp.iam import check_iam_service_account_token_creator
 
         client = _make_client()
-        self._setup_iam_policy(client, [
-            {
-                "role": "roles/iam.serviceAccountUser",
-                "members": ["group:devs@example.com"],
-            }
-        ])
+        self._setup_iam_policy(
+            client,
+            [
+                {
+                    "role": "roles/iam.serviceAccountUser",
+                    "members": ["group:devs@example.com"],
+                }
+            ],
+        )
         findings = check_iam_service_account_token_creator(client, PROJECT_ID, "global")
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert fail_findings
@@ -262,13 +274,13 @@ class TestCheckWorkloadIdentityPreferred:
         }
         keys_per_account = keys_per_account or {}
 
-        def _keys_side_effect(name, keyTypes):
+        def _keys_side_effect(name, keyTypes):  # noqa: N803  (mirrors GCP IAM API kwarg name)
             return MagicMock(
                 execute=MagicMock(return_value={"keys": keys_per_account.get(name, [])})
             )
 
         iam.projects.return_value.serviceAccounts.return_value.keys.return_value.list.side_effect = (
-            lambda name, keyTypes: MagicMock(
+            lambda name, keyTypes: MagicMock(  # noqa: N803  (mirrors GCP IAM API kwarg name)
                 execute=MagicMock(return_value={"keys": keys_per_account.get(name, [])})
             )
         )
@@ -278,9 +290,16 @@ class TestCheckWorkloadIdentityPreferred:
         from shasta.gcp.iam import check_iam_workload_identity_preferred
 
         client = _make_client()
-        self._setup_iam(client, [
-            {"email": "sa@test-project.iam.gserviceaccount.com", "name": "projects/test-project/serviceAccounts/sa"}
-        ], {})  # No user-managed keys → PASS
+        self._setup_iam(
+            client,
+            [
+                {
+                    "email": "sa@test-project.iam.gserviceaccount.com",
+                    "name": "projects/test-project/serviceAccounts/sa",
+                }
+            ],
+            {},
+        )  # No user-managed keys → PASS
         findings = check_iam_workload_identity_preferred(client, PROJECT_ID, "global")
         pass_findings = [f for f in findings if f.status == ComplianceStatus.PASS]
         assert pass_findings
@@ -344,15 +363,18 @@ class TestCheckFirewallNoSSH:
         from shasta.gcp.networking import check_firewall_no_unrestricted_ssh
 
         client = _make_client()
-        self._setup_firewall(client, [
-            {
-                "name": "allow-ssh",
-                "direction": "INGRESS",
-                "disabled": False,
-                "sourceRanges": ["0.0.0.0/0"],
-                "allowed": [{"IPProtocol": "tcp", "ports": ["22"]}],
-            }
-        ])
+        self._setup_firewall(
+            client,
+            [
+                {
+                    "name": "allow-ssh",
+                    "direction": "INGRESS",
+                    "disabled": False,
+                    "sourceRanges": ["0.0.0.0/0"],
+                    "allowed": [{"IPProtocol": "tcp", "ports": ["22"]}],
+                }
+            ],
+        )
         findings = check_firewall_no_unrestricted_ssh(client, PROJECT_ID)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert fail_findings
@@ -361,15 +383,18 @@ class TestCheckFirewallNoSSH:
         from shasta.gcp.networking import check_firewall_no_unrestricted_ssh
 
         client = _make_client()
-        self._setup_firewall(client, [
-            {
-                "name": "allow-ssh-corp",
-                "direction": "INGRESS",
-                "disabled": False,
-                "sourceRanges": ["10.0.0.0/8"],
-                "allowed": [{"IPProtocol": "tcp", "ports": ["22"]}],
-            }
-        ])
+        self._setup_firewall(
+            client,
+            [
+                {
+                    "name": "allow-ssh-corp",
+                    "direction": "INGRESS",
+                    "disabled": False,
+                    "sourceRanges": ["10.0.0.0/8"],
+                    "allowed": [{"IPProtocol": "tcp", "ports": ["22"]}],
+                }
+            ],
+        )
         findings = check_firewall_no_unrestricted_ssh(client, PROJECT_ID)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert not fail_findings
@@ -389,15 +414,18 @@ class TestCheckFirewallNoSSH:
         from shasta.gcp.networking import check_firewall_no_unrestricted_ssh
 
         client = _make_client()
-        self._setup_firewall(client, [
-            {
-                "name": "allow-ssh-disabled",
-                "direction": "INGRESS",
-                "disabled": True,
-                "sourceRanges": ["0.0.0.0/0"],
-                "allowed": [{"IPProtocol": "tcp", "ports": ["22"]}],
-            }
-        ])
+        self._setup_firewall(
+            client,
+            [
+                {
+                    "name": "allow-ssh-disabled",
+                    "direction": "INGRESS",
+                    "disabled": True,
+                    "sourceRanges": ["0.0.0.0/0"],
+                    "allowed": [{"IPProtocol": "tcp", "ports": ["22"]}],
+                }
+            ],
+        )
         findings = check_firewall_no_unrestricted_ssh(client, PROJECT_ID)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert not fail_findings
@@ -450,13 +478,16 @@ class TestCheckSubnetFlowLogs:
         from shasta.gcp.networking import check_subnet_flow_logs_enabled
 
         client = _make_client()
-        self._setup(client, [
-            {
-                "name": "default",
-                "selfLink": "https://compute.googleapis.com/compute/v1/projects/test-project/regions/us-central1/subnetworks/default",
-                # No logConfig → flow logs disabled
-            }
-        ])
+        self._setup(
+            client,
+            [
+                {
+                    "name": "default",
+                    "selfLink": "https://compute.googleapis.com/compute/v1/projects/test-project/regions/us-central1/subnetworks/default",
+                    # No logConfig → flow logs disabled
+                }
+            ],
+        )
         findings = check_subnet_flow_logs_enabled(client, PROJECT_ID, REGION)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert fail_findings
@@ -467,13 +498,16 @@ class TestCheckSubnetFlowLogs:
         from shasta.gcp.networking import check_subnet_flow_logs_enabled
 
         client = _make_client()
-        self._setup(client, [
-            {
-                "name": "my-subnet",
-                "selfLink": "https://compute.googleapis.com/compute/v1/projects/test-project/regions/us-central1/subnetworks/my-subnet",
-                "logConfig": {"enable": True},
-            }
-        ])
+        self._setup(
+            client,
+            [
+                {
+                    "name": "my-subnet",
+                    "selfLink": "https://compute.googleapis.com/compute/v1/projects/test-project/regions/us-central1/subnetworks/my-subnet",
+                    "logConfig": {"enable": True},
+                }
+            ],
+        )
         findings = check_subnet_flow_logs_enabled(client, PROJECT_ID, REGION)
         assert all(f.status == ComplianceStatus.PASS for f in findings)
 
@@ -482,18 +516,21 @@ class TestCheckSubnetFlowLogs:
         from shasta.gcp.networking import check_subnet_flow_logs_enabled
 
         client = _make_client()
-        self._setup(client, [
-            {
-                "name": "compliant-subnet",
-                "selfLink": "https://example.com/subnetworks/compliant-subnet",
-                "logConfig": {"enable": True},
-            },
-            {
-                "name": "bad-subnet",
-                "selfLink": "https://example.com/subnetworks/bad-subnet",
-                # no logConfig
-            },
-        ])
+        self._setup(
+            client,
+            [
+                {
+                    "name": "compliant-subnet",
+                    "selfLink": "https://example.com/subnetworks/compliant-subnet",
+                    "logConfig": {"enable": True},
+                },
+                {
+                    "name": "bad-subnet",
+                    "selfLink": "https://example.com/subnetworks/bad-subnet",
+                    # no logConfig
+                },
+            ],
+        )
         findings = check_subnet_flow_logs_enabled(client, PROJECT_ID, REGION)
         statuses = {f.status for f in findings}
         assert ComplianceStatus.PASS in statuses
@@ -624,9 +661,7 @@ def _setup_kms(client, key_rings, crypto_keys=None):
     kms = MagicMock()
     loc_chain = kms.projects.return_value.locations.return_value
     # Step 1: enumerate locations
-    loc_chain.list.return_value.execute.return_value = {
-        "locations": [{"locationId": "global"}]
-    }
+    loc_chain.list.return_value.execute.return_value = {"locations": [{"locationId": "global"}]}
     ring_chain = loc_chain.keyRings.return_value
     # Step 2: list key rings per location
     ring_chain.list.return_value.execute.return_value = {"keyRings": key_rings}
@@ -643,15 +678,17 @@ class TestCheckKmsKeyRotation:
         from shasta.gcp.encryption import check_kms_key_rotation_period
 
         client = _make_client()
-        _setup_kms(client, [
-            {"name": "projects/test-project/locations/global/keyRings/my-ring"}
-        ], [
-            {
-                "name": "projects/test-project/locations/global/keyRings/my-ring/cryptoKeys/my-key",
-                "purpose": "ENCRYPT_DECRYPT",
-                # No rotationPeriod → non-compliant
-            }
-        ])
+        _setup_kms(
+            client,
+            [{"name": "projects/test-project/locations/global/keyRings/my-ring"}],
+            [
+                {
+                    "name": "projects/test-project/locations/global/keyRings/my-ring/cryptoKeys/my-key",
+                    "purpose": "ENCRYPT_DECRYPT",
+                    # No rotationPeriod → non-compliant
+                }
+            ],
+        )
 
         findings = check_kms_key_rotation_period(client, PROJECT_ID)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
@@ -661,15 +698,17 @@ class TestCheckKmsKeyRotation:
         from shasta.gcp.encryption import check_kms_key_rotation_period
 
         client = _make_client()
-        _setup_kms(client, [
-            {"name": "projects/test-project/locations/global/keyRings/my-ring"}
-        ], [
-            {
-                "name": "projects/test-project/locations/global/keyRings/my-ring/cryptoKeys/my-key",
-                "purpose": "ENCRYPT_DECRYPT",
-                "rotationPeriod": "7776000s",  # 90 days exactly
-            }
-        ])
+        _setup_kms(
+            client,
+            [{"name": "projects/test-project/locations/global/keyRings/my-ring"}],
+            [
+                {
+                    "name": "projects/test-project/locations/global/keyRings/my-ring/cryptoKeys/my-key",
+                    "purpose": "ENCRYPT_DECRYPT",
+                    "rotationPeriod": "7776000s",  # 90 days exactly
+                }
+            ],
+        )
 
         findings = check_kms_key_rotation_period(client, PROJECT_ID)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
@@ -679,15 +718,17 @@ class TestCheckKmsKeyRotation:
         from shasta.gcp.encryption import check_kms_key_rotation_period
 
         client = _make_client()
-        _setup_kms(client, [
-            {"name": "projects/test-project/locations/global/keyRings/my-ring"}
-        ], [
-            {
-                "name": "projects/test-project/locations/global/keyRings/my-ring/cryptoKeys/my-key",
-                "purpose": "ENCRYPT_DECRYPT",
-                "rotationPeriod": "31536000s",  # 365 days — too long
-            }
-        ])
+        _setup_kms(
+            client,
+            [{"name": "projects/test-project/locations/global/keyRings/my-ring"}],
+            [
+                {
+                    "name": "projects/test-project/locations/global/keyRings/my-ring/cryptoKeys/my-key",
+                    "purpose": "ENCRYPT_DECRYPT",
+                    "rotationPeriod": "31536000s",  # 365 days — too long
+                }
+            ],
+        )
 
         findings = check_kms_key_rotation_period(client, PROJECT_ID)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
@@ -708,8 +749,8 @@ class TestCheckKmsKeyRotation:
 
         client = _make_client()
         kms = MagicMock()
-        kms.projects.return_value.locations.return_value.list.return_value.execute.side_effect = Exception(
-            "403 Permission denied"
+        kms.projects.return_value.locations.return_value.list.return_value.execute.side_effect = (
+            Exception("403 Permission denied")
         )
         client.service.return_value = kms
 
@@ -831,9 +872,7 @@ class TestCheckOsLogin:
         compute = MagicMock()
         compute.projects.return_value.get.return_value.execute.return_value = {
             "name": PROJECT_ID,
-            "commonInstanceMetadata": {
-                "items": [{"key": "enable-oslogin", "value": "FALSE"}]
-            },
+            "commonInstanceMetadata": {"items": [{"key": "enable-oslogin", "value": "FALSE"}]},
         }
         client.service.return_value = compute
         findings = check_os_login_project_enabled(client, PROJECT_ID)
@@ -847,9 +886,7 @@ class TestCheckOsLogin:
         compute = MagicMock()
         compute.projects.return_value.get.return_value.execute.return_value = {
             "name": PROJECT_ID,
-            "commonInstanceMetadata": {
-                "items": [{"key": "enable-oslogin", "value": "TRUE"}]
-            },
+            "commonInstanceMetadata": {"items": [{"key": "enable-oslogin", "value": "TRUE"}]},
         }
         client.service.return_value = compute
         findings = check_os_login_project_enabled(client, PROJECT_ID)
@@ -879,9 +916,7 @@ class TestCheckSerialPort:
         compute = MagicMock()
         compute.projects.return_value.get.return_value.execute.return_value = {
             "name": PROJECT_ID,
-            "commonInstanceMetadata": {
-                "items": [{"key": "serial-port-enable", "value": "1"}]
-            },
+            "commonInstanceMetadata": {"items": [{"key": "serial-port-enable", "value": "1"}]},
         }
         client.service.return_value = compute
         findings = check_serial_port_disabled_project(client, PROJECT_ID)
@@ -895,9 +930,7 @@ class TestCheckSerialPort:
         compute = MagicMock()
         compute.projects.return_value.get.return_value.execute.return_value = {
             "name": PROJECT_ID,
-            "commonInstanceMetadata": {
-                "items": [{"key": "serial-port-enable", "value": "false"}]
-            },
+            "commonInstanceMetadata": {"items": [{"key": "serial-port-enable", "value": "false"}]},
         }
         client.service.return_value = compute
         findings = check_serial_port_disabled_project(client, PROJECT_ID)
@@ -1009,9 +1042,7 @@ class TestFindingShape:
         mock_bucket = MagicMock()
         mock_bucket.name = "public-bucket"
         mock_policy = MagicMock()
-        mock_policy.bindings = [
-            {"role": "roles/storage.objectViewer", "members": ["allUsers"]}
-        ]
+        mock_policy.bindings = [{"role": "roles/storage.objectViewer", "members": ["allUsers"]}]
         mock_bucket.get_iam_policy.return_value = mock_policy
 
         storage_client = MagicMock()
@@ -1125,9 +1156,7 @@ class TestCloudRunNoUnauthAccess:
 
         # Override getIamPolicy to return allUsers binding
         run.projects.return_value.locations.return_value.services.return_value.getIamPolicy.return_value.execute.return_value = {
-            "bindings": [
-                {"role": "roles/run.invoker", "members": ["allUsers"]}
-            ]
+            "bindings": [{"role": "roles/run.invoker", "members": ["allUsers"]}]
         }
 
         findings = check_cloud_run_no_unauthenticated_access(client, PROJECT_ID, REGION)
@@ -1143,7 +1172,10 @@ class TestCloudRunNoUnauthAccess:
         run = _setup_cloud_run_services(client, [{"name": svc_name}])
         run.projects.return_value.locations.return_value.services.return_value.getIamPolicy.return_value.execute.return_value = {
             "bindings": [
-                {"role": "roles/run.invoker", "members": ["serviceAccount:caller@proj.iam.gserviceaccount.com"]}
+                {
+                    "role": "roles/run.invoker",
+                    "members": ["serviceAccount:caller@proj.iam.gserviceaccount.com"],
+                }
             ]
         }
 
@@ -1179,14 +1211,17 @@ class TestCloudRunNoDefaultSA:
 
         client = _make_client()
         svc_name = f"projects/{PROJECT_ID}/locations/{REGION}/services/my-svc"
-        _setup_cloud_run_services(client, [
-            {
-                "name": svc_name,
-                "template": {
-                    "serviceAccount": "123456789-compute@developer.gserviceaccount.com"
-                },
-            }
-        ])
+        _setup_cloud_run_services(
+            client,
+            [
+                {
+                    "name": svc_name,
+                    "template": {
+                        "serviceAccount": "123456789-compute@developer.gserviceaccount.com"
+                    },
+                }
+            ],
+        )
         findings = check_cloud_run_no_default_service_account(client, PROJECT_ID, REGION)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert fail_findings
@@ -1196,14 +1231,17 @@ class TestCloudRunNoDefaultSA:
 
         client = _make_client()
         svc_name = f"projects/{PROJECT_ID}/locations/{REGION}/services/my-svc"
-        _setup_cloud_run_services(client, [
-            {
-                "name": svc_name,
-                "template": {
-                    "serviceAccount": f"my-svc-sa@{PROJECT_ID}.iam.gserviceaccount.com"
-                },
-            }
-        ])
+        _setup_cloud_run_services(
+            client,
+            [
+                {
+                    "name": svc_name,
+                    "template": {
+                        "serviceAccount": f"my-svc-sa@{PROJECT_ID}.iam.gserviceaccount.com"
+                    },
+                }
+            ],
+        )
         findings = check_cloud_run_no_default_service_account(client, PROJECT_ID, REGION)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert not fail_findings
@@ -1213,9 +1251,12 @@ class TestCloudRunNoDefaultSA:
 
         client = _make_client()
         svc_name = f"projects/{PROJECT_ID}/locations/{REGION}/services/my-svc"
-        _setup_cloud_run_services(client, [
-            {"name": svc_name, "template": {}}  # No serviceAccount key
-        ])
+        _setup_cloud_run_services(
+            client,
+            [
+                {"name": svc_name, "template": {}}  # No serviceAccount key
+            ],
+        )
         findings = check_cloud_run_no_default_service_account(client, PROJECT_ID, REGION)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert fail_findings
@@ -1227,9 +1268,7 @@ class TestCloudRunIngressRestricted:
 
         client = _make_client()
         svc_name = f"projects/{PROJECT_ID}/locations/{REGION}/services/my-svc"
-        _setup_cloud_run_services(client, [
-            {"name": svc_name, "ingress": "INGRESS_TRAFFIC_ALL"}
-        ])
+        _setup_cloud_run_services(client, [{"name": svc_name, "ingress": "INGRESS_TRAFFIC_ALL"}])
         findings = check_cloud_run_ingress_restricted(client, PROJECT_ID, REGION)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert fail_findings
@@ -1239,9 +1278,9 @@ class TestCloudRunIngressRestricted:
 
         client = _make_client()
         svc_name = f"projects/{PROJECT_ID}/locations/{REGION}/services/my-svc"
-        _setup_cloud_run_services(client, [
-            {"name": svc_name, "ingress": "INGRESS_TRAFFIC_INTERNAL_ONLY"}
-        ])
+        _setup_cloud_run_services(
+            client, [{"name": svc_name, "ingress": "INGRESS_TRAFFIC_INTERNAL_ONLY"}]
+        )
         findings = check_cloud_run_ingress_restricted(client, PROJECT_ID, REGION)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert not fail_findings
@@ -1251,9 +1290,9 @@ class TestCloudRunIngressRestricted:
 
         client = _make_client()
         svc_name = f"projects/{PROJECT_ID}/locations/{REGION}/services/my-svc"
-        _setup_cloud_run_services(client, [
-            {"name": svc_name, "ingress": "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"}
-        ])
+        _setup_cloud_run_services(
+            client, [{"name": svc_name, "ingress": "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"}]
+        )
         findings = check_cloud_run_ingress_restricted(client, PROJECT_ID, REGION)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert not fail_findings
@@ -1265,9 +1304,12 @@ class TestCloudRunBinaryAuthorization:
 
         client = _make_client()
         svc_name = f"projects/{PROJECT_ID}/locations/{REGION}/services/my-svc"
-        _setup_cloud_run_services(client, [
-            {"name": svc_name}  # No binaryAuthorization key
-        ])
+        _setup_cloud_run_services(
+            client,
+            [
+                {"name": svc_name}  # No binaryAuthorization key
+            ],
+        )
         findings = check_cloud_run_binary_authorization(client, PROJECT_ID, REGION)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert fail_findings
@@ -1277,9 +1319,9 @@ class TestCloudRunBinaryAuthorization:
 
         client = _make_client()
         svc_name = f"projects/{PROJECT_ID}/locations/{REGION}/services/my-svc"
-        _setup_cloud_run_services(client, [
-            {"name": svc_name, "binaryAuthorization": {"useDefault": True}}
-        ])
+        _setup_cloud_run_services(
+            client, [{"name": svc_name, "binaryAuthorization": {"useDefault": True}}]
+        )
         findings = check_cloud_run_binary_authorization(client, PROJECT_ID, REGION)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert not fail_findings
@@ -1289,12 +1331,17 @@ class TestCloudRunBinaryAuthorization:
 
         client = _make_client()
         svc_name = f"projects/{PROJECT_ID}/locations/{REGION}/services/my-svc"
-        _setup_cloud_run_services(client, [
-            {
-                "name": svc_name,
-                "binaryAuthorization": {"policy": f"projects/{PROJECT_ID}/platforms/cloudRun/policies/default"}
-            }
-        ])
+        _setup_cloud_run_services(
+            client,
+            [
+                {
+                    "name": svc_name,
+                    "binaryAuthorization": {
+                        "policy": f"projects/{PROJECT_ID}/platforms/cloudRun/policies/default"
+                    },
+                }
+            ],
+        )
         findings = check_cloud_run_binary_authorization(client, PROJECT_ID, REGION)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert not fail_findings
@@ -1306,21 +1353,24 @@ class TestCloudRunNoPlaintextSecrets:
 
         client = _make_client()
         svc_name = f"projects/{PROJECT_ID}/locations/{REGION}/services/my-svc"
-        _setup_cloud_run_services(client, [
-            {
-                "name": svc_name,
-                "template": {
-                    "containers": [
-                        {
-                            "image": "gcr.io/project/image:latest",
-                            "env": [
-                                {"name": "API_KEY", "value": "super-secret-value"},
-                            ],
-                        }
-                    ]
-                },
-            }
-        ])
+        _setup_cloud_run_services(
+            client,
+            [
+                {
+                    "name": svc_name,
+                    "template": {
+                        "containers": [
+                            {
+                                "image": "gcr.io/project/image:latest",
+                                "env": [
+                                    {"name": "API_KEY", "value": "super-secret-value"},
+                                ],
+                            }
+                        ]
+                    },
+                }
+            ],
+        )
         findings = check_cloud_run_no_plaintext_secrets(client, PROJECT_ID, REGION)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert fail_findings
@@ -1330,26 +1380,32 @@ class TestCloudRunNoPlaintextSecrets:
 
         client = _make_client()
         svc_name = f"projects/{PROJECT_ID}/locations/{REGION}/services/my-svc"
-        _setup_cloud_run_services(client, [
-            {
-                "name": svc_name,
-                "template": {
-                    "containers": [
-                        {
-                            "image": "gcr.io/project/image:latest",
-                            "env": [
-                                {
-                                    "name": "API_KEY",
-                                    "valueSource": {
-                                        "secretKeyRef": {"secret": "my-api-key", "version": "latest"}
+        _setup_cloud_run_services(
+            client,
+            [
+                {
+                    "name": svc_name,
+                    "template": {
+                        "containers": [
+                            {
+                                "image": "gcr.io/project/image:latest",
+                                "env": [
+                                    {
+                                        "name": "API_KEY",
+                                        "valueSource": {
+                                            "secretKeyRef": {
+                                                "secret": "my-api-key",
+                                                "version": "latest",
+                                            }
+                                        },
                                     },
-                                },
-                            ],
-                        }
-                    ]
-                },
-            }
-        ])
+                                ],
+                            }
+                        ]
+                    },
+                }
+            ],
+        )
         findings = check_cloud_run_no_plaintext_secrets(client, PROJECT_ID, REGION)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert not fail_findings
@@ -1359,22 +1415,25 @@ class TestCloudRunNoPlaintextSecrets:
 
         client = _make_client()
         svc_name = f"projects/{PROJECT_ID}/locations/{REGION}/services/my-svc"
-        _setup_cloud_run_services(client, [
-            {
-                "name": svc_name,
-                "template": {
-                    "containers": [
-                        {
-                            "image": "gcr.io/project/image:latest",
-                            "env": [
-                                {"name": "LOG_LEVEL", "value": "INFO"},
-                                {"name": "PORT", "value": "8080"},
-                            ],
-                        }
-                    ]
-                },
-            }
-        ])
+        _setup_cloud_run_services(
+            client,
+            [
+                {
+                    "name": svc_name,
+                    "template": {
+                        "containers": [
+                            {
+                                "image": "gcr.io/project/image:latest",
+                                "env": [
+                                    {"name": "LOG_LEVEL", "value": "INFO"},
+                                    {"name": "PORT", "value": "8080"},
+                                ],
+                            }
+                        ]
+                    },
+                }
+            ],
+        )
         findings = check_cloud_run_no_plaintext_secrets(client, PROJECT_ID, REGION)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert not fail_findings
@@ -1384,21 +1443,24 @@ class TestCloudRunNoPlaintextSecrets:
 
         client = _make_client()
         svc_name = f"projects/{PROJECT_ID}/locations/{REGION}/services/my-svc"
-        _setup_cloud_run_services(client, [
-            {
-                "name": svc_name,
-                "template": {
-                    "containers": [
-                        {
-                            "image": "gcr.io/project/image:latest",
-                            "env": [
-                                {"name": "DB_PASSWORD", "value": "p@ssw0rd"},
-                            ],
-                        }
-                    ]
-                },
-            }
-        ])
+        _setup_cloud_run_services(
+            client,
+            [
+                {
+                    "name": svc_name,
+                    "template": {
+                        "containers": [
+                            {
+                                "image": "gcr.io/project/image:latest",
+                                "env": [
+                                    {"name": "DB_PASSWORD", "value": "p@ssw0rd"},
+                                ],
+                            }
+                        ]
+                    },
+                }
+            ],
+        )
         findings = check_cloud_run_no_plaintext_secrets(client, PROJECT_ID, REGION)
         fail_findings = [f for f in findings if f.status == ComplianceStatus.FAIL]
         assert fail_findings
