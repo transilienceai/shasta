@@ -23,7 +23,7 @@ Shasta and Whitney together ship the following, all integrity-tested:
 
 - **267 check functions** (267 cloud compliance + 0 AI governance — Whitney now ships as a separate repo at [github.com/transilienceai/whitney](https://github.com/transilienceai/whitney); install with `pip install whitney` for source-code scanning)
 - **132 Terraform remediation templates** (81 AWS + 31 Azure + 20 GCP)
-- **814 tests** that all pass on every commit
+- **851 tests** that all pass on every commit
 
 None of the claims in this README are written by hand and hoped-for —
 every numeric claim is AST-counted from source by an integrity test
@@ -38,7 +38,7 @@ results six months from now on the same infrastructure.
 
 ```
 Layer 0 — Deterministic detection (no LLM in the pipeline)
-Layer 1 — Test suite (684 tests, all green on every commit)
+Layer 1 — Test suite (851 tests, all green on every commit)
 Layer 2 — Doc-vs-code drift integrity tests
 Layer 3 — Multi-region structural enforcement
 Layer 4 — CI workflow (mechanical PR-time enforcement)
@@ -98,24 +98,26 @@ py -3.12 -m pytest tests/test_whitney/test_integrity.py -v
 
 ### Layer 1 — Test suite
 
-**519 tests** across `tests/`, all green on every commit. Breakdown:
+**851 tests** across `tests/`, all green on every commit. Breakdown:
 
 | Suite | Tests | What it covers |
 |---|---|---|
 | `tests/test_whitney/` | 205 | AI compliance frameworks (ISO 42001, EU AI Act, OWASP LLM Top 10, OWASP Agentic, NIST AI RMF, NIST AI 600-1, MITRE ATLAS), AI policies, AI SBOM (code + AWS + Azure), mapper + scorer, integrity. The Whitney corpus eval lives in the standalone Whitney repo. |
-| `tests/test_aws/` | 108 | AWS smoke tests: imports, runner signatures, multi-region structural enforcement, Terraform template renders, deprecated runtime tables, VPC endpoint expectations |
-| `tests/test_azure/` | 58 | Azure smoke tests: imports, runner signatures, diagnostic settings matrix, Defender required plans, CIS 5.2.x activity log alert mappings, Terraform template renders, Entra ID checks |
-| `tests/test_compliance/` | 21 | SOC 2 + ISO 27001 scorer + mapper |
-| `tests/test_workflows/` | 26 | Risk register + drift detection workflows |
-| `tests/test_integrity/` | 11 | **Doc-vs-code drift** — see Layer 2 |
-| `tests/test_reports/` | 13 | Markdown / HTML / PDF report generation |
-| Other | ~80 | Conftest, models, client, AWS/Azure unit fixtures |
+| `tests/test_gcp/` | 142 | GCP smoke + functional tests: imports, runner signatures, multi-project iteration, `NOT_ASSESSED`-on-error behavior, Terraform template renders, CIS GCP control mappings |
+| `tests/test_aws/` | 140 | AWS smoke tests: imports, runner signatures, multi-region structural enforcement, Terraform template renders, deprecated runtime tables, VPC endpoint expectations |
+| `tests/test_azure/` | 97 | Azure smoke tests: imports, runner signatures, diagnostic settings matrix, Defender required plans, CIS 5.2.x activity log alert mappings, Terraform template renders, Entra ID checks |
+| `tests/voice/` | 74 | Voice console: tool endpoints, score / finding / risk queries, ephemeral token minting |
+| `tests/test_compliance/` | 71 | SOC 2 + ISO 27001 scorer + mapper |
+| `tests/test_reports/` | 45 | Markdown / HTML / PDF report generation |
+| `tests/test_workflows/` | 44 | Risk register + drift detection workflows |
+| `tests/test_integrity/` | 15 | **Doc-vs-code drift** — see Layer 2 |
+| Other | ~18 | Conftest, models, client, integration + trust-center fixtures |
 
 **Run them yourself:**
 
 ```bash
 py -3.12 -m pytest --ignore=tests/test_rainier
-# 537 passed in ~2 minutes
+# 851 passed in ~2 minutes
 ```
 
 The full suite runs on every PR via
@@ -129,19 +131,23 @@ The full suite runs on every PR via
 This is the layer that closes the most embarrassing failure mode:
 **numeric claims in the README that don't match the code.**
 
-`tests/test_integrity/test_doc_claims.py` contains **16 parametrized assertions** that AST-count the source tree and assert each numeric claim in `README.md` and `TRUST.md` matches reality:
+`tests/test_integrity/test_doc_claims.py` contains **15 parametrized assertions** that AST-count the source tree and assert each numeric claim in `README.md` and `TRUST.md` matches reality:
 
 | Test | Claim it verifies | Source of truth |
 |---|---|---|
 | `test_readme_total_check_count` | "5 Domains, X+ Checks" headline | AST count of `check_*` in `src/shasta/` |
 | `test_readme_technical_controls_check_count` | Technical-controls table row | AST count of `check_*` in `src/shasta/` |
+| `test_readme_intro_total_check_count` | Intro-paragraph "N automated checks" | AST count of `check_*` in `src/shasta/` |
+| `test_readme_intro_terraform_template_count` | Intro-paragraph "N Terraform templates" | `TERRAFORM_TEMPLATES` registry |
 | `test_readme_check_to_risk_mapping_count` | "X check-to-risk mappings" | `len(FINDING_TO_RISK)` |
 | `test_readme_test_count_in_tree_block` | "(N+ tests)" annotation | `pytest --collect-only` |
-| `test_readme_ai_check_count` | "N AI checks (code + cloud)" | AST count of `check_*` in `src/whitney/` |
-| `test_readme_terraform_template_breakdown` | "X templates (Y AWS + Z Azure)" | `TERRAFORM_TEMPLATES` registry |
+| `test_readme_terraform_template_breakdown` | "X templates (Y AWS + Z Azure + W GCP)" | `TERRAFORM_TEMPLATES` registry |
 | `test_readme_policy_template_count` | "N SOC 2 policy documents" | `len(POLICIES)` |
-| `test_whitney_readme_test_count` | Whitney status checklist test count | `pytest tests/test_whitney/ --collect-only` |
-| `test_whitney_trust_unit_test_count` | TRUST.md Layer 1 header | `pytest tests/test_whitney/ --collect-only` |
+| `test_root_trust_total_check_count` | TRUST.md TL;DR "N check functions" | AST count of `check_*` in `src/shasta/` |
+| `test_root_trust_terraform_template_count` | TRUST.md TL;DR Terraform template count | `TERRAFORM_TEMPLATES` registry |
+| `test_root_trust_test_count` | TRUST.md TL;DR "N tests" bullet | `pytest --collect-only` |
+| `test_root_trust_layer1_test_breakdown` | TRUST.md Layer 1 table Whitney row | `pytest tests/test_whitney/ --collect-only` |
+| `test_root_trust_integrity_test_count` | TRUST.md "N parametrized assertions" | `pytest tests/test_integrity/ --collect-only` |
 | `test_counters_return_positive_numbers` | self-test of helper functions | n/a |
 | `test_pytest_collector_works` | self-test of pytest collector | n/a |
 
@@ -179,7 +185,7 @@ introduced minutes earlier.
 
 ```bash
 py -3.12 -m pytest tests/test_integrity/ -v
-# 11 passed
+# 15 passed
 ```
 
 ---

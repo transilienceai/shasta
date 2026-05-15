@@ -1,10 +1,10 @@
 # Shasta — Multi-Cloud Compliance Automation
 
 ## What is this?
-Shasta is a Claude Code-native multi-cloud compliance platform. It scans AWS and Azure environments, maps findings to compliance controls (SOC 2, ISO 27001, HIPAA, ISO 42001, EU AI Act), generates remediation guidance (with Terraform), produces compliance policies and reports, and ships an optional voice-driven dashboard (`python -m shasta.voice`) for hands-free posture queries.
+Shasta is a Claude Code-native multi-cloud compliance platform. It scans AWS, Azure, and GCP environments, maps findings to compliance controls (SOC 2, ISO 27001, HIPAA, ISO 42001, EU AI Act), generates remediation guidance (with Terraform), produces compliance policies and reports, and ships an optional voice-driven dashboard (`python -m shasta.voice`) for hands-free posture queries.
 
 ## Tech stack
-- Python 3.11+, boto3, azure-identity, azure-mgmt-*, msgraph-sdk, rich, pydantic, jinja2, weasyprint
+- Python 3.11+, boto3, azure-identity, azure-mgmt-*, msgraph-sdk, google-auth, google-api-python-client, google-cloud-storage, rich, pydantic, jinja2, weasyprint
 - SQLite for local data storage
 - Claude Code skills for user interface
 
@@ -12,17 +12,18 @@ Shasta is a Claude Code-native multi-cloud compliance platform. It scans AWS and
 - `src/shasta/` — cloud compliance library (SOC 2, ISO 27001)
 - `src/shasta/aws/` — AWS check modules (boto3)
 - `src/shasta/azure/` — Azure check modules (azure-mgmt-*, msgraph-sdk)
+- `src/shasta/gcp/` — GCP check modules (google-api-python-client, google-cloud-storage)
 - `src/shasta/compliance/ai/` — AI governance frameworks (ISO 42001, EU AI Act, NIST AI RMF)
 - `src/shasta/aws/ai_checks.py` — AWS AI service checks (Bedrock, SageMaker)
 - `src/shasta/azure/ai_checks.py` — Azure AI service checks (Azure OpenAI, Azure ML)
 - `src/shasta/dashboard/` — read-only HTML compliance dashboard (FastAPI + Jinja, port 8080)
 - `src/shasta/voice/` — opt-in voice console (FastAPI + React + OpenAI Realtime, port 8090); install with `pip install -e ".[voice]"`
 - `.claude/skills/` — Claude Code skill definitions
-- `tests/` — pytest test suite (uses moto for AWS mocking, unittest.mock for Azure); voice-specific tests live under `tests/voice/`
+- `tests/` — pytest test suite (uses moto for AWS mocking, unittest.mock for Azure and GCP); voice-specific tests live under `tests/voice/`, GCP tests under `tests/test_gcp/`
 - `data/` — runtime data (gitignored)
 
 ## Commands
-- Install: `pip install -e ".[dev]"` (core), `pip install -e ".[dev,azure]"` (with Azure), or `pip install -e ".[dev,azure,voice]"` (with voice console)
+- Install: `pip install -e ".[dev]"` (core), `pip install -e ".[dev,azure]"` (with Azure), `pip install -e ".[dev,gcp]"` (with GCP), or `pip install -e ".[dev,azure,gcp,voice]"` (everything)
 - Test: `pytest` (or `pytest tests/voice/` for voice-only)
 - Lint: `ruff check src/ tests/`
 - Format: `ruff format src/ tests/`
@@ -33,6 +34,7 @@ Shasta is a Claude Code-native multi-cloud compliance platform. It scans AWS and
 - Use pydantic models for all data structures
 - All AWS calls go through `src/shasta/aws/client.py` session management
 - All Azure calls go through `src/shasta/azure/client.py` session management
+- All GCP calls go through `src/shasta/gcp/client.py` session management
 - Every check function returns a list of `Finding` objects
 - Use `rich` for terminal output formatting
 - Keep functions focused — one check per function
@@ -58,11 +60,13 @@ they are in context at every conversation start:
    `tests/test_whitney/test_integrity.py` enforce this for Whitney; extend
    the same pattern when adding new modules.
 
-3. **Default to multi-region / multi-subscription.** New AWS check modules
-   must iterate `client.get_enabled_regions()` via `client.for_region(r)`.
-   New Azure check modules must call sites via `AzureClient.for_subscription(sid)`
-   when scanning multiple subscriptions. Single-region/single-subscription is
-   the explicit override, never the default.
+3. **Default to multi-region / multi-subscription / multi-project.** New AWS
+   check modules must iterate `client.get_enabled_regions()` via
+   `client.for_region(r)`. New Azure check modules must call sites via
+   `AzureClient.for_subscription(sid)` when scanning multiple subscriptions.
+   New GCP check modules must iterate projects via `GCPClient.for_project(pid)`.
+   Single-region / single-subscription / single-project is the explicit
+   override, never the default.
 
 4. **Frameworks belong on the `Finding` model.** Populate
    `soc2_controls`, `cis_aws_controls`, `cis_azure_controls`, `mcsb_controls`,
@@ -104,6 +108,7 @@ they are in context at every conversation start:
 - `pytest tests/test_integrity/` — doc-vs-code drift integrity tests
 - `pytest tests/test_aws/test_aws_sweep_smoke.py` — AWS module structural smoke tests
 - `pytest tests/test_azure/test_smoke.py` — Azure module structural smoke tests
+- `pytest tests/test_gcp/test_smoke.py` — GCP module structural smoke tests
 
 These are mechanically enforced by `.github/workflows/integrity.yml` on every PR.
 A drift in any tracked numeric claim (or a stub-shaped function, or a missing
