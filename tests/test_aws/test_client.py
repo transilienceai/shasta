@@ -1,9 +1,8 @@
 """Tests for AWS client module."""
 
-import pytest
 from moto import mock_aws
 
-from shasta.aws.client import AWSClient, AWSClientError
+from shasta.aws.client import AWSClient
 
 
 @mock_aws

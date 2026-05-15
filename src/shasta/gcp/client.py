@@ -246,7 +246,7 @@ class GCPClient:
                 {"project_id": pid, "display_name": "", "project_number": "", "state": "ACTIVE"}
             ]
 
-    def for_project(self, project_id: str) -> "GCPClient":
+    def for_project(self, project_id: str) -> GCPClient:
         """Return a sibling GCPClient bound to a different project.
 
         Reuses the same credentials and clears the service cache so each project
@@ -259,7 +259,7 @@ class GCPClient:
         )
         return sibling
 
-    def for_region(self, region: str) -> "GCPClient":
+    def for_region(self, region: str) -> GCPClient:
         """Return a sibling GCPClient scoped to a specific region.
 
         The region is stored for use by regional API calls (subnets, instances).

@@ -1,4 +1,5 @@
 """Structured logging for tool calls."""
+
 import json
 import logging
 import os

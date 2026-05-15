@@ -6,8 +6,6 @@ existence, encryption, immutability/lock, recovery point retention.
 
 from __future__ import annotations
 
-from typing import Any
-
 from botocore.exceptions import ClientError
 
 from shasta.aws.client import AWSClient
@@ -63,15 +61,17 @@ def check_backup_cross_region_copy(
         bk = client.client("backup")
         plans_list = bk.list_backup_plans().get("BackupPlansList", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="aws-backup-cross-region-copy",
-            title="Unable to check Backup cross-region copy",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.LOGGING,
-            resource_type="AWS::Backup::BackupPlan",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="aws-backup-cross-region-copy",
+                title="Unable to check Backup cross-region copy",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.LOGGING,
+                resource_type="AWS::Backup::BackupPlan",
+                account_id=account_id,
+                region=region,
+            )
+        ]
     if not plans_list:
         return []
 
@@ -165,15 +165,17 @@ def check_backup_vault_access_policy(
     try:
         bk = client.client("backup")
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="aws-backup-vault-access-policy",
-            title="Unable to check Backup vault access policies",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.LOGGING,
-            resource_type="AWS::Backup::BackupVault",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="aws-backup-vault-access-policy",
+                title="Unable to check Backup vault access policies",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.LOGGING,
+                resource_type="AWS::Backup::BackupVault",
+                account_id=account_id,
+                region=region,
+            )
+        ]
     for v in _list_vaults(client):
         name = v.get("BackupVaultName", "unknown")
         arn = v.get("BackupVaultArn", "")
@@ -226,9 +228,9 @@ def check_backup_vault_access_policy(
                     account_id=account_id,
                     remediation=(
                         f"aws backup put-backup-vault-access-policy --backup-vault-name {name} "
-                        '--policy file://deny-policy.json. The policy should Deny '
-                        'backup:DeleteBackupVault, backup:DeleteRecoveryPoint, and '
-                        'backup:StartCopyJob with a NotPrincipal of your break-glass role ARN.'
+                        "--policy file://deny-policy.json. The policy should Deny "
+                        "backup:DeleteBackupVault, backup:DeleteRecoveryPoint, and "
+                        "backup:StartCopyJob with a NotPrincipal of your break-glass role ARN."
                     ),
                     soc2_controls=["A1.1", "A1.2"],
                     cis_aws_controls=["2.x"],
@@ -280,15 +282,17 @@ def check_backup_vault_lock(client: AWSClient, account_id: str, region: str) -> 
     try:
         bk = client.client("backup")
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="aws-backup-vault-lock",
-            title="Unable to check Backup vault lock status",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.LOGGING,
-            resource_type="AWS::Backup::BackupVault",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="aws-backup-vault-lock",
+                title="Unable to check Backup vault lock status",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.LOGGING,
+                resource_type="AWS::Backup::BackupVault",
+                account_id=account_id,
+                region=region,
+            )
+        ]
     for v in _list_vaults(client):
         name = v.get("BackupVaultName", "unknown")
         arn = v.get("BackupVaultArn", "")
@@ -430,15 +434,17 @@ def check_backup_plans(client: AWSClient, account_id: str, region: str) -> list[
         bk = client.client("backup")
         plans = bk.list_backup_plans().get("BackupPlansList", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="aws-backup-plans",
-            title="Unable to check Backup plans",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.LOGGING,
-            resource_type="AWS::Backup::BackupPlan",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="aws-backup-plans",
+                title="Unable to check Backup plans",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.LOGGING,
+                resource_type="AWS::Backup::BackupPlan",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     if plans:
         return [

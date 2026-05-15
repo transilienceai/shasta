@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from shasta.gcp.client import GCPClient
 from shasta.evidence.models import (
     CheckDomain,
     CloudProvider,
@@ -18,6 +17,7 @@ from shasta.evidence.models import (
     Finding,
     Severity,
 )
+from shasta.gcp.client import GCPClient
 
 IS_GLOBAL = True  # Uses global/project-wide listing endpoints for KMS, SQL, BigQuery
 
@@ -40,9 +40,7 @@ def run_all_gcp_encryption_checks(client: GCPClient) -> list[Finding]:
     return findings
 
 
-def check_kms_key_rotation_period(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_kms_key_rotation_period(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 1.10] Cloud KMS key rotation period should be ≤90 days.
 
     Key rotation limits the amount of data encrypted under a single key version
@@ -54,17 +52,13 @@ def check_kms_key_rotation_period(
         kms = client.service("cloudkms", "v1")
         # KMS doesn't accept "-" as a wildcard location — enumerate supported
         # locations first, then list key rings per location.
-        locations_resp = (
-            kms.projects().locations().list(name=f"projects/{project_id}").execute()
-        )
+        locations_resp = kms.projects().locations().list(name=f"projects/{project_id}").execute()
         locations = [loc.get("locationId") for loc in locations_resp.get("locations", [])]
         key_rings: list[dict[str, Any]] = []
         for location in locations:
             try:
                 parent = f"projects/{project_id}/locations/{location}"
-                resp = (
-                    kms.projects().locations().keyRings().list(parent=parent).execute()
-                )
+                resp = kms.projects().locations().keyRings().list(parent=parent).execute()
                 key_rings.extend(resp.get("keyRings", []))
             except Exception:
                 # A single failed location should not abort the whole check
@@ -107,12 +101,7 @@ def check_kms_key_rotation_period(
         ring_name = ring.get("name", "")
         try:
             keys_resp = (
-                kms.projects()
-                .locations()
-                .keyRings()
-                .cryptoKeys()
-                .list(parent=ring_name)
-                .execute()
+                kms.projects().locations().keyRings().cryptoKeys().list(parent=ring_name).execute()
             )
             keys = keys_resp.get("cryptoKeys", [])
         except Exception:
@@ -123,7 +112,7 @@ def check_kms_key_rotation_period(
             if purpose != "ENCRYPT_DECRYPT":
                 continue  # Only symmetric encryption keys can be rotated
             rotation_period = key.get("rotationPeriod")
-            next_rotation = key.get("nextRotationTime")
+            key.get("nextRotationTime")
 
             if not rotation_period:
                 offenders.append(
@@ -195,9 +184,7 @@ def check_kms_key_rotation_period(
     ]
 
 
-def check_sql_require_ssl(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_sql_require_ssl(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 6.3] Cloud SQL instances should require SSL for all connections.
 
     Without enforced SSL, database clients can connect over unencrypted channels,
@@ -305,9 +292,7 @@ def check_sql_require_ssl(
     ]
 
 
-def check_sql_no_public_ip(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_sql_no_public_ip(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 6.2] Cloud SQL instances should not have a public IP address.
 
     A public IP makes the database endpoint directly reachable from the internet.
@@ -397,9 +382,7 @@ def check_sql_no_public_ip(
     ]
 
 
-def check_sql_data_backup_enabled(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_sql_data_backup_enabled(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 6.7] Cloud SQL instances should have automated backups enabled.
 
     Automated backups are a last resort recovery mechanism. Without them, data
@@ -488,9 +471,7 @@ def check_sql_data_backup_enabled(
     ]
 
 
-def check_bigquery_no_public_access(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_bigquery_no_public_access(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 7.1] BigQuery datasets should not be publicly accessible.
 
     Public datasets expose all tables within them to the internet, bypassing
@@ -538,17 +519,11 @@ def check_bigquery_no_public_access(
     for ds_ref in datasets:
         dataset_id = ds_ref.get("datasetReference", {}).get("datasetId", "")
         try:
-            dataset = (
-                bq.datasets()
-                .get(projectId=project_id, datasetId=dataset_id)
-                .execute()
-            )
+            dataset = bq.datasets().get(projectId=project_id, datasetId=dataset_id).execute()
             for entry in dataset.get("access", []):
                 special = entry.get("specialGroup", "")
                 if special in ("allUsers", "allAuthenticatedUsers"):
-                    public_datasets.append(
-                        {"dataset": dataset_id, "special_group": special}
-                    )
+                    public_datasets.append({"dataset": dataset_id, "special_group": special})
                     break
         except Exception:
             continue
@@ -601,9 +576,7 @@ def check_bigquery_no_public_access(
     ]
 
 
-def check_bigquery_cmek_configured(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_bigquery_cmek_configured(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 7.2] BigQuery datasets with sensitive data should use Customer-Managed Encryption Keys.
 
     By default BigQuery uses Google-managed keys. CMEK gives you control over key
@@ -636,11 +609,7 @@ def check_bigquery_cmek_configured(
     for ds_ref in datasets:
         dataset_id = ds_ref.get("datasetReference", {}).get("datasetId", "")
         try:
-            dataset = (
-                bq.datasets()
-                .get(projectId=project_id, datasetId=dataset_id)
-                .execute()
-            )
+            dataset = bq.datasets().get(projectId=project_id, datasetId=dataset_id).execute()
             # defaultEncryptionConfiguration is only set when CMEK is configured
             if not dataset.get("defaultEncryptionConfiguration", {}).get("kmsKeyName"):
                 missing_cmek.append(dataset_id)

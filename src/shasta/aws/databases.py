@@ -8,8 +8,6 @@ module did not touch.
 
 from __future__ import annotations
 
-from typing import Any
-
 from botocore.exceptions import ClientError
 
 from shasta.aws.client import AWSClient
@@ -71,9 +69,7 @@ def _get_parameter_value(client: AWSClient, param_group_name: str, param_name: s
     return None
 
 
-def check_rds_force_ssl_parameter(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_rds_force_ssl_parameter(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """PostgreSQL/SQL Server RDS parameter group should force SSL.
 
     Mirrors Azure's check_postgresql_secure_transport. Without this parameter,
@@ -93,7 +89,14 @@ def check_rds_force_ssl_parameter(
         if not pg_name:
             continue
 
-        if engine in ("postgres", "aurora-postgresql", "sqlserver-ex", "sqlserver-se", "sqlserver-ee", "sqlserver-web"):
+        if engine in (
+            "postgres",
+            "aurora-postgresql",
+            "sqlserver-ex",
+            "sqlserver-se",
+            "sqlserver-ee",
+            "sqlserver-web",
+        ):
             param_name = "rds.force_ssl"
             expected_value = "1"
         elif engine in ("mysql", "mariadb", "aurora-mysql"):
@@ -148,7 +151,12 @@ def check_rds_force_ssl_parameter(
                     ),
                     soc2_controls=["CC6.1", "CC6.7"],
                     cis_aws_controls=["2.3.x"],
-                    details={"db": db_id, "engine": engine, "parameter": param_name, "value": actual},
+                    details={
+                        "db": db_id,
+                        "engine": engine,
+                        "parameter": param_name,
+                        "value": actual,
+                    },
                 )
             )
     return findings
@@ -229,9 +237,7 @@ def check_rds_postgres_log_settings(
     return findings
 
 
-def check_rds_min_tls_version(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_rds_min_tls_version(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """SQL Server RDS should have rds.tls_version set to TLS 1.2 or higher.
 
     Mirrors Azure's check_sql_min_tls. Only applies to SQL Server engines.
@@ -550,15 +556,17 @@ def check_documentdb_encryption(client: AWSClient, account_id: str, region: str)
         docdb = client.client("docdb")
         clusters = docdb.describe_db_clusters().get("DBClusters", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="docdb-encryption",
-            title="Unable to check DocumentDB encryption",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.ENCRYPTION,
-            resource_type="AWS::DocDB::DBCluster",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="docdb-encryption",
+                title="Unable to check DocumentDB encryption",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.ENCRYPTION,
+                resource_type="AWS::DocDB::DBCluster",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     for cluster in clusters:
         if "docdb" not in (cluster.get("Engine") or ""):
@@ -607,15 +615,17 @@ def check_documentdb_audit_logs(client: AWSClient, account_id: str, region: str)
         docdb = client.client("docdb")
         clusters = docdb.describe_db_clusters().get("DBClusters", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="docdb-audit-logs",
-            title="Unable to check DocumentDB audit logs",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.LOGGING,
-            resource_type="AWS::DocDB::DBCluster",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="docdb-audit-logs",
+                title="Unable to check DocumentDB audit logs",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.LOGGING,
+                resource_type="AWS::DocDB::DBCluster",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     for cluster in clusters:
         if "docdb" not in (cluster.get("Engine") or ""):
@@ -672,20 +682,21 @@ def check_documentdb_audit_logs(client: AWSClient, account_id: str, region: str)
 
 def check_dynamodb_pitr(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """DynamoDB tables should have Point-in-Time Recovery enabled."""
-    findings: list[Finding] = []
     try:
         ddb = client.client("dynamodb")
         tables = ddb.list_tables().get("TableNames", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="dynamodb-pitr",
-            title="Unable to check DynamoDB PITR",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.STORAGE,
-            resource_type="AWS::DynamoDB::Table",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="dynamodb-pitr",
+                title="Unable to check DynamoDB PITR",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.STORAGE,
+                resource_type="AWS::DynamoDB::Table",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     no_pitr: list[str] = []
     pitr: list[str] = []
@@ -757,15 +768,17 @@ def check_dynamodb_encryption_kms(client: AWSClient, account_id: str, region: st
         ddb = client.client("dynamodb")
         tables = ddb.list_tables().get("TableNames", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="dynamodb-kms",
-            title="Unable to check DynamoDB encryption",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.ENCRYPTION,
-            resource_type="AWS::DynamoDB::Table",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="dynamodb-kms",
+                title="Unable to check DynamoDB encryption",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.ENCRYPTION,
+                resource_type="AWS::DynamoDB::Table",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     for t in tables:
         try:

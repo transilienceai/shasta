@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from shasta.evidence.models import Finding
 from shasta.compliance.ai.mapper import (
     get_eu_ai_act_obligation_summary,
     get_iso42001_control_summary,
@@ -14,6 +13,7 @@ from shasta.compliance.ai.mapper import (
     get_owasp_agentic_summary,
     get_owasp_llm_summary,
 )
+from shasta.evidence.models import Finding
 
 
 @dataclass

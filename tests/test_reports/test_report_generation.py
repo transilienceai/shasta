@@ -24,9 +24,8 @@ from shasta.reports.generator import (
     save_html_report,
     save_markdown_report,
 )
-from shasta.reports.iso27001_report import save_iso27001_markdown_report
 from shasta.reports.hipaa_report import save_hipaa_report
-
+from shasta.reports.iso27001_report import save_iso27001_markdown_report
 
 # ---------------------------------------------------------------------------
 # Fixtures

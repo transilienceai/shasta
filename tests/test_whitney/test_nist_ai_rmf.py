@@ -3,11 +3,11 @@
 from shasta.compliance.ai.nist_ai_rmf import (
     NIST_AI_RMF_CATEGORIES,
     NISTAIRMFCategory,
-    get_nist_ai_rmf_category,
-    get_nist_ai_rmf_categories_for_check,
     get_automated_nist_ai_rmf_categories,
-    get_policy_required_nist_ai_rmf_categories,
     get_nist_ai_rmf_categories_by_function,
+    get_nist_ai_rmf_categories_for_check,
+    get_nist_ai_rmf_category,
+    get_policy_required_nist_ai_rmf_categories,
 )
 
 

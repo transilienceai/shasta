@@ -17,10 +17,10 @@ Physical Safeguards are largely N/A when infrastructure is fully in AWS/Azure.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 
-class HIPAASafeguard(str, Enum):
+class HIPAASafeguard(StrEnum):
     """HIPAA Security Rule safeguard categories."""
 
     ADMINISTRATIVE = "Administrative"

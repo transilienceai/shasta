@@ -1,15 +1,12 @@
 """Tests for ISO 27001 compliance scorer."""
 
-import pytest
-
-from shasta.compliance.iso27001_scorer import calculate_iso27001_score, ISO27001Score
-from shasta.compliance.iso27001_mapper import enrich_findings_with_iso27001
+from shasta.compliance.iso27001_scorer import ISO27001Score, calculate_iso27001_score
 from shasta.evidence.models import (
-    Finding,
     CheckDomain,
-    ComplianceStatus,
-    Severity,
     CloudProvider,
+    ComplianceStatus,
+    Finding,
+    Severity,
 )
 
 

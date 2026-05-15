@@ -24,7 +24,9 @@ checks fail.
 
 from __future__ import annotations
 
-_ControlAggregate = dict  # keys: fail_count, partial_count, pass_count, requires_policy, has_automated_checks
+_ControlAggregate = (
+    dict  # keys: fail_count, partial_count, pass_count, requires_policy, has_automated_checks
+)
 
 
 def decide_control_status(data: _ControlAggregate) -> str:

@@ -1,4 +1,5 @@
 """FastAPI application for the voice console."""
+
 import os
 from pathlib import Path
 

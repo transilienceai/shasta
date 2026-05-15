@@ -17,7 +17,7 @@ control without touching the cloud console.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -247,7 +247,7 @@ TEST_DEFINITIONS: list[dict[str, Any]] = [
 
 def generate_control_tests(scan: ScanResult) -> ControlTestSuite:
     """Generate auditor-grade control tests from scan findings."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     findings_by_check = _index_findings(scan.findings)
 
     tests = []
@@ -385,12 +385,12 @@ def save_control_test_report(
         f"**{labels['account_label']}:** {suite.account_id}",
         f"**Test Period:** {suite.test_period}",
         f"**Tested At:** {suite.tested_at}",
-        f"**Tested By:** Shasta Automated Compliance Testing",
+        "**Tested By:** Shasta Automated Compliance Testing",
         "",
         "## Summary",
         "",
-        f"| Result | Count |",
-        f"|--------|-------|",
+        "| Result | Count |",
+        "|--------|-------|",
         f"| Total Tests | {suite.total_tests} |",
         f"| Passed | {suite.passed} |",
         f"| Failed | {suite.failed} |",

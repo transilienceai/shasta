@@ -10,13 +10,11 @@ A living risk register that:
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
-from shasta.evidence.models import ComplianceStatus, Finding, Severity
+from shasta.evidence.models import ComplianceStatus, Finding
 
 LIKELIHOOD_VALUES = {"low": 1, "medium": 2, "high": 3}
 IMPACT_VALUES = {"low": 1, "medium": 2, "high": 3}
@@ -391,7 +389,7 @@ FINDING_TO_RISK: dict[str, dict[str, str]] = {
 
 def auto_seed_from_findings(findings: list[Finding], account_id: str) -> list[RiskItem]:
     """Convert failing scan findings into risk register items."""
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    now = datetime.now(UTC).strftime("%Y-%m-%d")
     risks = []
     seen_checks = set()
     counter = 1
@@ -437,7 +435,7 @@ def auto_seed_from_findings(findings: list[Finding], account_id: str) -> list[Ri
 
 def build_register(items: list[RiskItem], account_id: str) -> RiskRegister:
     """Build a RiskRegister summary from a list of items."""
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    now = datetime.now(UTC).strftime("%Y-%m-%d")
     active = [r for r in items if r.status in ("open", "in_progress")]
 
     return RiskRegister(

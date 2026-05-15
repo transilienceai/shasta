@@ -13,10 +13,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
-from urllib import request, error
+from urllib import error, request
 
 from shasta.sbom.discovery import SBOMReport
 
@@ -56,7 +55,7 @@ def generate_daily_advisory(
     lookback_days: int = 1,
 ) -> DailyAdvisoryReport:
     """Generate a personalized daily threat advisory."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     start_date = now - timedelta(days=lookback_days)
 
     # Build tech stack profile from SBOM
@@ -123,7 +122,7 @@ def _query_nvd(tech_stack: dict, start_date: datetime) -> list[ThreatAdvisory]:
     for term in search_terms:
         try:
             start_str = start_date.strftime("%Y-%m-%dT00:00:00.000")
-            end_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT23:59:59.999")
+            end_str = datetime.now(UTC).strftime("%Y-%m-%dT23:59:59.999")
 
             url = (
                 f"https://services.nvd.nist.gov/rest/json/cves/2.0"
@@ -176,7 +175,7 @@ def _query_nvd(tech_stack: dict, start_date: datetime) -> list[ThreatAdvisory]:
                         published=published,
                         description=desc[:500],
                         affected_component=f"{term} {version}",
-                        affected_resource=f"Detected in your environment via SBOM",
+                        affected_resource="Detected in your environment via SBOM",
                         action_required=f"Check if your version of {term} ({version}) is affected. Update to the latest patched version.",
                         references=references,
                     )
@@ -208,7 +207,7 @@ def _query_cisa_kev_recent(tech_stack: dict, start_date: datetime) -> list[Threa
         for vuln in data.get("vulnerabilities", []):
             date_added = vuln.get("dateAdded", "")
             try:
-                added_dt = datetime.strptime(date_added, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                added_dt = datetime.strptime(date_added, "%Y-%m-%d").replace(tzinfo=UTC)
                 if added_dt < start_date:
                     continue
             except ValueError:
@@ -317,7 +316,7 @@ def _check_recent_supply_chain(tech_stack: dict, start_date: datetime) -> list[T
                         published=published,
                         description=adv.get("description", "")[:500],
                         affected_component=affected_pkg,
-                        affected_resource=f"Found in your SBOM",
+                        affected_resource="Found in your SBOM",
                         action_required="Update to the patched version immediately.",
                         references=[adv.get("html_url", "")],
                         is_supply_chain=True,

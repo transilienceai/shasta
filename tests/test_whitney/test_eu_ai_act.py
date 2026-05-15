@@ -3,9 +3,9 @@
 from shasta.compliance.ai.eu_ai_act import (
     EU_AI_ACT_OBLIGATIONS,
     EUAIActObligation,
+    get_automated_eu_ai_act_obligations,
     get_eu_ai_act_obligation,
     get_eu_ai_act_obligations_for_check,
-    get_automated_eu_ai_act_obligations,
     get_policy_required_eu_ai_act_obligations,
 )
 

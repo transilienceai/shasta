@@ -43,9 +43,7 @@ def test_policy_only_control_stays_requires_policy_with_passes_too():
 
 def test_automated_control_still_fails_on_failing_finding():
     """Controls with automated checks mapped in the framework still fail normally."""
-    data = _agg(
-        requires_policy=True, has_automated_checks=True, fail_count=1, pass_count=2
-    )
+    data = _agg(requires_policy=True, has_automated_checks=True, fail_count=1, pass_count=2)
     assert decide_control_status(data) == "fail"
 
 

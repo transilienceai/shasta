@@ -12,7 +12,7 @@ Engineering Principle #3.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from botocore.exceptions import ClientError
@@ -24,7 +24,6 @@ from shasta.evidence.models import (
     Finding,
     Severity,
 )
-
 
 # Module-level marker so the structural multi-region smoke test knows
 # this module is regional, not global. See tests/test_aws/test_aws_sweep_smoke.py.
@@ -91,9 +90,7 @@ def _list_running_instances(ec2: Any) -> list[dict]:
     return out
 
 
-def check_ec2_imdsv2_enforced(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_ec2_imdsv2_enforced(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """[CIS AWS 5.6] EC2 instances must enforce IMDSv2 (HttpTokens=required).
 
     Capital One was breached in 2019 because IMDSv1 allowed an SSRF on a
@@ -101,19 +98,20 @@ def check_ec2_imdsv2_enforced(
     credentials. IMDSv2 requires a session token (PUT method) which SSRF
     cannot trivially perform.
     """
-    findings: list[Finding] = []
     try:
         ec2 = client.client("ec2")
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="ec2-imdsv2-enforced",
-            title="Unable to check EC2 IMDSv2 enforcement",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.COMPUTE,
-            resource_type="AWS::EC2::Instance",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="ec2-imdsv2-enforced",
+                title="Unable to check EC2 IMDSv2 enforcement",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.COMPUTE,
+                resource_type="AWS::EC2::Instance",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     instances = _list_running_instances(ec2)
     if not instances:
@@ -132,11 +130,7 @@ def check_ec2_imdsv2_enforced(
                 {
                     "instance_id": instance_id,
                     "name": next(
-                        (
-                            t["Value"]
-                            for t in (inst.get("Tags") or [])
-                            if t.get("Key") == "Name"
-                        ),
+                        (t["Value"] for t in (inst.get("Tags") or []) if t.get("Key") == "Name"),
                         "",
                     ),
                     "http_tokens": http_tokens,
@@ -192,9 +186,7 @@ def check_ec2_imdsv2_enforced(
     ]
 
 
-def check_ec2_public_ips(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_ec2_public_ips(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """EC2 instances with public IPv4 addresses should be inventoried.
 
     A public IP on an EC2 instance is not necessarily wrong, but it should be
@@ -204,15 +196,17 @@ def check_ec2_public_ips(
     try:
         ec2 = client.client("ec2")
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="ec2-public-ips",
-            title="Unable to check EC2 public IPs",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.COMPUTE,
-            resource_type="AWS::EC2::Instance",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="ec2-public-ips",
+                title="Unable to check EC2 public IPs",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.COMPUTE,
+                resource_type="AWS::EC2::Instance",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     instances = _list_running_instances(ec2)
     if not instances:
@@ -227,11 +221,7 @@ def check_ec2_public_ips(
                     "instance_id": inst.get("InstanceId", "unknown"),
                     "public_ip": public_ip,
                     "name": next(
-                        (
-                            t["Value"]
-                            for t in (inst.get("Tags") or [])
-                            if t.get("Key") == "Name"
-                        ),
+                        (t["Value"] for t in (inst.get("Tags") or []) if t.get("Key") == "Name"),
                         "",
                     ),
                 }
@@ -295,15 +285,17 @@ def check_ec2_instance_profile_attached(
     try:
         ec2 = client.client("ec2")
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="ec2-instance-profile",
-            title="Unable to check EC2 instance profiles",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.IAM,
-            resource_type="AWS::EC2::Instance",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="ec2-instance-profile",
+                title="Unable to check EC2 instance profiles",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.IAM,
+                resource_type="AWS::EC2::Instance",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     instances = _list_running_instances(ec2)
     if not instances:
@@ -359,9 +351,7 @@ def check_ec2_instance_profile_attached(
     ]
 
 
-def check_ami_age(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_ami_age(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """EC2 instances should run on AMIs younger than the threshold (default 90 days).
 
     Stale AMIs accumulate unpatched CVEs. The right pattern is rebuilding the
@@ -370,15 +360,17 @@ def check_ami_age(
     try:
         ec2 = client.client("ec2")
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="ec2-ami-age",
-            title="Unable to check AMI age",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.COMPUTE,
-            resource_type="AWS::EC2::Image",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="ec2-ami-age",
+                title="Unable to check AMI age",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.COMPUTE,
+                resource_type="AWS::EC2::Image",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     instances = _list_running_instances(ec2)
     if not instances:
@@ -393,17 +385,19 @@ def check_ami_age(
         ami_resp = ec2.describe_images(ImageIds=list(ami_ids))
         amis = {a["ImageId"]: a for a in ami_resp.get("Images", [])}
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="ec2-ami-age",
-            title="Unable to check AMI age",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.COMPUTE,
-            resource_type="AWS::EC2::Image",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="ec2-ami-age",
+                title="Unable to check AMI age",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.COMPUTE,
+                resource_type="AWS::EC2::Image",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
-    threshold = datetime.now(timezone.utc) - timedelta(days=AMI_AGE_DAYS_THRESHOLD)
+    threshold = datetime.now(UTC) - timedelta(days=AMI_AGE_DAYS_THRESHOLD)
     stale_amis: list[dict] = []
     for ami_id, ami in amis.items():
         creation = ami.get("CreationDate")
@@ -419,11 +413,13 @@ def check_ami_age(
                     "ami_id": ami_id,
                     "name": ami.get("Name", ""),
                     "created": creation,
-                    "age_days": (datetime.now(timezone.utc) - created).days,
+                    "age_days": (datetime.now(UTC) - created).days,
                 }
             )
 
-    instances_on_stale = sum(1 for i in instances if i.get("ImageId") in {a["ami_id"] for a in stale_amis})
+    instances_on_stale = sum(
+        1 for i in instances if i.get("ImageId") in {a["ami_id"] for a in stale_amis}
+    )
 
     if not stale_amis:
         return [
@@ -491,9 +487,7 @@ def _list_eks_clusters(client: AWSClient) -> list[dict]:
         return []
 
 
-def check_eks_private_endpoint(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_eks_private_endpoint(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """[CIS AWS 5.4.x] EKS API server endpoint should be private (or at least restricted).
 
     A public EKS API endpoint is reachable from anywhere on the internet. Even
@@ -561,9 +555,7 @@ def check_eks_private_endpoint(
     return findings
 
 
-def check_eks_audit_logging(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_eks_audit_logging(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """[CIS AWS 5.4.x] EKS control plane logging should include audit + authenticator.
 
     Without these log types, you cannot reconstruct who did what in the cluster
@@ -571,7 +563,7 @@ def check_eks_audit_logging(
     controllerManager / scheduler — all five are recommended for SOC 2.
     """
     findings: list[Finding] = []
-    REQUIRED = {"api", "audit", "authenticator"}
+    required = {"api", "audit", "authenticator"}
 
     for cluster in _list_eks_clusters(client):
         name = cluster.get("name", "unknown")
@@ -582,7 +574,7 @@ def check_eks_audit_logging(
             if entry.get("enabled"):
                 enabled_types.update(entry.get("types", []))
 
-        missing = REQUIRED - enabled_types
+        missing = required - enabled_types
         if not missing:
             findings.append(
                 Finding(
@@ -634,9 +626,7 @@ def check_eks_audit_logging(
     return findings
 
 
-def check_eks_secrets_encryption(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_eks_secrets_encryption(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """[CIS AWS 5.4.x] EKS clusters should encrypt Kubernetes secrets with KMS.
 
     By default, Kubernetes secrets are stored base64-encoded (not encrypted) in
@@ -648,9 +638,7 @@ def check_eks_secrets_encryption(
         name = cluster.get("name", "unknown")
         arn = cluster.get("arn", "")
         encryption_config = cluster.get("encryptionConfig") or []
-        secrets_encrypted = any(
-            "secrets" in (e.get("resources") or []) for e in encryption_config
-        )
+        secrets_encrypted = any("secrets" in (e.get("resources") or []) for e in encryption_config)
 
         if secrets_encrypted:
             findings.append(
@@ -724,9 +712,7 @@ def _list_ecs_task_definitions(client: AWSClient) -> list[dict]:
         return []
 
 
-def check_ecs_task_privileged(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_ecs_task_privileged(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """[CIS AWS 5.x] ECS task definitions should not run containers in privileged mode.
 
     Privileged containers can access the host kernel, mount filesystems, and
@@ -796,9 +782,7 @@ def check_ecs_task_privileged(
     ]
 
 
-def check_ecs_task_root_user(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_ecs_task_root_user(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """[CIS AWS 5.x] ECS task definitions should not run containers as root (uid 0).
 
     Containers running as root that are exploited give the attacker root inside
@@ -815,7 +799,7 @@ def check_ecs_task_root_user(
         for cd in td.get("containerDefinitions", []) or []:
             user = cd.get("user", "")
             # Empty string means root by default
-            is_root = (user == "" or user == "root" or user == "0" or user.startswith("0:"))
+            is_root = user == "" or user == "root" or user == "0" or user.startswith("0:")
             if is_root:
                 root_running.append(
                     {

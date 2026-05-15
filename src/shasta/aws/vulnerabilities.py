@@ -26,10 +26,10 @@ def run_all_vulnerability_checks(client: AWSClient) -> list[Finding]:
         regions = [region]
 
     # Multi-region rollup
-    enabled_regions, disabled_regions = _inspector_status_per_region(
-        client, account_id, regions
+    enabled_regions, disabled_regions = _inspector_status_per_region(client, account_id, regions)
+    findings.extend(
+        _inspector_enable_findings(account_id, region, enabled_regions, disabled_regions)
     )
-    findings.extend(_inspector_enable_findings(account_id, region, enabled_regions, disabled_regions))
 
     # Per-region findings — only query regions where Inspector is enabled
     for r in sorted(enabled_regions.keys()):

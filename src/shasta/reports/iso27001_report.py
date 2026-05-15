@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from shasta.compliance.iso27001_mapper import get_iso27001_control_summary
@@ -36,7 +36,7 @@ def save_iso27001_markdown_report(
     lines = [
         "# ISO 27001:2022 Gap Analysis Report",
         "",
-        f"**Generated:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
+        f"**Generated:** {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}",
         f"**{labels['account_label']}:** {scan.account_id}",
         f"**Region:** {scan.region}",
         "",

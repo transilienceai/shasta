@@ -70,16 +70,18 @@ def check_management_group_hierarchy(
                     mcsb_controls=["GS-1"],
                 )
             ]
-        return [Finding.not_assessed(
-            check_id="azure-management-group-hierarchy",
-            title="Unable to check management group hierarchy",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.MONITORING,
-            resource_type="Azure::Management::Group",
-            account_id=subscription_id,
-            region=region,
-            cloud_provider=CloudProvider.AZURE,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="azure-management-group-hierarchy",
+                title="Unable to check management group hierarchy",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.MONITORING,
+                resource_type="Azure::Management::Group",
+                account_id=subscription_id,
+                region=region,
+                cloud_provider=CloudProvider.AZURE,
+            )
+        ]
 
     # Tenant Root group is always present; we want at least one child group too
     non_root = [g for g in groups if (g.name or "") != (g.tenant_id or "")]
@@ -142,16 +144,18 @@ def check_security_initiative_assigned(
         policy = client.mgmt_client(PolicyClient)
         assignments = list(policy.policy_assignments.list())
     except Exception as e:
-        return [Finding.not_assessed(
-            check_id="azure-security-initiative",
-            title="Unable to check security initiative assignments",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.MONITORING,
-            resource_type="Azure::Policy::Assignment",
-            account_id=subscription_id,
-            region=region,
-            cloud_provider=CloudProvider.AZURE,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="azure-security-initiative",
+                title="Unable to check security initiative assignments",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.MONITORING,
+                resource_type="Azure::Policy::Assignment",
+                account_id=subscription_id,
+                region=region,
+                cloud_provider=CloudProvider.AZURE,
+            )
+        ]
 
     initiative_names = [a.display_name or "" for a in assignments]
     matched = [n for n in initiative_names if any(e in n for e in EXPECTED_INITIATIVE_NAMES)]
@@ -218,16 +222,18 @@ def check_critical_resource_locks(
         from azure.mgmt.resource import ResourceManagementClient
         from azure.mgmt.resource.locks import ManagementLockClient
     except ImportError:
-        return [Finding.not_assessed(
-            check_id="azure-resource-locks",
-            title="Unable to check resource locks (SDK not installed)",
-            description="azure-mgmt-resource package not installed.",
-            domain=CheckDomain.MONITORING,
-            resource_type="Azure::Authorization::Lock",
-            account_id=subscription_id,
-            region=region,
-            cloud_provider=CloudProvider.AZURE,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="azure-resource-locks",
+                title="Unable to check resource locks (SDK not installed)",
+                description="azure-mgmt-resource package not installed.",
+                domain=CheckDomain.MONITORING,
+                resource_type="Azure::Authorization::Lock",
+                account_id=subscription_id,
+                region=region,
+                cloud_provider=CloudProvider.AZURE,
+            )
+        ]
 
     rm = client.mgmt_client(ResourceManagementClient)
     locks_client = client.mgmt_client(ManagementLockClient)
@@ -321,16 +327,18 @@ def check_required_tags(client: AzureClient, subscription_id: str, region: str) 
         rm = client.mgmt_client(ResourceManagementClient)
         groups = list(rm.resource_groups.list())
     except Exception as e:
-        return [Finding.not_assessed(
-            check_id="azure-required-tags",
-            title="Unable to check resource group tags",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.MONITORING,
-            resource_type="Azure::Resources::ResourceGroup",
-            account_id=subscription_id,
-            region=region,
-            cloud_provider=CloudProvider.AZURE,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="azure-required-tags",
+                title="Unable to check resource group tags",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.MONITORING,
+                resource_type="Azure::Resources::ResourceGroup",
+                account_id=subscription_id,
+                region=region,
+                cloud_provider=CloudProvider.AZURE,
+            )
+        ]
 
     required = {"owner", "environment"}
     untagged: list[str] = []

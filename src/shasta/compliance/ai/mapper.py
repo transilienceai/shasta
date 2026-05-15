@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from shasta.evidence.models import Finding
 from shasta.compliance.ai.eu_ai_act import (
     EU_AI_ACT_OBLIGATIONS,
     get_eu_ai_act_obligations_for_check,
@@ -31,6 +30,7 @@ from shasta.compliance.ai.owasp_llm_top10 import (
     OWASP_LLM_TOP10,
     get_owasp_llm_risks_for_check,
 )
+from shasta.evidence.models import Finding
 
 
 def enrich_findings_with_ai_controls(findings: list[Finding]) -> list[Finding]:

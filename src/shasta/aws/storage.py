@@ -63,15 +63,17 @@ def check_s3_object_ownership_enforced(
         if code == "OwnershipControlsNotFoundError":
             ownership = "ObjectWriter"  # Legacy default
         else:
-            return [Finding.not_assessed(
-                check_id="s3-object-ownership",
-                title=f"Unable to check S3 bucket '{bucket_name}' object ownership",
-                description=f"API call failed: {e}",
-                domain=CheckDomain.STORAGE,
-                resource_type="AWS::S3::Bucket",
-                account_id=account_id,
-                region=region,
-            )]
+            return [
+                Finding.not_assessed(
+                    check_id="s3-object-ownership",
+                    title=f"Unable to check S3 bucket '{bucket_name}' object ownership",
+                    description=f"API call failed: {e}",
+                    domain=CheckDomain.STORAGE,
+                    resource_type="AWS::S3::Bucket",
+                    account_id=account_id,
+                    region=region,
+                )
+            ]
 
     if ownership == "BucketOwnerEnforced":
         return [
@@ -131,15 +133,17 @@ def check_s3_access_logging(
         resp = s3.get_bucket_logging(Bucket=bucket_name)
         logging_enabled = resp.get("LoggingEnabled")
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="s3-access-logging",
-            title=f"Unable to check S3 bucket '{bucket_name}' access logging",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.LOGGING,
-            resource_type="AWS::S3::Bucket",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="s3-access-logging",
+                title=f"Unable to check S3 bucket '{bucket_name}' access logging",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.LOGGING,
+                resource_type="AWS::S3::Bucket",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     if logging_enabled and logging_enabled.get("TargetBucket"):
         target = logging_enabled.get("TargetBucket")
@@ -178,8 +182,8 @@ def check_s3_access_logging(
             remediation=(
                 "Create a dedicated log destination bucket with Object Lock + lifecycle rules, "
                 f"then aws s3api put-bucket-logging --bucket {bucket_name} --bucket-logging-status "
-                "'{\"LoggingEnabled\":{\"TargetBucket\":\"<log-bucket>\",\"TargetPrefix\":"
-                f"\"{bucket_name}/\"}}'"
+                '\'{"LoggingEnabled":{"TargetBucket":"<log-bucket>","TargetPrefix":'
+                f'"{bucket_name}/"}}\''
             ),
             soc2_controls=["CC7.1"],
             cis_aws_controls=["2.x"],
@@ -222,15 +226,17 @@ def check_s3_kms_cmk_encryption(
         algo = sse_default.get("SSEAlgorithm", "")
         kms_key = sse_default.get("KMSMasterKeyID", "")
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="s3-kms-cmk",
-            title=f"Unable to check S3 bucket '{bucket_name}' KMS CMK encryption",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.ENCRYPTION,
-            resource_type="AWS::S3::Bucket",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="s3-kms-cmk",
+                title=f"Unable to check S3 bucket '{bucket_name}' KMS CMK encryption",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.ENCRYPTION,
+                resource_type="AWS::S3::Bucket",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     if algo == "aws:kms" and kms_key and "alias/aws/s3" not in kms_key:
         return [
@@ -270,8 +276,8 @@ def check_s3_kms_cmk_encryption(
                 "Create a customer-managed KMS key with rotation enabled, then "
                 f"aws s3api put-bucket-encryption --bucket {bucket_name} "
                 "--server-side-encryption-configuration "
-                "'{\"Rules\":[{\"ApplyServerSideEncryptionByDefault\":"
-                "{\"SSEAlgorithm\":\"aws:kms\",\"KMSMasterKeyID\":\"<key-arn>\"}}]}'"
+                '\'{"Rules":[{"ApplyServerSideEncryptionByDefault":'
+                '{"SSEAlgorithm":"aws:kms","KMSMasterKeyID":"<key-arn>"}}]}\''
             ),
             soc2_controls=["CC6.7"],
             cis_aws_controls=["2.x"],
@@ -329,15 +335,17 @@ def check_s3_encryption(s3: Any, bucket_name: str, account_id: str, region: str)
                     details={"bucket": bucket_name, "encryption": None},
                 )
             ]
-        return [Finding.not_assessed(
-            check_id="s3-encryption-at-rest",
-            title=f"Unable to check S3 bucket '{bucket_name}' encryption",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.STORAGE,
-            resource_type="AWS::S3::Bucket",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="s3-encryption-at-rest",
+                title=f"Unable to check S3 bucket '{bucket_name}' encryption",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.STORAGE,
+                resource_type="AWS::S3::Bucket",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     return []
 
@@ -384,15 +392,17 @@ def check_s3_versioning(s3: Any, bucket_name: str, account_id: str, region: str)
                 )
             ]
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="s3-versioning",
-            title=f"Unable to check S3 bucket '{bucket_name}' versioning",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.STORAGE,
-            resource_type="AWS::S3::Bucket",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="s3-versioning",
+                title=f"Unable to check S3 bucket '{bucket_name}' versioning",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.STORAGE,
+                resource_type="AWS::S3::Bucket",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
 
 def check_s3_public_access_block(
@@ -475,15 +485,17 @@ def check_s3_public_access_block(
                     details={"bucket": bucket_name, "public_access_block": None},
                 )
             ]
-        return [Finding.not_assessed(
-            check_id="s3-public-access-block",
-            title=f"Unable to check S3 bucket '{bucket_name}' public access block",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.STORAGE,
-            resource_type="AWS::S3::Bucket",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="s3-public-access-block",
+                title=f"Unable to check S3 bucket '{bucket_name}' public access block",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.STORAGE,
+                resource_type="AWS::S3::Bucket",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
 
 def check_s3_ssl_only(s3: Any, bucket_name: str, account_id: str, region: str) -> list[Finding]:
@@ -560,12 +572,14 @@ def check_s3_ssl_only(s3: Any, bucket_name: str, account_id: str, region: str) -
                     details={"bucket": bucket_name, "ssl_enforced": False, "policy_exists": False},
                 )
             ]
-        return [Finding.not_assessed(
-            check_id="s3-ssl-only",
-            title=f"Unable to check S3 bucket '{bucket_name}' SSL enforcement",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.STORAGE,
-            resource_type="AWS::S3::Bucket",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="s3-ssl-only",
+                title=f"Unable to check S3 bucket '{bucket_name}' SSL enforcement",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.STORAGE,
+                resource_type="AWS::S3::Bucket",
+                account_id=account_id,
+                region=region,
+            )
+        ]

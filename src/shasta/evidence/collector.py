@@ -13,7 +13,7 @@ Each evidence artifact is timestamped and stored in the database + as JSON files
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -80,7 +80,7 @@ def collect_all_evidence(
     manifest = {
         "scan_id": scan_id,
         "account_id": account_id,
-        "collected_at": datetime.now(timezone.utc).isoformat(),
+        "collected_at": datetime.now(UTC).isoformat(),
         "artifacts": [str(f.name) for f in saved_files],
     }
     manifest_path = scan_dir / "manifest.json"

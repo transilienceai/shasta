@@ -7,8 +7,6 @@ attachment, logging, throttling, mTLS; Step Functions logging.
 
 from __future__ import annotations
 
-from typing import Any
-
 from botocore.exceptions import ClientError
 
 from shasta.aws.client import AWSClient
@@ -18,7 +16,6 @@ from shasta.evidence.models import (
     Finding,
     Severity,
 )
-
 
 # Lambda runtimes that AWS has marked deprecated. Updated for 2026.
 DEPRECATED_LAMBDA_RUNTIMES = {
@@ -98,19 +95,20 @@ def check_lambda_function_url_auth(
     costs). This is one of the most common new misconfigurations in AWS as
     of 2026.
     """
-    findings: list[Finding] = []
     try:
         lam = client.client("lambda")
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="lambda-function-url-auth",
-            title="Unable to check Lambda Function URL auth",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.IAM,
-            resource_type="AWS::Lambda::Url",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="lambda-function-url-auth",
+                title="Unable to check Lambda Function URL auth",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.IAM,
+                resource_type="AWS::Lambda::Url",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     fns = _lambda_functions(client)
     if not fns:
@@ -189,9 +187,7 @@ def check_lambda_function_url_auth(
     ]
 
 
-def check_lambda_layer_origin(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_lambda_layer_origin(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """Lambda layers should come from your own account, not foreign accounts.
 
     Lambda layers can be sourced from any AWS account that grants you
@@ -199,7 +195,6 @@ def check_lambda_layer_origin(
     chain risk: the layer publisher can ship arbitrary code that runs in
     your function's execution context.
     """
-    findings: list[Finding] = []
     fns = _lambda_functions(client)
     if not fns:
         return []
@@ -286,20 +281,21 @@ def check_apigw_client_certificate(
     request originated from your API Gateway, not from someone who guessed
     the backend URL.
     """
-    findings: list[Finding] = []
     try:
         apigw = client.client("apigateway")
         apis = apigw.get_rest_apis().get("items", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="apigw-client-cert",
-            title="Unable to check API Gateway client certificates",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.IAM,
-            resource_type="AWS::ApiGateway::Stage",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="apigw-client-cert",
+                title="Unable to check API Gateway client certificates",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.IAM,
+                resource_type="AWS::ApiGateway::Stage",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     if not apis:
         return []
@@ -374,20 +370,21 @@ def check_apigw_authorizer_required(
     Methods with AuthorizationType=NONE are publicly callable. This is the
     AWS equivalent of Azure App Service Easy Auth being disabled.
     """
-    findings: list[Finding] = []
     try:
         apigw = client.client("apigateway")
         apis = apigw.get_rest_apis().get("items", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="apigw-authorizer",
-            title="Unable to check API Gateway authorizers",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.IAM,
-            resource_type="AWS::ApiGateway::Method",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="apigw-authorizer",
+                title="Unable to check API Gateway authorizers",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.IAM,
+                resource_type="AWS::ApiGateway::Method",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     if not apis:
         return []
@@ -463,24 +460,23 @@ def check_apigw_authorizer_required(
     ]
 
 
-def check_apigw_throttling(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_apigw_throttling(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """API Gateway stages should have throttling configured to prevent abuse / cost overruns."""
-    findings: list[Finding] = []
     try:
         apigw = client.client("apigateway")
         apis = apigw.get_rest_apis().get("items", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="apigw-throttling",
-            title="Unable to check API Gateway throttling",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.NETWORKING,
-            resource_type="AWS::ApiGateway::Stage",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="apigw-throttling",
+                title="Unable to check API Gateway throttling",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.NETWORKING,
+                resource_type="AWS::ApiGateway::Stage",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     if not apis:
         return []
@@ -559,20 +555,21 @@ def check_apigw_request_validation(
     Lambda — wasting compute and exposing the backend to fuzz inputs.
     Validation rejects bad requests at the edge.
     """
-    findings: list[Finding] = []
     try:
         apigw = client.client("apigateway")
         apis = apigw.get_rest_apis().get("items", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="apigw-request-validation",
-            title="Unable to check API Gateway request validation",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.NETWORKING,
-            resource_type="AWS::ApiGateway::RestApi",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="apigw-request-validation",
+                title="Unable to check API Gateway request validation",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.NETWORKING,
+                resource_type="AWS::ApiGateway::RestApi",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     if not apis:
         return []
@@ -653,7 +650,6 @@ def _lambda_functions(client: AWSClient) -> list[dict]:
 
 def check_lambda_runtime_eol(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """[CIS AWS] Lambda functions on deprecated runtimes are unmaintained."""
-    findings: list[Finding] = []
     fns = _lambda_functions(client)
     if not fns:
         return []
@@ -714,7 +710,6 @@ def check_lambda_runtime_eol(client: AWSClient, account_id: str, region: str) ->
 
 def check_lambda_env_encryption(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """Lambda env vars should be encrypted with a customer-managed KMS key."""
-    findings: list[Finding] = []
     fns = _lambda_functions(client)
     no_cmk: list[str] = []
     has_cmk = 0
@@ -778,7 +773,6 @@ def check_lambda_env_encryption(client: AWSClient, account_id: str, region: str)
 
 def check_lambda_dead_letter(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """Async Lambda invocations should have a dead-letter queue or destination."""
-    findings: list[Finding] = []
     fns = _lambda_functions(client)
     no_dlq: list[str] = []
     for f in fns:
@@ -832,7 +826,6 @@ def check_lambda_dead_letter(client: AWSClient, account_id: str, region: str) ->
 
 def check_lambda_code_signing(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """Lambda functions should require code signing for supply-chain integrity."""
-    findings: list[Finding] = []
     fns = _lambda_functions(client)
     if not fns:
         return []
@@ -896,15 +889,17 @@ def check_apigw_logging(client: AWSClient, account_id: str, region: str) -> list
         apigw = client.client("apigateway")
         apis = apigw.get_rest_apis().get("items", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="apigw-logging",
-            title="Unable to check API Gateway logging",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.LOGGING,
-            resource_type="AWS::ApiGateway::Stage",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="apigw-logging",
+                title="Unable to check API Gateway logging",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.LOGGING,
+                resource_type="AWS::ApiGateway::Stage",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     for api in apis:
         api_id = api.get("id", "")
@@ -966,20 +961,21 @@ def check_apigw_logging(client: AWSClient, account_id: str, region: str) -> list
 
 def check_apigw_waf(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """[CIS AWS] Public API Gateway stages should have AWS WAF associated."""
-    findings: list[Finding] = []
     try:
         apigw = client.client("apigateway")
         apis = apigw.get_rest_apis().get("items", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="apigw-waf",
-            title="Unable to check API Gateway WAF",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.NETWORKING,
-            resource_type="AWS::ApiGateway::Stage",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="apigw-waf",
+                title="Unable to check API Gateway WAF",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.NETWORKING,
+                resource_type="AWS::ApiGateway::Stage",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     if not apis:
         return []
@@ -1052,20 +1048,21 @@ def check_apigw_waf(client: AWSClient, account_id: str, region: str) -> list[Fin
 
 def check_stepfunctions_logging(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """Step Functions state machines should have execution history logging enabled."""
-    findings: list[Finding] = []
     try:
         sfn = client.client("stepfunctions")
         machines = sfn.list_state_machines().get("stateMachines", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="sfn-logging",
-            title="Unable to check Step Functions logging",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.LOGGING,
-            resource_type="AWS::StepFunctions::StateMachine",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="sfn-logging",
+                title="Unable to check Step Functions logging",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.LOGGING,
+                resource_type="AWS::StepFunctions::StateMachine",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     if not machines:
         return []

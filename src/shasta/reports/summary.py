@@ -8,7 +8,6 @@ provides a compact summary while preserving full detail in the saved scan.
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any
 
 from shasta.evidence.models import Finding, ScanResult
 

@@ -8,7 +8,7 @@ Covers:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from shasta.aws.client import AWSClient
@@ -224,7 +224,7 @@ def check_root_account_activity(iam: Any, account_id: str, region: str) -> list[
     if not root_entry:
         return findings
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     threshold = now - timedelta(days=ROOT_RECENT_USE_DAYS)
 
     last_activity: datetime | None = None
@@ -394,7 +394,7 @@ def check_access_key_rotation(iam: Any, account_id: str, region: str) -> list[Fi
     """CC6.3 — Check that access keys are rotated within the threshold."""
     findings = []
     users = _get_all_users(iam)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     for user in users:
         username = user["UserName"]
@@ -460,22 +460,24 @@ def check_access_key_rotation(iam: Any, account_id: str, region: str) -> list[Fi
 def check_inactive_users(iam: Any, account_id: str, region: str) -> list[Finding]:
     """CC6.3 — Check for users who haven't been active recently."""
     findings = []
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     threshold = now - timedelta(days=INACTIVE_USER_DAYS)
 
     try:
         _generate_credential_report(iam)
         report = _parse_credential_report(iam)
     except Exception as e:
-        return [Finding.not_assessed(
-            check_id="iam-inactive-user",
-            title="Unable to check inactive users",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.IAM,
-            resource_type="AWS::IAM::User",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="iam-inactive-user",
+                title="Unable to check inactive users",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.IAM,
+                resource_type="AWS::IAM::User",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     for entry in report:
         if entry["user"] == "<root_account>":
@@ -699,9 +701,7 @@ def _parse_credential_report(iam: Any) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def check_iam_policy_wildcards(
-    iam: Any, account_id: str, region: str
-) -> list[Finding]:
+def check_iam_policy_wildcards(iam: Any, account_id: str, region: str) -> list[Finding]:
     """[CIS AWS 1.16] Customer-managed IAM policies should not grant Action='*' on Resource='*'.
 
     Mirrors Azure's check_custom_role_wildcards. A customer-managed policy
@@ -717,15 +717,17 @@ def check_iam_policy_wildcards(
         for page in paginator.paginate(Scope="Local", OnlyAttached=False):
             custom_policies.extend(page.get("Policies", []))
     except Exception as e:
-        return [Finding.not_assessed(
-            check_id="iam-policy-wildcards",
-            title="Unable to check IAM policy wildcards",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.IAM,
-            resource_type="AWS::IAM::ManagedPolicy",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="iam-policy-wildcards",
+                title="Unable to check IAM policy wildcards",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.IAM,
+                resource_type="AWS::IAM::ManagedPolicy",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     if not custom_policies:
         return []
@@ -823,9 +825,7 @@ def check_iam_policy_wildcards(
     ]
 
 
-def check_iam_role_trust_external_account(
-    iam: Any, account_id: str, region: str
-) -> list[Finding]:
+def check_iam_role_trust_external_account(iam: Any, account_id: str, region: str) -> list[Finding]:
     """IAM roles trusting external AWS accounts should require an ExternalId condition.
 
     The "confused deputy" attack: a third-party SaaS holds an IAM role that
@@ -842,15 +842,17 @@ def check_iam_role_trust_external_account(
         for page in paginator.paginate():
             roles.extend(page.get("Roles", []))
     except Exception as e:
-        return [Finding.not_assessed(
-            check_id="iam-role-trust-external",
-            title="Unable to check IAM role trust policies",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.IAM,
-            resource_type="AWS::IAM::Role",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="iam-role-trust-external",
+                title="Unable to check IAM role trust policies",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.IAM,
+                resource_type="AWS::IAM::Role",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     if not roles:
         return []
@@ -891,12 +893,8 @@ def check_iam_role_trust_external_account(
                 continue
             cond = stmt.get("Condition", {}) or {}
             has_external_id = (
-                "StringEquals" in cond
-                and "sts:ExternalId" in cond.get("StringEquals", {})
-            ) or (
-                "StringLike" in cond
-                and "sts:ExternalId" in cond.get("StringLike", {})
-            )
+                "StringEquals" in cond and "sts:ExternalId" in cond.get("StringEquals", {})
+            ) or ("StringLike" in cond and "sts:ExternalId" in cond.get("StringLike", {}))
             if not has_external_id:
                 offenders.append(
                     {
@@ -959,9 +957,7 @@ def check_iam_role_trust_external_account(
 UNUSED_ROLE_DAYS_THRESHOLD = 90
 
 
-def check_iam_unused_roles(
-    iam: Any, account_id: str, region: str
-) -> list[Finding]:
+def check_iam_unused_roles(iam: Any, account_id: str, region: str) -> list[Finding]:
     """IAM roles with no LastUsedDate (or LastUsedDate >90 days) are stale.
 
     Mirrors check_inactive_users but for roles. Stale roles accumulate
@@ -974,20 +970,22 @@ def check_iam_unused_roles(
         for page in paginator.paginate():
             roles.extend(page.get("Roles", []))
     except Exception as e:
-        return [Finding.not_assessed(
-            check_id="iam-unused-roles",
-            title="Unable to check unused IAM roles",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.IAM,
-            resource_type="AWS::IAM::Role",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="iam-unused-roles",
+                title="Unable to check unused IAM roles",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.IAM,
+                resource_type="AWS::IAM::Role",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     if not roles:
         return []
 
-    threshold = datetime.now(timezone.utc) - timedelta(days=UNUSED_ROLE_DAYS_THRESHOLD)
+    threshold = datetime.now(UTC) - timedelta(days=UNUSED_ROLE_DAYS_THRESHOLD)
     stale: list[dict] = []
     for role in roles:
         path = role.get("Path", "/")
@@ -1000,7 +998,7 @@ def check_iam_unused_roles(
         last_used_info = detail.get("RoleLastUsed", {}) or {}
         last_used = last_used_info.get("LastUsedDate")
         created = role.get("CreateDate")
-        if created and (datetime.now(timezone.utc) - created).days < UNUSED_ROLE_DAYS_THRESHOLD:
+        if created and (datetime.now(UTC) - created).days < UNUSED_ROLE_DAYS_THRESHOLD:
             continue
         if last_used is None:
             stale.append(
@@ -1012,7 +1010,7 @@ def check_iam_unused_roles(
                 }
             )
         elif last_used < threshold:
-            days_ago = (datetime.now(timezone.utc) - last_used).days
+            days_ago = (datetime.now(UTC) - last_used).days
             stale.append(
                 {
                     "role_name": role.get("RoleName"),

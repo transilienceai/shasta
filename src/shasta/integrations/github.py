@@ -11,8 +11,7 @@ Checks repository security settings that auditors care about:
 from __future__ import annotations
 
 import json
-from typing import Any
-from urllib import request, error
+from urllib import error, request
 
 from shasta.evidence.models import CheckDomain, ComplianceStatus, Finding, Severity
 

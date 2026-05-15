@@ -3,9 +3,9 @@
 from shasta.compliance.ai.owasp_agentic import (
     OWASP_AGENTIC_TOP10,
     OWASPAgenticRisk,
+    get_automated_owasp_agentic_risks,
     get_owasp_agentic_risk,
     get_owasp_agentic_risks_for_check,
-    get_automated_owasp_agentic_risks,
 )
 
 

@@ -16,10 +16,10 @@ is handled by HR/training, A.7 (physical) is N/A.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 
-class ISO27001Theme(str, Enum):
+class ISO27001Theme(StrEnum):
     """ISO 27001:2022 control themes."""
 
     ORGANIZATIONAL = "Organizational"

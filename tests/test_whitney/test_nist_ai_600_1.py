@@ -25,9 +25,7 @@ class TestNISTAI6001Risks:
     def test_all_risks_have_rmf_crosswalk(self):
         """Every 600-1 risk should reference parent RMF categories."""
         for risk_id, risk in NIST_AI_600_1_RISKS.items():
-            assert risk.nist_rmf_crosswalk, (
-                f"{risk_id} has no NIST RMF crosswalk references"
-            )
+            assert risk.nist_rmf_crosswalk, f"{risk_id} has no NIST RMF crosswalk references"
 
 
 class TestGetNISTAI6001Risk:

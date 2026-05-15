@@ -3,7 +3,6 @@
 from shasta.evidence.models import (
     CheckDomain,
     ComplianceStatus,
-    Evidence,
     Finding,
     ScanResult,
     ScanSummary,

@@ -3,11 +3,11 @@
 from shasta.compliance.ai.mitre_atlas import (
     ATLAS_TECHNIQUES,
     ATLASTechnique,
+    get_atlas_tactics,
     get_atlas_technique,
+    get_atlas_techniques_by_tactic,
     get_atlas_techniques_for_check,
     get_automated_atlas_techniques,
-    get_atlas_techniques_by_tactic,
-    get_atlas_tactics,
 )
 
 

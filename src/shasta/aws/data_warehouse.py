@@ -9,8 +9,6 @@ audit findings.
 
 from __future__ import annotations
 
-from typing import Any
-
 from botocore.exceptions import ClientError
 
 from shasta.aws.client import AWSClient
@@ -20,7 +18,6 @@ from shasta.evidence.models import (
     Finding,
     Severity,
 )
-
 
 # Regional. Iterates client.get_enabled_regions() per Engineering Principle #3.
 IS_GLOBAL = False
@@ -71,9 +68,7 @@ def _redshift_clusters(client: AWSClient) -> list[dict]:
         return []
 
 
-def check_redshift_encryption(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_redshift_encryption(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """Redshift clusters must be encrypted at rest."""
     findings: list[Finding] = []
     for cluster in _redshift_clusters(client):
@@ -127,9 +122,7 @@ def check_redshift_encryption(
     return findings
 
 
-def check_redshift_public_access(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_redshift_public_access(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """Redshift clusters should not be publicly accessible."""
     findings: list[Finding] = []
     for cluster in _redshift_clusters(client):
@@ -182,23 +175,23 @@ def check_redshift_public_access(
     return findings
 
 
-def check_redshift_audit_logging(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_redshift_audit_logging(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """Redshift clusters should have audit logging enabled."""
     findings: list[Finding] = []
     try:
         rs = client.client("redshift")
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="redshift-audit-logging",
-            title="Unable to check Redshift audit logging",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.LOGGING,
-            resource_type="AWS::Redshift::Cluster",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="redshift-audit-logging",
+                title="Unable to check Redshift audit logging",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.LOGGING,
+                resource_type="AWS::Redshift::Cluster",
+                account_id=account_id,
+                region=region,
+            )
+        ]
     for cluster in _redshift_clusters(client):
         cid = cluster.get("ClusterIdentifier", "unknown")
         arn = f"arn:aws:redshift:{region}:{account_id}:cluster:{cid}"
@@ -255,23 +248,23 @@ def check_redshift_audit_logging(
     return findings
 
 
-def check_redshift_require_ssl(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_redshift_require_ssl(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """Redshift cluster parameter group should set require_ssl=true."""
     findings: list[Finding] = []
     try:
         rs = client.client("redshift")
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="redshift-require-ssl",
-            title="Unable to check Redshift SSL requirement",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.ENCRYPTION,
-            resource_type="AWS::Redshift::Cluster",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="redshift-require-ssl",
+                title="Unable to check Redshift SSL requirement",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.ENCRYPTION,
+                resource_type="AWS::Redshift::Cluster",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     for cluster in _redshift_clusters(client):
         cid = cluster.get("ClusterIdentifier", "unknown")
@@ -285,7 +278,9 @@ def check_redshift_require_ssl(
             try:
                 params_resp = rs.describe_cluster_parameters(ParameterGroupName=pg_name)
                 for param in params_resp.get("Parameters", []):
-                    if param.get("ParameterName") == "require_ssl" and param.get("ParameterValue") in ("true", "1"):
+                    if param.get("ParameterName") == "require_ssl" and param.get(
+                        "ParameterValue"
+                    ) in ("true", "1"):
                         require_ssl_set = True
                         break
             except ClientError:
@@ -465,9 +460,7 @@ def check_elasticache_encryption_at_rest(
     return findings
 
 
-def check_elasticache_auth_token(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_elasticache_auth_token(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """[CIS AWS] ElastiCache Redis with transit encryption should also have AUTH token enabled."""
     findings: list[Finding] = []
     for rg in _elasticache_clusters(client):
@@ -529,23 +522,23 @@ def check_elasticache_auth_token(
 # ---------------------------------------------------------------------------
 
 
-def check_neptune_encryption(
-    client: AWSClient, account_id: str, region: str
-) -> list[Finding]:
+def check_neptune_encryption(client: AWSClient, account_id: str, region: str) -> list[Finding]:
     """Neptune clusters must be encrypted at rest."""
     try:
         neptune = client.client("neptune")
         clusters = neptune.describe_db_clusters().get("DBClusters", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="neptune-encryption",
-            title="Unable to check Neptune encryption",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.ENCRYPTION,
-            resource_type="AWS::Neptune::DBCluster",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="neptune-encryption",
+                title="Unable to check Neptune encryption",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.ENCRYPTION,
+                resource_type="AWS::Neptune::DBCluster",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     findings: list[Finding] = []
     for cluster in clusters:

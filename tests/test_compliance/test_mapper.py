@@ -1,15 +1,13 @@
 """Tests for SOC 2 mapper (enrich_findings_with_controls and get_control_summary)."""
 
-import pytest
-
-from shasta.compliance.mapper import enrich_findings_with_controls, get_control_summary
 from shasta.compliance.framework import SOC2_CONTROLS
+from shasta.compliance.mapper import enrich_findings_with_controls, get_control_summary
 from shasta.evidence.models import (
-    Finding,
     CheckDomain,
-    ComplianceStatus,
-    Severity,
     CloudProvider,
+    ComplianceStatus,
+    Finding,
+    Severity,
 )
 
 

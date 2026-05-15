@@ -20,7 +20,6 @@ from shasta.evidence.models import (
     Severity,
 )
 
-
 # Services that strongly benefit from a VPC endpoint when used from inside a VPC.
 # Maps endpoint service-name suffix to (display name, severity).
 EXPECTED_VPC_ENDPOINTS = {
@@ -67,15 +66,17 @@ def _check_region(client: AWSClient, account_id: str, region: str) -> list[Findi
         vpcs = ec2.describe_vpcs().get("Vpcs", [])
         endpoints = ec2.describe_vpc_endpoints().get("VpcEndpoints", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="aws-vpc-endpoints",
-            title="Unable to check VPC endpoints",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.NETWORKING,
-            resource_type="AWS::EC2::VPC",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="aws-vpc-endpoints",
+                title="Unable to check VPC endpoints",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.NETWORKING,
+                resource_type="AWS::EC2::VPC",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     if not vpcs:
         return []

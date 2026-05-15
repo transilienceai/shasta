@@ -10,9 +10,6 @@ per Engineering Principle #3.
 
 from __future__ import annotations
 
-from typing import Any
-
-from shasta.gcp.client import GCPClient
 from shasta.evidence.models import (
     CheckDomain,
     CloudProvider,
@@ -20,6 +17,7 @@ from shasta.evidence.models import (
     Finding,
     Severity,
 )
+from shasta.gcp.client import GCPClient
 
 IS_GLOBAL = False  # Compute instance and GKE cluster checks are per-region
 
@@ -42,7 +40,11 @@ def run_all_gcp_compute_checks(client: GCPClient) -> list[Finding]:
     for region in client.get_enabled_regions():
         regional_client = client.for_region(region)
         findings.extend(check_instance_no_external_ip(regional_client, project_id, region))
-        findings.extend(check_instance_no_default_service_account_full_scope(regional_client, project_id, region))
+        findings.extend(
+            check_instance_no_default_service_account_full_scope(
+                regional_client, project_id, region
+            )
+        )
         findings.extend(check_instance_shielded_vm(regional_client, project_id, region))
         findings.extend(check_gke_private_cluster(regional_client, project_id, region))
         findings.extend(check_gke_workload_identity(regional_client, project_id, region))
@@ -52,9 +54,7 @@ def run_all_gcp_compute_checks(client: GCPClient) -> list[Finding]:
     return findings
 
 
-def check_os_login_project_enabled(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_os_login_project_enabled(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 4.4] OS Login should be enabled at the project level.
 
     OS Login ties SSH access to Google Account credentials and supports
@@ -139,9 +139,7 @@ def check_os_login_project_enabled(
     ]
 
 
-def check_serial_port_disabled_project(
-    client: GCPClient, project_id: str
-) -> list[Finding]:
+def check_serial_port_disabled_project(client: GCPClient, project_id: str) -> list[Finding]:
     """[CIS 4.5] Serial port access should be disabled at the project level.
 
     The serial console provides interactive access to a VM without SSH and bypasses
@@ -219,9 +217,7 @@ def check_serial_port_disabled_project(
     ]
 
 
-def check_instance_no_external_ip(
-    client: GCPClient, project_id: str, region: str
-) -> list[Finding]:
+def check_instance_no_external_ip(client: GCPClient, project_id: str, region: str) -> list[Finding]:
     """[CIS 4.6] Compute Engine instances should not have external IP addresses.
 
     Instances with public IPs are directly reachable from the internet. Use
@@ -336,8 +332,8 @@ def check_instance_no_default_service_account_full_scope(
     This violates least privilege and means any code running on the instance has
     full GCP project control.
     """
-    FULL_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
-    DEFAULT_SA_SUFFIX = "-compute@developer.gserviceaccount.com"
+    full_scope = "https://www.googleapis.com/auth/cloud-platform"
+    default_sa_suffix = "-compute@developer.gserviceaccount.com"
 
     try:
         compute = client.service("compute", "v1")
@@ -377,8 +373,8 @@ def check_instance_no_default_service_account_full_scope(
         for sa in inst.get("serviceAccounts", []):
             email = sa.get("email", "")
             scopes = sa.get("scopes", [])
-            is_default = email.endswith(DEFAULT_SA_SUFFIX)
-            has_full_scope = FULL_SCOPE in scopes
+            is_default = email.endswith(default_sa_suffix)
+            has_full_scope = full_scope in scopes
             if is_default and has_full_scope:
                 offenders.append(
                     {
@@ -439,9 +435,7 @@ def check_instance_no_default_service_account_full_scope(
     ]
 
 
-def check_instance_shielded_vm(
-    client: GCPClient, project_id: str, region: str
-) -> list[Finding]:
+def check_instance_shielded_vm(client: GCPClient, project_id: str, region: str) -> list[Finding]:
     """[CIS 4.8] Compute instances should have Shielded VM enabled.
 
     Shielded VM provides verifiable integrity of Compute Engine VM instances using
@@ -544,9 +538,7 @@ def check_instance_shielded_vm(
     ]
 
 
-def check_gke_private_cluster(
-    client: GCPClient, project_id: str, region: str
-) -> list[Finding]:
+def check_gke_private_cluster(client: GCPClient, project_id: str, region: str) -> list[Finding]:
     """[CIS 7.1] GKE clusters should use private nodes (no public IP on nodes).
 
     Private clusters ensure worker nodes have no external IP addresses, preventing
@@ -635,9 +627,7 @@ def check_gke_private_cluster(
     ]
 
 
-def check_gke_workload_identity(
-    client: GCPClient, project_id: str, region: str
-) -> list[Finding]:
+def check_gke_workload_identity(client: GCPClient, project_id: str, region: str) -> list[Finding]:
     """[CIS 7.4] GKE clusters should use Workload Identity for GCP API access.
 
     Without Workload Identity, pods must use mounted service account key files or
@@ -729,9 +719,7 @@ def check_gke_workload_identity(
     ]
 
 
-def check_gke_network_policy(
-    client: GCPClient, project_id: str, region: str
-) -> list[Finding]:
+def check_gke_network_policy(client: GCPClient, project_id: str, region: str) -> list[Finding]:
     """[CIS 7.5] GKE clusters should have a Network Policy enabled.
 
     Without a network policy, all pods can communicate with all other pods across
@@ -827,9 +815,7 @@ def check_gke_network_policy(
     ]
 
 
-def check_gke_node_auto_upgrade(
-    client: GCPClient, project_id: str, region: str
-) -> list[Finding]:
+def check_gke_node_auto_upgrade(client: GCPClient, project_id: str, region: str) -> list[Finding]:
     """GKE node pools should have automatic node upgrades enabled.
 
     Auto-upgrade keeps node pools on the latest patched Kubernetes minor version,

@@ -10,10 +10,9 @@ CIS GCP v2.0 Section 1 (Identity and Access Management).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from shasta.gcp.client import GCPClient
 from shasta.evidence.models import (
     CheckDomain,
     CloudProvider,
@@ -21,6 +20,7 @@ from shasta.evidence.models import (
     Finding,
     Severity,
 )
+from shasta.gcp.client import GCPClient
 
 IS_GLOBAL = True  # IAM is project-level — no per-region iteration
 
@@ -97,7 +97,7 @@ def check_service_account_key_rotation(
             )
         ]
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     threshold = now - timedelta(days=SA_KEY_MAX_AGE_DAYS)
     stale: list[dict[str, Any]] = []
     access_errors: list[dict[str, str]] = []
@@ -479,7 +479,7 @@ def check_iam_service_account_token_creator(
     resource-level bindings, not at the project level — regardless of principal type.
     A compromised service account holder has the same blast radius as a compromised user.
     """
-    IMPERSONATION_ROLES = {
+    impersonation_roles = {
         "roles/iam.serviceAccountTokenCreator",
         "roles/iam.serviceAccountUser",
     }
@@ -505,7 +505,7 @@ def check_iam_service_account_token_creator(
     offenders: list[dict[str, Any]] = []
     for binding in bindings:
         role = binding.get("role", "")
-        if role not in IMPERSONATION_ROLES:
+        if role not in impersonation_roles:
             continue
         members = binding.get("members", [])
         if members:

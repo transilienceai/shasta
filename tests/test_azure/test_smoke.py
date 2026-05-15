@@ -20,7 +20,6 @@ import pytest
 
 from shasta.evidence.models import CheckDomain, CloudProvider, Finding, Severity
 
-
 AZURE_MODULES = [
     "shasta.azure.iam",
     "shasta.azure.storage",

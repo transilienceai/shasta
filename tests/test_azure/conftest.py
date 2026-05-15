@@ -6,7 +6,7 @@ so that Azure check modules can be tested without hitting Azure APIs.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, PropertyMock
+from unittest.mock import MagicMock
 
 import pytest
 

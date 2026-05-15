@@ -7,8 +7,7 @@ via incoming webhooks. No external dependencies — uses urllib.
 from __future__ import annotations
 
 import json
-from typing import Any
-from urllib import request, error
+from urllib import error, request
 
 from shasta.compliance.scorer import ComplianceScore
 from shasta.evidence.models import Finding, ScanResult
@@ -47,7 +46,7 @@ class SlackClient:
         blocks = [
             {
                 "type": "header",
-                "text": {"type": "plain_text", "text": f"Shasta Compliance Scan Complete"},
+                "text": {"type": "plain_text", "text": "Shasta Compliance Scan Complete"},
             },
             {
                 "type": "section",

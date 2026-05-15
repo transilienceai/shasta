@@ -682,7 +682,6 @@ def check_azure_openai_abuse_monitoring(
         # It can only be disabled via an approved exception.
         # We check the API properties for dynamic_throttling_enabled
         # as a proxy for whether the account has standard safeguards.
-        props = account.properties
         # Abuse monitoring opt-out would show in restricted_access_uri or similar;
         # since it's on by default and requires MS approval to disable, we PASS
         # but note if the account has any unusual config.
@@ -1461,7 +1460,7 @@ def check_azure_ai_search_auth(client: AzureClient, sub_id: str, region: str) ->
 
     findings: list[Finding] = []
     for svc in services:
-        auth_options = getattr(svc, "auth_options", None)
+        getattr(svc, "auth_options", None)
         disable_local_auth = getattr(svc, "disable_local_auth", False)
 
         if disable_local_auth:

@@ -13,13 +13,10 @@ scanning and threat advisory.
 from __future__ import annotations
 
 import json
-import zipfile
-import io
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 from botocore.exceptions import ClientError
 
@@ -123,7 +120,7 @@ def discover_sbom(client: AWSClient) -> SBOMReport:
 
     report = SBOMReport(
         account_id=account_id,
-        generated_at=datetime.now(timezone.utc).isoformat(),
+        generated_at=datetime.now(UTC).isoformat(),
     )
 
     # Discover from Lambda
@@ -195,7 +192,7 @@ def _discover_lambda_dependencies(client: AWSClient) -> list[Dependency]:
                 # Try to get function code metadata for package detection
                 try:
                     config = lam.get_function(FunctionName=func_name)
-                    code_size = config.get("Configuration", {}).get("CodeSize", 0)
+                    config.get("Configuration", {}).get("CodeSize", 0)
                     # If code is small enough, we could download and scan
                     # For now, record the function's environment vars for framework detection
                     env_vars = (

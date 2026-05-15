@@ -194,15 +194,17 @@ def check_tag_policy(client: AWSClient, account_id: str, region: str) -> list[Fi
     try:
         policies = org.list_policies(Filter="TAG_POLICY").get("Policies", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="aws-tag-policy",
-            title="Unable to check tag policies",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.MONITORING,
-            resource_type="AWS::Organizations::Policy",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="aws-tag-policy",
+                title="Unable to check tag policies",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.MONITORING,
+                resource_type="AWS::Organizations::Policy",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     if policies:
         return [
@@ -254,15 +256,17 @@ def check_backup_policy(client: AWSClient, account_id: str, region: str) -> list
     try:
         policies = org.list_policies(Filter="BACKUP_POLICY").get("Policies", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="aws-backup-policy",
-            title="Unable to check org-level backup policies",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.LOGGING,
-            resource_type="AWS::Organizations::Policy",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="aws-backup-policy",
+                title="Unable to check org-level backup policies",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.LOGGING,
+                resource_type="AWS::Organizations::Policy",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     if policies:
         return [
@@ -315,15 +319,17 @@ def check_delegated_admin(client: AWSClient, account_id: str, region: str) -> li
     try:
         delegated = org.list_delegated_administrators().get("DelegatedAdministrators", [])
     except ClientError as e:
-        return [Finding.not_assessed(
-            check_id="aws-delegated-admin",
-            title="Unable to check delegated administrators",
-            description=f"API call failed: {e}",
-            domain=CheckDomain.IAM,
-            resource_type="AWS::Organizations::DelegatedAdministrator",
-            account_id=account_id,
-            region=region,
-        )]
+        return [
+            Finding.not_assessed(
+                check_id="aws-delegated-admin",
+                title="Unable to check delegated administrators",
+                description=f"API call failed: {e}",
+                domain=CheckDomain.IAM,
+                resource_type="AWS::Organizations::DelegatedAdministrator",
+                account_id=account_id,
+                region=region,
+            )
+        ]
 
     if delegated:
         return [

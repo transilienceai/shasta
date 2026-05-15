@@ -22,7 +22,6 @@ from shasta.evidence.models import (
     Severity,
 )
 
-
 GCP_MODULES = [
     "shasta.gcp.iam",
     "shasta.gcp.networking",

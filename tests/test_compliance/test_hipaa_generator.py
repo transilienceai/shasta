@@ -64,8 +64,6 @@ def test_list_hipaa_policies_shape():
 
 
 def test_generate_all_writes_six_files(tmp_path):
-    paths = generate_all_hipaa_policies(
-        company_name="Testaco Health", output_path=tmp_path
-    )
+    paths = generate_all_hipaa_policies(company_name="Testaco Health", output_path=tmp_path)
     assert len(paths) == 6
     assert all(p.exists() and p.stat().st_size > 0 for p in paths)
