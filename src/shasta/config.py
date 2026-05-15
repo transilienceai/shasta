@@ -25,6 +25,8 @@ _AZURE_REGION_PATTERN = re.compile(r"^[a-z]+[a-z0-9]*$")
 _UUID_PATTERN = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
 )
+# GCP project ID: 6-30 chars, lowercase letter start, letters/digits/hyphens, no trailing hyphen
+_GCP_PROJECT_ID_PATTERN = re.compile(r"^[a-z][a-z0-9-]{4,28}[a-z0-9]$")
 
 
 class ShastaConfig(BaseModel):
@@ -35,6 +37,8 @@ class ShastaConfig(BaseModel):
     azure_subscription_id: str = ""
     azure_tenant_id: str = ""
     azure_region: str = ""
+    gcp_project_id: str = ""
+    gcp_region: str = ""
     python_cmd: str = ""
     company_name: str = ""
     github_repos: list[str] = []
@@ -60,6 +64,16 @@ class ShastaConfig(BaseModel):
             raise ValueError(
                 f"azure_tenant_id must be a UUID (got '{v}'). "
                 "Run 'az account show' to find your tenant ID."
+            )
+        return v
+
+    @field_validator("gcp_project_id")
+    @classmethod
+    def validate_gcp_project_id(cls, v: str) -> str:
+        if v and not _GCP_PROJECT_ID_PATTERN.match(v):
+            raise ValueError(
+                f"gcp_project_id must be a valid GCP project ID (got '{v}'). "
+                "Run 'gcloud config get-value project' to find your project ID."
             )
         return v
 
@@ -117,6 +131,8 @@ def load_config() -> dict[str, Any]:
         "azure_subscription_id": "",
         "azure_tenant_id": "",
         "azure_region": "",
+        "gcp_project_id": "",
+        "gcp_region": "",
         "python_cmd": _detect_python_cmd(),
         "company_name": "",
         "github_repos": [],
@@ -199,3 +215,13 @@ def get_azure_client():
         tenant_id=tenant_id,
         region=region,
     )
+
+
+def get_gcp_client():
+    """Convenience: create a GCPClient from config."""
+    from shasta.gcp.client import GCPClient
+
+    cfg = load_config()
+    project_id = cfg.get("gcp_project_id") or None
+    region = cfg.get("gcp_region") or None
+    return GCPClient(project_id=project_id, region=region)
