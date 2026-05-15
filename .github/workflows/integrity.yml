@@ -39,10 +39,19 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install package + dev extras
+      - name: Install system dependencies for pycairo / weasyprint
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcairo2-dev pkg-config python3-dev
+
+      - name: Install package + all extras
+        # Install every optional extra so the full suite can exercise Azure,
+        # GCP, and voice tests without ModuleNotFoundError. The smoke jobs
+        # also need this because pytest collection imports test files, and
+        # voice/azure/gcp tests import their respective SDKs at module scope.
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install -e ".[dev,azure,gcp,voice]"
 
       - name: Doc-vs-code drift integrity tests
         # The single most load-bearing test in the repo. Catches the
@@ -86,10 +95,19 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install package + dev extras
+      - name: Install system dependencies for pycairo / weasyprint
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcairo2-dev pkg-config python3-dev
+
+      - name: Install package + all extras
+        # Install every optional extra so the full suite can exercise Azure,
+        # GCP, and voice tests without ModuleNotFoundError. The smoke jobs
+        # also need this because pytest collection imports test files, and
+        # voice/azure/gcp tests import their respective SDKs at module scope.
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install -e ".[dev,azure,gcp,voice]"
 
       - name: Run full pytest suite
         run: pytest -q --ignore=tests/integration

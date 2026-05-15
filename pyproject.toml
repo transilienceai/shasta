@@ -107,3 +107,9 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
+# E501 (line-too-long) is delegated to `ruff format`. The formatter respects
+# the 100-char limit where it can and leaves long string literals / f-strings
+# intact rather than fragmenting them. Linting the same rule produces noise on
+# strings the formatter chose not to break, so we ignore it here and let the
+# formatter own line-length policy.
+ignore = ["E501"]
